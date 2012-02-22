@@ -9,7 +9,7 @@
 #
 
 GIT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
-# GIT_COMPAT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/compat.git"
+GIT_COMPAT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/compat.git"
 
 FILES="scripts/checkout_files"
 SRC=${SRC:-'.'}
@@ -186,21 +186,21 @@ else
 	echo "You said to use git tree at: $GIT_TREE for linux-next"
 fi
 
-# if [ -z $GIT_COMPAT_TREE ]; then
-# 	GIT_COMPAT_TREE="/home/$USER/compat/"
-# 	if [ ! -d $GIT_COMPAT_TREE ]; then
-# 		echo "Please tell me where your compat git tree is."
-# 		echo "You can do this by exporting its location as follows:"
-# 		echo
-# 		echo "  export GIT_COMPAT_TREE=/home/$USER/compat/"
-# 		echo
-# 		echo "If you do not have one you can clone the repository:"
-# 		echo "  git clone $GIT_COMPAT_URL"
-# 		exit 1
-# 	fi
-# else
-# 	echo "You said to use git tree at: $GIT_COMPAT_TREE for compat"
-# fi
+if [ -z $GIT_COMPAT_TREE ]; then
+	GIT_COMPAT_TREE="/home/$USER/compat/"
+	if [ ! -d $GIT_COMPAT_TREE ]; then
+		echo "Please tell me where your compat git tree is."
+		echo "You can do this by exporting its location as follows:"
+		echo
+		echo "  export GIT_COMPAT_TREE=/home/$USER/compat/"
+		echo
+		echo "If you do not have one you can clone the repository:"
+		echo "  git clone $GIT_COMPAT_URL"
+		exit 1
+	fi
+else
+	echo "You said to use git tree at: $GIT_COMPAT_TREE for compat"
+fi
 
 # Drivers that have their own directory
 
@@ -225,18 +225,15 @@ fi
 # Compat stuff
 COMPAT="compat"
 mkdir -p $COMPAT include/{linux,net,scsi}
-### echo "Copying $GIT_COMPAT_TREE/ files..."
-### cp $GIT_COMPAT_TREE/compat/*.c $COMPAT/
-### cp $GIT_COMPAT_TREE/compat/Makefile $COMPAT/
-### cp -a $GIT_COMPAT_TREE/udev/ .
-### cp -a $GIT_COMPAT_TREE/scripts/ $COMPAT/
-### cp -a $GIT_COMPAT_TREE/include/linux/* include/linux/
-### cp -a $GIT_COMPAT_TREE/include/net/* include/net/
-### cp -a $GIT_COMPAT_TREE/include/scsi/* include/scsi/
-### rm -f $COMPAT/*.mod.c
-cp -a $COMPAT/include/linux/* include/linux/
-cp -a $COMPAT/include/net/* include/net/
-cp -a $COMPAT/include/scsi/* include/scsi/
+echo "Copying $GIT_COMPAT_TREE/ files..."
+cp $GIT_COMPAT_TREE/compat/*.c $COMPAT/
+cp $GIT_COMPAT_TREE/compat/Makefile $COMPAT/
+cp -a $GIT_COMPAT_TREE/udev/ .
+cp -a $GIT_COMPAT_TREE/scripts/ $COMPAT/
+cp -a $GIT_COMPAT_TREE/include/linux/* include/linux/
+cp -a $GIT_COMPAT_TREE/include/net/* include/net/
+cp -a $GIT_COMPAT_TREE/include/scsi/* include/scsi/
+rm -f $COMPAT/*.mod.c
 
 # Stable pending, if -n was passed
 if [[ "$GET_STABLE_PENDING" = y ]]; then
