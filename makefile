@@ -15,6 +15,11 @@ include ./config.mk
 export CREL=$(shell cat $(CWD)/compat_version)
 export CREL_PRE:=.compat_autoconf_
 export CREL_CHECK:=$(CREL_PRE)$(CREL)
+CFLAGS += \
+	-DCOMPAT_BASE_TREE="\"$(shell cat compat_base_tree)\"" \
+	-DCOMPAT_BASE_TREE_VERSION="\"$(shell cat compat_base_tree_version)\"" \
+	-DCOMPAT_PROJECT="\"Compat-rdma\"" \
+	-DCOMPAT_VERSION="\"$(shell cat compat_version)\"" \
 
 DEPMOD  = /sbin/depmod
 INSTALL_MOD_DIR ?= $(shell test -f /etc/redhat-release && echo extra/ofa_kernel || echo updates)
@@ -111,14 +116,11 @@ kernel:
 		CONFIG_NFSD_RDMA=$(CONFIG_NFSD_RDMA) \
 		LINUXINCLUDE=' \
 		-D__OFED_BUILD__ \
-		-DCOMPAT_BASE_TREE="\"$(shell cat compat_base_tree)\"" \
-        	-DCOMPAT_BASE_TREE_VERSION="\"$(shell cat compat_base_tree_version)\"" \
-        	-DCOMPAT_PROJECT="\"Compat-rdma\"" \
-        	-DCOMPAT_VERSION="\"$(shell cat compat_version)\"" \
+		$(CFLAGS) \
 		-include $(autoconf_h) \
 		-include $(CWD)/include/linux/autoconf.h \
 		$(KCONFIG_H) \
-		-include ../include/linux/compat-2.6.h \
+		-include $(CWD)/include/linux/compat-2.6.h \
 		$(BACKPORT_INCLUDES) \
 		$(KERNEL_MEMTRACK_CFLAGS) \
 		$(KERNEL_NFS_FS_CFLAGS) \
