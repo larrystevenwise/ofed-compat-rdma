@@ -371,7 +371,7 @@ done
 
 DIR="$PWD"
 cd $GIT_TREE
-GIT_DESCRIBE=$(git describe)
+GIT_DESCRIBE=$($DIR/scripts/setlocalversion $GIT_TREE)
 GIT_BRANCH=$(git branch --no-color |sed -n 's/^\* //p')
 GIT_BRANCH=${GIT_BRANCH:-master}
 GIT_REMOTE=$(git config branch.${GIT_BRANCH}.remote)
@@ -383,9 +383,9 @@ echo -e "Origin remote URL: ${CYAN}${GIT_REMOTE_URL}${NORMAL}"
 cd $DIR
 if [ -d ./.git ]; then
 	if [[ ${POSTFIX_RELEASE_TAG} != "" ]]; then
-		echo -e "$(git describe)-${POSTFIX_RELEASE_TAG}" > compat_version
+		echo -e "$(./scripts/setlocalversion)-${POSTFIX_RELEASE_TAG}" > compat_version
 	else
-		echo -e "$(git describe)" > compat_version
+		echo -e "$(./scripts/setlocalversion)" > compat_version
 	fi
 
 	cd $GIT_TREE
