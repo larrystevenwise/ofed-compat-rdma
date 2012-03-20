@@ -56,7 +56,7 @@ do
 		ex "" chmod -R u+rw .pc
 		ex "" chmod -R o+r .pc
 	fi
-	ex "" rm -fr .git
+	ex "" rm -fr .git .gitignore
 	ex "" git init-db
 	ex "" git add .
 	ex "" git commit -s -m\"${project}-${backport}: Initial commit based on $project git: $version\"
