@@ -41,8 +41,8 @@ all: kernel
 install: install_kernel
 install_kernel: install_modules
 
-autoconf_h=$(shell /bin/ls -1 $(KSRC)/include/*/autoconf.h | head -1)
-kconfig_h=$(shell /bin/ls -1 $(KSRC)/include/*/kconfig.h | head -1)
+autoconf_h=$(shell /bin/ls -1 $(KSRC)/include/*/autoconf.h 2> /dev/null | head -1)
+kconfig_h=$(shell /bin/ls -1 $(KSRC)/include/*/kconfig.h 2> /dev/null | head -1)
 
 ifneq ($(kconfig_h),)
 KCONFIG_H = -include $(kconfig_h)
