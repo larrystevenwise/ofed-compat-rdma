@@ -1,0 +1,332 @@
+From 9e60fe057cb38b467dfbac003175644519920cac Mon Sep 17 00:00:00 2001
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Date: Fri, 23 Mar 2012 21:21:06 +0200
+Subject: [PATCH] ib/core: Add RHEL6.2 backports
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ include/rdma/ib_addr.h                |    1 +
+ drivers/infiniband/core/addr.c        |   42 ++++++++++++++++----------------
+ drivers/infiniband/core/mad.c         |   19 ++++++++++++--
+ drivers/infiniband/core/netlink.c     |   10 ++++---
+ drivers/infiniband/core/sysfs.c       |    1 -
+ drivers/infiniband/core/ucm.c         |   13 ++++++----
+ drivers/infiniband/core/user_mad.c    |    9 ++++--
+ drivers/infiniband/core/uverbs_main.c |    9 ++++--
+ 8 files changed, 64 insertions(+), 40 deletions(-)
+
+diff --git a/include/rdma/ib_addr.h b/include/rdma/ib_addr.h
+index 639a449..a040c9c 100644
+--- a/include/rdma/ib_addr.h
++++ b/include/rdma/ib_addr.h
+@@ -40,6 +40,7 @@
+ #include <linux/netdevice.h>
+ #include <linux/socket.h>
+ #include <linux/if_vlan.h>
++#include <linux/rtnetlink.h>
+ #include <rdma/ib_verbs.h>
+ #include <rdma/ib_pack.h>
+
+diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
+index e9cf51b..f72272c 100644
+--- a/drivers/infiniband/core/addr.c
++++ b/drivers/infiniband/core/addr.c
+@@ -186,22 +186,22 @@ static int addr4_resolve(struct sockaddr_in *src_in,
+ 	__be32 dst_ip = dst_in->sin_addr.s_addr;
+ 	struct rtable *rt;
+ 	struct neighbour *neigh;
+-	struct flowi4 fl4;
++	struct flowi fl;
+ 	int ret;
+ 
+-	memset(&fl4, 0, sizeof(fl4));
+-	fl4.daddr = dst_ip;
+-	fl4.saddr = src_ip;
+-	fl4.flowi4_oif = addr->bound_dev_if;
+-	rt = ip_route_output_key(&init_net, &fl4);
++	memset(&fl, 0, sizeof(fl));
++	fl.nl_u.ip4_u.daddr = dst_ip;
++	fl.nl_u.ip4_u.saddr = src_ip;
++	fl.oif = addr->bound_dev_if;
++	ret = ip_route_output_key(&init_net, &rt, &fl);
+ 	if (IS_ERR(rt)) {
+ 		ret = PTR_ERR(rt);
+ 		goto out;
+ 	}
+ 	src_in->sin_family = AF_INET;
+-	src_in->sin_addr.s_addr = fl4.saddr;
++	src_in->sin_addr.s_addr = src_ip;
+ 
+-	if (rt->dst.dev->flags & IFF_LOOPBACK) {
++	if (rt->idev->dev->flags & IFF_LOOPBACK) {
+ 		ret = rdma_translate_ip((struct sockaddr *) dst_in, addr);
+ 		if (!ret)
+ 			memcpy(addr->dst_dev_addr, addr->src_dev_addr, MAX_ADDR_LEN);
+@@ -209,15 +209,15 @@ static int addr4_resolve(struct sockaddr_in *src_in,
+ 	}
+ 
+ 	/* If the device does ARP internally, return 'done' */
+-	if (rt->dst.dev->flags & IFF_NOARP) {
+-		ret = rdma_copy_addr(addr, rt->dst.dev, NULL);
++	if (rt->idev->dev->flags & IFF_NOARP) {
++		ret = rdma_copy_addr(addr, rt->idev->dev, NULL);
+ 		goto put;
+ 	}
+ 
+-	neigh = neigh_lookup(&arp_tbl, &rt->rt_gateway, rt->dst.dev);
++	neigh = neigh_lookup(&arp_tbl, &rt->rt_gateway, rt->idev->dev);
+ 	if (!neigh || !(neigh->nud_state & NUD_VALID)) {
+ 		rcu_read_lock();
+-		neigh_event_send(dst_get_neighbour(&rt->dst), NULL);
++		neigh_event_send(rt->u.dst.neighbour, NULL);
+ 		rcu_read_unlock();
+ 		ret = -ENODATA;
+ 		if (neigh)
+@@ -239,28 +239,28 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
+ 			 struct sockaddr_in6 *dst_in,
+ 			 struct rdma_dev_addr *addr)
+ {
+-	struct flowi6 fl6;
++	struct flowi fl;
+ 	struct neighbour *neigh;
+ 	struct dst_entry *dst;
+ 	int ret;
+ 
+-	memset(&fl6, 0, sizeof fl6);
+-	ipv6_addr_copy(&fl6.daddr, &dst_in->sin6_addr);
+-	ipv6_addr_copy(&fl6.saddr, &src_in->sin6_addr);
+-	fl6.flowi6_oif = addr->bound_dev_if;
++	memset(&fl, 0, sizeof fl);
++	ipv6_addr_copy(&fl.fl6_dst, &dst_in->sin6_addr);
++	ipv6_addr_copy(&fl.fl6_src, &src_in->sin6_addr);
++	fl.oif = addr->bound_dev_if;
+ 
+-	dst = ip6_route_output(&init_net, NULL, &fl6);
++	dst = ip6_route_output(&init_net, NULL, &fl);
+ 	if ((ret = dst->error))
+ 		goto put;
+ 
+-	if (ipv6_addr_any(&fl6.saddr)) {
++	if (ipv6_addr_any(&fl.fl6_src)) {
+ 		ret = ipv6_dev_get_saddr(&init_net, ip6_dst_idev(dst)->dev,
+-					 &fl6.daddr, 0, &fl6.saddr);
++					 &fl.fl6_dst, 0, &fl.fl6_src);
+ 		if (ret)
+ 			goto put;
+ 
+ 		src_in->sin6_family = AF_INET6;
+-		ipv6_addr_copy(&src_in->sin6_addr, &fl6.saddr);
++		ipv6_addr_copy(&src_in->sin6_addr, &fl.fl6_src);
+ 	}
+ 
+ 	if (dst->dev->flags & IFF_LOOPBACK) {
+diff --git a/drivers/infiniband/core/mad.c b/drivers/infiniband/core/mad.c
+index 2fe428b..a8a769d 100644
+--- a/drivers/infiniband/core/mad.c
++++ b/drivers/infiniband/core/mad.c
+@@ -1200,7 +1200,10 @@ static int method_in_use(struct ib_mad_mgmt_method_table **method,
+ {
+ 	int i;
+ 
+-	for_each_set_bit(i, mad_reg_req->method_mask, IB_MGMT_MAX_METHODS) {
++	for (i = find_first_bit(mad_reg_req->method_mask, IB_MGMT_MAX_METHODS);
++	     i < IB_MGMT_MAX_METHODS;
++	     i = find_next_bit(mad_reg_req->method_mask, IB_MGMT_MAX_METHODS,
++			       1+i)) {
+ 		if ((*method)->agent[i]) {
+ 			printk(KERN_ERR PFX "Method %d already in use\n", i);
+ 			return -EINVAL;
+@@ -1334,8 +1337,13 @@ static int add_nonoui_reg_req(struct ib_mad_reg_req *mad_reg_req,
+ 		goto error3;
+ 
+ 	/* Finally, add in methods being registered */
+-	for_each_set_bit(i, mad_reg_req->method_mask, IB_MGMT_MAX_METHODS)
++	for (i = find_first_bit(mad_reg_req->method_mask,
++				IB_MGMT_MAX_METHODS);
++	     i < IB_MGMT_MAX_METHODS;
++	     i = find_next_bit(mad_reg_req->method_mask, IB_MGMT_MAX_METHODS,
++			       1+i)) {
+ 		(*method)->agent[i] = agent_priv;
++	}
+ 
+ 	return 0;
+ 
+@@ -1429,8 +1437,13 @@ check_in_use:
+ 		goto error4;
+ 
+ 	/* Finally, add in methods being registered */
+-	for_each_set_bit(i, mad_reg_req->method_mask, IB_MGMT_MAX_METHODS)
++	for (i = find_first_bit(mad_reg_req->method_mask,
++				IB_MGMT_MAX_METHODS);
++	     i < IB_MGMT_MAX_METHODS;
++	     i = find_next_bit(mad_reg_req->method_mask, IB_MGMT_MAX_METHODS,
++			       1+i)) {
+ 		(*method)->agent[i] = agent_priv;
++	}
+ 
+ 	return 0;
+ 
+diff --git a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
+index d1c8196..3e62f8b 100644
+--- a/drivers/infiniband/core/netlink.c
++++ b/drivers/infiniband/core/netlink.c
+@@ -30,7 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifndef pr_fmt
+ #define pr_fmt(fmt) "%s:%s: " fmt, KBUILD_MODNAME, __func__
++#endif
+ 
+ #include <linux/export.h>
+ #include <net/netlink.h>
+@@ -67,7 +69,7 @@ int ibnl_add_client(int index, int nops,
+ 
+ 	list_for_each_entry(cur, &client_list, list) {
+ 		if (cur->index == index) {
+-			pr_warn("Client for %d already exists\n", index);
++			printk("Client for %d already exists\n", index);
+ 			mutex_unlock(&ibnl_mutex);
+ 			kfree(nl_client);
+ 			return -EINVAL;
+@@ -95,7 +97,7 @@ int ibnl_remove_client(int index)
+ 			return 0;
+ 		}
+ 	}
+-	pr_warn("Can't remove callback for client idx %d. Not found\n", index);
++	printk("Can't remove callback for client idx %d. Not found\n", index);
+ 	mutex_unlock(&ibnl_mutex);
+ 
+ 	return -EINVAL;
+@@ -149,7 +151,7 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
+ 				return -EINVAL;
+ 			return netlink_dump_start(nls, skb, nlh,
+ 						  client->cb_table[op].dump,
+-						  NULL, 0);
++						  NULL);
+ 		}
+ 	}
+ 
+@@ -169,7 +171,7 @@ int __init ibnl_init(void)
+ 	nls = netlink_kernel_create(&init_net, NETLINK_RDMA, 0, ibnl_rcv,
+ 				    NULL, THIS_MODULE);
+ 	if (!nls) {
+-		pr_warn("Failed to create netlink socket\n");
++		printk("Failed to create netlink socket\n");
+ 		return -ENOMEM;
+ 	}
+ 
+diff --git a/drivers/infiniband/core/sysfs.c b/drivers/infiniband/core/sysfs.c
+index c61bca3..2b4d2fc 100644
+--- a/drivers/infiniband/core/sysfs.c
++++ b/drivers/infiniband/core/sysfs.c
+@@ -495,7 +495,6 @@ alloc_group_attrs(ssize_t (*show)(struct ib_port *,
+ 		element->attr.attr.mode  = S_IRUGO;
+ 		element->attr.show       = show;
+ 		element->index		 = i;
+-		sysfs_attr_init(&element->attr.attr);
+ 
+ 		tab_attr[i] = &element->attr.attr;
+ 	}
+diff --git a/drivers/infiniband/core/ucm.c b/drivers/infiniband/core/ucm.c
+index b8a0b4a..d249a44 100644
+--- a/drivers/infiniband/core/ucm.c
++++ b/drivers/infiniband/core/ucm.c
+@@ -1333,8 +1333,11 @@ static void ib_ucm_remove_one(struct ib_device *device)
+ 	device_unregister(&ucm_dev->dev);
+ }
+ 
+-static CLASS_ATTR_STRING(abi_version, S_IRUGO,
+-			 __stringify(IB_USER_CM_ABI_VERSION));
++static ssize_t show_abi_version(struct class *class, char *buf)
++{
++	return sprintf(buf, "%d\n", IB_USER_CM_ABI_VERSION);
++}
++static CLASS_ATTR(abi_version, S_IRUGO, show_abi_version, NULL);
+ 
+ static int __init ib_ucm_init(void)
+ {
+@@ -1347,7 +1350,7 @@ static int __init ib_ucm_init(void)
+ 		goto error1;
+ 	}
+ 
+-	ret = class_create_file(&cm_class, &class_attr_abi_version.attr);
++	ret = class_create_file(&cm_class, &class_attr_abi_version);
+ 	if (ret) {
+ 		printk(KERN_ERR "ucm: couldn't create abi_version attribute\n");
+ 		goto error2;
+@@ -1361,7 +1364,7 @@ static int __init ib_ucm_init(void)
+ 	return 0;
+ 
+ error3:
+-	class_remove_file(&cm_class, &class_attr_abi_version.attr);
++	class_remove_file(&cm_class, &class_attr_abi_version);
+ error2:
+ 	unregister_chrdev_region(IB_UCM_BASE_DEV, IB_UCM_MAX_DEVICES);
+ error1:
+@@ -1371,7 +1374,7 @@ error1:
+ static void __exit ib_ucm_cleanup(void)
+ {
+ 	ib_unregister_client(&ucm_client);
+-	class_remove_file(&cm_class, &class_attr_abi_version.attr);
++	class_remove_file(&cm_class, &class_attr_abi_version);
+ 	unregister_chrdev_region(IB_UCM_BASE_DEV, IB_UCM_MAX_DEVICES);
+ 	if (overflow_maj)
+ 		unregister_chrdev_region(overflow_maj, IB_UCM_MAX_DEVICES);
+diff --git a/drivers/infiniband/core/user_mad.c b/drivers/infiniband/core/user_mad.c
+index 07db229..2fc66f0 100644
+--- a/drivers/infiniband/core/user_mad.c
++++ b/drivers/infiniband/core/user_mad.c
+@@ -969,8 +969,11 @@ static ssize_t show_port(struct device *dev, struct device_attribute *attr,
+ }
+ static DEVICE_ATTR(port, S_IRUGO, show_port, NULL);
+ 
+-static CLASS_ATTR_STRING(abi_version, S_IRUGO,
+-			 __stringify(IB_USER_MAD_ABI_VERSION));
++static ssize_t show_abi_version(struct class *class, char *buf)
++{
++	return sprintf(buf, "%d\n", IB_USER_MAD_ABI_VERSION);
++}
++static CLASS_ATTR(abi_version, S_IRUGO, show_abi_version, NULL);
+ 
+ static dev_t overflow_maj;
+ static DECLARE_BITMAP(overflow_map, IB_UMAD_MAX_PORTS);
+@@ -1200,7 +1203,7 @@ static int __init ib_umad_init(void)
+ 
+ 	umad_class->devnode = umad_devnode;
+ 
+-	ret = class_create_file(umad_class, &class_attr_abi_version.attr);
++	ret = class_create_file(umad_class, &class_attr_abi_version);
+ 	if (ret) {
+ 		printk(KERN_ERR "user_mad: couldn't create abi_version attribute\n");
+ 		goto out_class;
+diff --git a/drivers/infiniband/core/uverbs_main.c b/drivers/infiniband/core/uverbs_main.c
+index 8796367..9ce0700 100644
+--- a/drivers/infiniband/core/uverbs_main.c
++++ b/drivers/infiniband/core/uverbs_main.c
+@@ -715,8 +715,11 @@ static ssize_t show_dev_abi_version(struct device *device,
+ }
+ static DEVICE_ATTR(abi_version, S_IRUGO, show_dev_abi_version, NULL);
+ 
+-static CLASS_ATTR_STRING(abi_version, S_IRUGO,
+-			 __stringify(IB_USER_VERBS_ABI_VERSION));
++static ssize_t show_abi_version(struct class *class, char *buf)
++{
++	return sprintf(buf, "%d\n", IB_USER_VERBS_ABI_VERSION);
++}
++static CLASS_ATTR(abi_version, S_IRUGO, show_abi_version, NULL);
+ 
+ static dev_t overflow_maj;
+ static DECLARE_BITMAP(overflow_map, IB_UVERBS_MAX_DEVICES);
+@@ -873,7 +876,7 @@ static int __init ib_uverbs_init(void)
+ 
+ 	uverbs_class->devnode = uverbs_devnode;
+ 
+-	ret = class_create_file(uverbs_class, &class_attr_abi_version.attr);
++	ret = class_create_file(uverbs_class, &class_attr_abi_version);
+ 	if (ret) {
+ 		printk(KERN_ERR "user_verbs: couldn't create abi_version attribute\n");
+ 		goto out_class;
+-- 
+1.5.4.3
+
