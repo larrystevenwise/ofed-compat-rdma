@@ -129,8 +129,6 @@ kernel:
 		-I$(CWD)/drivers/infiniband/debug \
 		-I/usr/local/include/scst \
 		-I$(CWD)/drivers/infiniband/ulp/srpt \
-		-I$(CWD)/drivers/net/ethernet/chelsio/cxgb3 \
-		-I$(CWD)/drivers/net/ethernet/chelsio/cxgb4 \
 		$$(if $$(CONFIG_XEN),-D__XEN_INTERFACE_VERSION__=$$(CONFIG_XEN_INTERFACE_VERSION)) \
 		$$(if $$(CONFIG_XEN),-I$$(srctree)/arch/x86/include/mach-xen) \
 		-I$$(srctree)/arch/$$(SRCARCH)/include \
