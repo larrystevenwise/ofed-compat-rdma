@@ -1,0 +1,53 @@
+From e861ec83739c5c981a1ae96edb08062f73d52dc4 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Mon, 7 May 2012 14:40:34 +0530
+Subject: [PATCH 2/2] cxgb4: Add build support for kernel 3.1
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 4c8f42a..0b77fec 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -32,6 +32,9 @@
+  * SOFTWARE.
+  */
+
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+
+ #include <linux/bitmap.h>
+@@ -41,7 +44,6 @@
+ #include <linux/err.h>
+ #include <linux/etherdevice.h>
+ #include <linux/firmware.h>
+-#include <linux/if.h>
+ #include <linux/if_vlan.h>
+ #include <linux/init.h>
+ #include <linux/log2.h>
+@@ -1902,7 +1904,7 @@ static int set_rss_table(struct net_device *dev,
+ }
+
+ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+-		     u32 *rules)
++		     void *rules)
+ {
+ 	const struct port_info *pi = netdev_priv(dev);
+
+@@ -3640,8 +3642,6 @@ static int __devinit init_one(struct pci_dev *pdev,
+ 		netdev->features |= netdev->hw_features | highdma;
+ 		netdev->vlan_features = netdev->features & VLAN_FEAT;
+
+-		netdev->priv_flags |= IFF_UNICAST_FLT;
+-
+ 		netdev->netdev_ops = &cxgb4_netdev_ops;
+ 		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
+ 	}
+--
+1.7.1
+

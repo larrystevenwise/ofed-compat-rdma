@@ -1,0 +1,148 @@
+From 5ea32823a4937cd918a823bd0dfbbb592e8b9e6e Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Mon, 7 May 2012 14:17:55 +0530
+Subject: [PATCH 1/2] cxgb4: Reversing convert to SKB paged frag API.
+
+This patch is a reverse patch of upstream commit
+e91b0f2491f7a7b21c4e562df09f3dbe551f0fe2
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h |    2 +-
+ drivers/net/ethernet/chelsio/cxgb4/sge.c   |   45 +++++++++++++--------------
+ 2 files changed, 23 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 0fe1885..223a7f7 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -326,7 +326,7 @@ struct sge_fl {                     /* SGE free-buffer queue state */
+
+ /* A packet gather list */
+ struct pkt_gl {
+-	struct page_frag frags[MAX_SKB_FRAGS];
++	skb_frag_t frags[MAX_SKB_FRAGS];
+ 	void *va;                         /* virtual address of first byte */
+ 	unsigned int nfrags;              /* # of fragments */
+ 	unsigned int tot_len;             /* total length of fragments */
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index 140254c..c5e99fb 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -216,8 +216,8 @@ static int map_skb(struct device *dev, const struct sk_buff *skb,
+ 	end = &si->frags[si->nr_frags];
+
+ 	for (fp = si->frags; fp < end; fp++) {
+-		*++addr = skb_frag_dma_map(dev, fp, 0, skb_frag_size(fp),
+-					   DMA_TO_DEVICE);
++		*++addr = dma_map_page(dev, fp->page, fp->page_offset,
++				       skb_frag_size(fp), DMA_TO_DEVICE);
+ 		if (dma_mapping_error(dev, *addr))
+ 			goto unwind;
+ 	}
+@@ -1410,23 +1410,22 @@ int cxgb4_ofld_send(struct net_device *dev, struct sk_buff *skb)
+ }
+ EXPORT_SYMBOL(cxgb4_ofld_send);
+
+-static inline void copy_frags(struct sk_buff *skb,
++static inline void copy_frags(struct skb_shared_info *ssi,
+ 			      const struct pkt_gl *gl, unsigned int offset)
+ {
+-	int i;
++	unsigned int n;
+
+ 	/* usually there's just one frag */
+-	__skb_fill_page_desc(skb, 0, gl->frags[0].page,
+-			     gl->frags[0].offset + offset,
+-			     gl->frags[0].size - offset);
+-	skb_shinfo(skb)->nr_frags = gl->nfrags;
+-	for (i = 1; i < gl->nfrags; i++)
+-		__skb_fill_page_desc(skb, i, gl->frags[i].page,
+-				     gl->frags[i].offset,
+-				     gl->frags[i].size);
++	ssi->frags[0].page = gl->frags[0].page;
++	ssi->frags[0].page_offset = gl->frags[0].page_offset + offset;
++	skb_frag_size_set(&ssi->frags[0], skb_frag_size(&gl->frags[0]) - offset);
++	ssi->nr_frags = gl->nfrags;
++	n = gl->nfrags - 1;
++	if (n)
++		memcpy(&ssi->frags[1], &gl->frags[1], n * sizeof(skb_frag_t));
+
+ 	/* get a reference to the last page, we don't own it */
+-	get_page(gl->frags[gl->nfrags - 1].page);
++	get_page(gl->frags[n].page);
+ }
+
+ /**
+@@ -1461,7 +1460,7 @@ struct sk_buff *cxgb4_pktgl_to_skb(const struct pkt_gl *gl,
+ 		__skb_put(skb, pull_len);
+ 		skb_copy_to_linear_data(skb, gl->va, pull_len);
+
+-		copy_frags(skb, gl, pull_len);
++		copy_frags(skb_shinfo(skb), gl, pull_len);
+ 		skb->len = gl->tot_len;
+ 		skb->data_len = skb->len - pull_len;
+ 		skb->truesize += skb->data_len;
+@@ -1480,7 +1479,7 @@ EXPORT_SYMBOL(cxgb4_pktgl_to_skb);
+ static void t4_pktgl_free(const struct pkt_gl *gl)
+ {
+ 	int n;
+-	const struct page_frag *p;
++	const skb_frag_t *p;
+
+ 	for (p = gl->frags, n = gl->nfrags - 1; n--; p++)
+ 		put_page(p->page);
+@@ -1524,7 +1523,7 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
+ 		return;
+ 	}
+
+-	copy_frags(skb, gl, RX_PKT_PAD);
++	copy_frags(skb_shinfo(skb), gl, RX_PKT_PAD);
+ 	skb->len = gl->tot_len - RX_PKT_PAD;
+ 	skb->data_len = skb->len;
+ 	skb->truesize += skb->data_len;
+@@ -1700,7 +1699,7 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 		rmb();
+ 		rsp_type = RSPD_TYPE(rc->type_gen);
+ 		if (likely(rsp_type == RSP_TYPE_FLBUF)) {
+-			struct page_frag *fp;
++			skb_frag_t *fp;
+ 			struct pkt_gl si;
+ 			const struct rx_sw_desc *rsd;
+ 			u32 len = ntohl(rc->pldbuflen_qid), bufsz, frags;
+@@ -1719,9 +1718,9 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 				rsd = &rxq->fl.sdesc[rxq->fl.cidx];
+ 				bufsz = get_buf_size(rsd);
+ 				fp->page = rsd->page;
+-				fp->offset = q->offset;
+-				fp->size = min(bufsz, len);
+-				len -= fp->size;
++				fp->page_offset = q->offset;
++				skb_frag_size_set(fp, min(bufsz, len));
++				len -= skb_frag_size(fp);
+ 				if (!len)
+ 					break;
+ 				unmap_rx_buf(q->adap, &rxq->fl);
+@@ -1733,16 +1732,16 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 			 */
+ 			dma_sync_single_for_cpu(q->adap->pdev_dev,
+ 						get_buf_addr(rsd),
+-						fp->size, DMA_FROM_DEVICE);
++						skb_frag_size(fp), DMA_FROM_DEVICE);
+
+ 			si.va = page_address(si.frags[0].page) +
+-				si.frags[0].offset;
++				si.frags[0].page_offset;
+ 			prefetch(si.va);
+
+ 			si.nfrags = frags + 1;
+ 			ret = q->handler(q, q->cur_desc, &si);
+ 			if (likely(ret == 0))
+-				q->offset += ALIGN(fp->size, FL_ALIGN);
++				q->offset += ALIGN(skb_frag_size(fp), FL_ALIGN);
+ 			else
+ 				restore_rx_bufs(&si, &rxq->fl, frags);
+ 		} else if (likely(rsp_type == RSP_TYPE_CPL)) {
+--
+1.7.1
+
