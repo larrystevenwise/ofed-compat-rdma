@@ -1,0 +1,77 @@
+From 585e4113fc88b627bbc365f2fc15f11a903906c6 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 17:12:56 +0530
+Subject: [PATCH 09/14] cxgb3: Add RHEL6.2 backports
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |    3 +--
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |    3 +--
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |    8 ++++----
+ 3 files changed, 6 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index e2da139..c80fed5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -1359,7 +1359,6 @@ out:
+ static int offload_close(struct t3cdev *tdev)
+ {
+ 	struct adapter *adapter = tdev2adap(tdev);
+-	struct t3c_data *td = T3C_DATA(tdev);
+
+ 	if (!test_bit(OFFLOAD_DEVMAP_BIT, &adapter->open_device_map))
+ 		return 0;
+@@ -1370,7 +1369,7 @@ static int offload_close(struct t3cdev *tdev)
+ 	sysfs_remove_group(&tdev->lldev->dev.kobj, &offload_attr_group);
+
+ 	/* Flush work scheduled while releasing TIDs */
+-	flush_work_sync(&td->tid_release_task);
++	flush_scheduled_work();
+
+ 	tdev->lldev = NULL;
+ 	cxgb3_set_dummy_ops(tdev);
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+index d7cd560..ce3b0ae 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+@@ -187,10 +187,9 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
+ 				dev = NULL;
+ 				if (grp)
+ 					dev = vlan_group_get_device(grp, vlan);
+-			} else if (netif_is_bond_slave(dev)) {
++			} else
+ 				while (dev->master)
+ 					dev = dev->master;
+-			}
+ 			return dev;
+ 		}
+ 	}
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
+index 3af19a5..5bcadc8 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
+@@ -311,16 +311,16 @@ int t3_mac_set_rx_mode(struct cmac *mac, struct net_device *dev)
+ 	if (dev->flags & IFF_ALLMULTI)
+ 		hash_lo = hash_hi = 0xffffffff;
+ 	else {
+-		struct netdev_hw_addr *ha;
++		const struct dev_addr_list *d;
+ 		int exact_addr_idx = mac->nucast;
+
+ 		hash_lo = hash_hi = 0;
+-		netdev_for_each_mc_addr(ha, dev)
++		netdev_for_each_mc_addr(d, dev)
+ 			if (exact_addr_idx < EXACT_ADDR_FILTERS)
+ 				set_addr_filter(mac, exact_addr_idx++,
+-						ha->addr);
++						d->dmi_addr);
+ 			else {
+-				int hash = hash_hw_addr(ha->addr);
++				int hash = hash_hw_addr(d->dmi_addr);
+
+ 				if (hash < 32)
+ 					hash_lo |= (1 << hash);
+--
+1.7.1
+

@@ -1,0 +1,66 @@
+From 4d79ac47a87ece1a8bae619683a11b264f7db063 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 3 May 2012 14:39:49 +0530
+Subject: [PATCH 04/14] iw_cxgb3: Add RHEL6.2 backports
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb3/iwch_cm.c |   27 ++++++++++++++++++++-------
+ 1 files changed, 20 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb3/iwch_cm.c b/drivers/infiniband/hw/cxgb3/iwch_cm.c
+index c88b12b..25f2377 100644
+--- a/drivers/infiniband/hw/cxgb3/iwch_cm.c
++++ b/drivers/infiniband/hw/cxgb3/iwch_cm.c
+@@ -338,12 +338,25 @@ static struct rtable *find_route(struct t3cdev *dev, __be32 local_ip,
+ 				 __be16 peer_port, u8 tos)
+ {
+ 	struct rtable *rt;
+-	struct flowi4 fl4;
++	struct flowi fl = {
++		.oif = 0,
++		.nl_u = {
++			.ip4_u = {
++				.daddr = peer_ip,
++				.saddr = local_ip,
++				.tos = tos
++			}
++		},
++		.proto = IPPROTO_TCP,
++		.uli_u = {
++			.ports = {
++				.sport = local_port,
++				.dport = peer_port
++			}
++		}
++	};
+
+-	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
+-				   peer_port, local_port, IPPROTO_TCP,
+-				   tos, 0);
+-	if (IS_ERR(rt))
++	if (ip_route_output_flow(&init_net, &rt, &fl, NULL, false))
+ 		return NULL;
+ 	return rt;
+ }
+@@ -1374,7 +1387,7 @@ static int pass_accept_req(struct t3cdev *tdev, struct sk_buff *skb, void *ctx)
+ 		       __func__);
+ 		goto reject;
+ 	}
+-	dst = &rt->dst;
++	dst = &rt->u.dst;
+ 	rcu_read_lock();
+ 	neigh = dst_get_neighbour(dst);
+ 	l2t = t3_l2t_get(tdev, neigh, neigh->dev);
+@@ -1946,7 +1959,7 @@ int iwch_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 		err = -EHOSTUNREACH;
+ 		goto fail3;
+ 	}
+-	ep->dst = &rt->dst;
++	ep->dst = &rt->u.dst;
+
+ 	rcu_read_lock();
+ 	neigh = dst_get_neighbour(ep->dst);
+--
+1.7.1
+

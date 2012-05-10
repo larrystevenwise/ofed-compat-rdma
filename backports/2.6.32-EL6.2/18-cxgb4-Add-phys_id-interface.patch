@@ -1,0 +1,35 @@
+From 23e76ca8dcd4d2d1ffbf1cde508c81bc14b09bc9 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 17:33:51 +0530
+Subject: [PATCH 10/14] cxgb4: Add phys_id interface
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |    4 ++--
+ 1 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 0b77fec..4083a3e 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -868,7 +868,7 @@ void *t4_alloc_mem(size_t size)
+ 	void *p = kzalloc(size, GFP_KERNEL);
+
+ 	if (!p)
+-		p = vzalloc(size);
++		p = vmalloc(size);
+ 	return p;
+ }
+
+@@ -1983,7 +1983,7 @@ static struct ethtool_ops cxgb_ethtool_ops = {
+ 	.set_pauseparam    = set_pauseparam,
+ 	.get_link          = ethtool_op_get_link,
+ 	.get_strings       = get_strings,
+-	.set_phys_id       = identify_port,
++	.phys_id           = identify_port,
+ 	.nway_reset        = restart_autoneg,
+ 	.get_sset_count    = get_sset_count,
+ 	.get_ethtool_stats = get_stats,
+--
+1.7.1
+

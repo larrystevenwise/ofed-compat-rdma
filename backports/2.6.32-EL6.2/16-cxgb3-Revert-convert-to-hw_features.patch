@@ -1,0 +1,248 @@
+From 810969f13f370934f20c017cea7ee949db23a002 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 17:02:03 +0530
+Subject: [PATCH 08/14] cxgb3: Revert convert to hw_features
+
+This patch is a reverse patch of the following upstream commit
+d2fe2755342b30bc1ee7797b9975f8626d65e485
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb3/adapter.h    |    7 ++
+ drivers/net/ethernet/chelsio/cxgb3/common.h     |    1 +
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c |   78 +++++++++++++++++++----
+ drivers/net/ethernet/chelsio/cxgb3/sge.c        |    7 +-
+ 4 files changed, 76 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
+index 7300de5..ef67be5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/adapter.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
+@@ -50,6 +50,11 @@ struct adapter;
+ struct sge_qset;
+ struct port_info;
+
++enum {			/* rx_offload flags */
++	T3_RX_CSUM	= 1 << 0,
++	T3_LRO		= 1 << 1,
++};
++
+ enum mac_idx_types {
+ 	LAN_MAC_IDX	= 0,
+ 	SAN_MAC_IDX,
+@@ -69,6 +74,7 @@ struct port_info {
+ 	struct vlan_group *vlan_grp;
+ 	struct sge_qset *qs;
+ 	u8 port_id;
++	u8 rx_offload;
+ 	u8 nqsets;
+ 	u8 first_qset;
+ 	struct cphy phy;
+@@ -206,6 +212,7 @@ struct sge_qset {		/* an SGE queue set */
+ 	struct sge_fl fl[SGE_RXQ_PER_SET];
+ 	struct sge_txq txq[SGE_TXQ_PER_SET];
+ 	int nomem;
++	int lro_enabled;
+ 	void *lro_va;
+ 	struct net_device *netdev;
+ 	struct netdev_queue *tx_q;	/* associated netdev TX queue */
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/common.h b/drivers/net/ethernet/chelsio/cxgb3/common.h
+index df01b63..85d032f 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/common.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/common.h
+@@ -317,6 +317,7 @@ struct tp_params {
+
+ struct qset_params {		/* SGE queue set parameters */
+ 	unsigned int polling;	/* polling/interrupt service for rspq */
++	unsigned int lro;	/* large receive offload */
+ 	unsigned int coalesce_usecs;	/* irq coalescing timer */
+ 	unsigned int rspq_size;	/* # of entries in response queue */
+ 	unsigned int fl_size;	/* # of entries in regular free list */
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index a671d43..e2da139 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -644,6 +644,26 @@ static void enable_all_napi(struct adapter *adap)
+ }
+
+ /**
++ *	set_qset_lro - Turn a queue set's LRO capability on and off
++ *	@dev: the device the qset is attached to
++ *	@qset_idx: the queue set index
++ *	@val: the LRO switch
++ *
++ *	Sets LRO on or off for a particular queue set.
++ *	the device's features flag is updated to reflect the LRO
++ *	capability when all queues belonging to the device are
++ *	in the same state.
++ */
++static void set_qset_lro(struct net_device *dev, int qset_idx, int val)
++{
++	struct port_info *pi = netdev_priv(dev);
++	struct adapter *adapter = pi->adapter;
++
++	adapter->params.sge.qset[qset_idx].lro = !!val;
++	adapter->sge.qs[qset_idx].lro_enabled = !!val;
++}
++
++/**
+  *	setup_sge_qsets - configure SGE Tx/Rx/response queues
+  *	@adap: the adapter
+  *
+@@ -665,6 +685,7 @@ static int setup_sge_qsets(struct adapter *adap)
+
+ 		pi->qs = &adap->sge.qs[pi->first_qset];
+ 		for (j = 0; j < pi->nqsets; ++j, ++qset_idx) {
++			set_qset_lro(dev, qset_idx, pi->rx_offload & T3_LRO);
+ 			err = t3_sge_alloc_qset(adap, qset_idx, 1,
+ 				(adap->flags & USING_MSIX) ? qset_idx + 1 :
+ 							     irq_idx,
+@@ -1889,6 +1910,29 @@ static int set_pauseparam(struct net_device *dev,
+ 	return 0;
+ }
+
++static u32 get_rx_csum(struct net_device *dev)
++{
++	struct port_info *p = netdev_priv(dev);
++
++	return p->rx_offload & T3_RX_CSUM;
++}
++
++static int set_rx_csum(struct net_device *dev, u32 data)
++{
++	struct port_info *p = netdev_priv(dev);
++
++	if (data) {
++		p->rx_offload |= T3_RX_CSUM;
++	} else {
++		int i;
++
++		p->rx_offload &= ~(T3_RX_CSUM | T3_LRO);
++		for (i = p->first_qset; i < p->first_qset + p->nqsets; i++)
++			set_qset_lro(dev, i, 0);
++	}
++	return 0;
++}
++
+ static void get_sge_param(struct net_device *dev, struct ethtool_ringparam *e)
+ {
+ 	struct port_info *pi = netdev_priv(dev);
+@@ -2059,6 +2103,10 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.set_eeprom = set_eeprom,
+ 	.get_pauseparam = get_pauseparam,
+ 	.set_pauseparam = set_pauseparam,
++	.get_rx_csum = get_rx_csum,
++	.set_rx_csum = set_rx_csum,
++	.set_tx_csum = ethtool_op_set_tx_csum,
++	.set_sg = ethtool_op_set_sg,
+ 	.get_link = ethtool_op_get_link,
+ 	.get_strings = get_strings,
+ 	.phys_id = cxgb3_phys_id,
+@@ -2068,6 +2116,7 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.get_regs_len = get_regs_len,
+ 	.get_regs = get_regs,
+ 	.get_wol = get_wol,
++	.set_tso = ethtool_op_set_tso,
+ };
+
+ static int in_range(int val, int lo, int hi)
+@@ -2115,6 +2164,15 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 			      MAX_RSPQ_ENTRIES))
+ 			return -EINVAL;
+
++		if ((adapter->flags & FULL_INIT_DONE) && t.lro > 0)
++			for_each_port(adapter, i) {
++				pi = adap2pinfo(adapter, i);
++				if (t.qset_idx >= pi->first_qset &&
++				    t.qset_idx < pi->first_qset + pi->nqsets &&
++				    !(pi->rx_offload & T3_RX_CSUM))
++					return -EINVAL;
++			}
++
+ 		if ((adapter->flags & FULL_INIT_DONE) &&
+ 			(t.rspq_size >= 0 || t.fl_size[0] >= 0 ||
+ 			t.fl_size[1] >= 0 || t.txq_size[0] >= 0 ||
+@@ -2175,14 +2233,8 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 				}
+ 			}
+ 		}
+-
+-		if (t.lro >= 0) {
+-			if (t.lro)
+-				dev->wanted_features |= NETIF_F_GRO;
+-			else
+-				dev->wanted_features &= ~NETIF_F_GRO;
+-			netdev_update_features(dev);
+-		}
++		if (t.lro >= 0)
++			set_qset_lro(dev, t.qset_idx, t.lro);
+
+ 		break;
+ 	}
+@@ -2216,7 +2268,7 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 		t.fl_size[0] = q->fl_size;
+ 		t.fl_size[1] = q->jumbo_size;
+ 		t.polling = q->polling;
+-		t.lro = !!(dev->features & NETIF_F_GRO);
++		t.lro = q->lro;
+ 		t.intr_lat = q->coalesce_usecs;
+ 		t.cong_thres = q->cong_thres;
+ 		t.qnum = q1;
+@@ -3254,18 +3306,18 @@ static int __devinit init_one(struct pci_dev *pdev,
+ 		adapter->port[i] = netdev;
+ 		pi = netdev_priv(netdev);
+ 		pi->adapter = adapter;
++		pi->rx_offload = T3_RX_CSUM | T3_LRO;
+ 		pi->port_id = i;
+ 		netif_carrier_off(netdev);
+ 		netdev->irq = pdev->irq;
+ 		netdev->mem_start = mmio_start;
+ 		netdev->mem_end = mmio_start + mmio_len - 1;
+-		netdev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM |
+-			NETIF_F_TSO | NETIF_F_RXCSUM;
+-		netdev->features |= netdev->hw_features |
+-			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
++		netdev->features |= NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
++		netdev->features |= NETIF_F_GRO;
+ 		if (pci_using_dac)
+ 			netdev->features |= NETIF_F_HIGHDMA;
+
++		netdev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
+ 		netdev->netdev_ops = &cxgb_netdev_ops;
+ 		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
+ 	}
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
+index 12c3d36..0e5b894 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c
+@@ -2020,7 +2020,7 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
+ 	skb_pull(skb, sizeof(*p) + pad);
+ 	skb->protocol = eth_type_trans(skb, adap->port[p->iff]);
+ 	pi = netdev_priv(skb->dev);
+-	if ((skb->dev->features & NETIF_F_RXCSUM) && p->csum_valid &&
++	if ((pi->rx_offload & T3_RX_CSUM) && p->csum_valid &&
+ 	    p->csum == htons(0xffff) && !p->fragment) {
+ 		qs->port_stats[SGE_PSTAT_RX_CSUM_GOOD]++;
+ 		skb->ip_summed = CHECKSUM_UNNECESSARY;
+@@ -2121,7 +2121,7 @@ static void lro_add_page(struct adapter *adap, struct sge_qset *qs,
+ 		offset = 2 + sizeof(struct cpl_rx_pkt);
+ 		cpl = qs->lro_va = sd->pg_chunk.va + 2;
+
+-		if ((qs->netdev->features & NETIF_F_RXCSUM) &&
++		if ((pi->rx_offload & T3_RX_CSUM) &&
+ 		     cpl->csum_valid && cpl->csum == htons(0xffff)) {
+ 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+ 			qs->port_stats[SGE_PSTAT_RX_CSUM_GOOD]++;
+@@ -2286,8 +2286,7 @@ static int process_responses(struct adapter *adap, struct sge_qset *qs,
+ 	q->next_holdoff = q->holdoff_tmr;
+
+ 	while (likely(budget_left && is_new_response(r, q))) {
+-		int packet_complete, eth, ethpad = 2;
+-		int lro = !!(qs->netdev->features & NETIF_F_GRO);
++		int packet_complete, eth, ethpad = 2, lro = qs->lro_enabled;
+ 		struct sk_buff *skb = NULL;
+ 		u32 len, flags;
+ 		__be32 rss_hi, rss_lo;
+--
+1.7.1
+

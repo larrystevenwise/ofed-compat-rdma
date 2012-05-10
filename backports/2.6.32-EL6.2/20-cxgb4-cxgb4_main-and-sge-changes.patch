@@ -1,0 +1,183 @@
+From 65f230d00b7f0d6558f53a2df049cc7f9fa7f041 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 17:49:00 +0530
+Subject: [PATCH 12/14] cxgb4: cxgb4_main and sge changes
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   89 ++---------------------
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |    4 -
+ 2 files changed, 7 insertions(+), 86 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index ef62323..49da127 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -333,14 +333,14 @@ static int set_addr_filters(const struct net_device *dev, bool sleep)
+ 	u16 filt_idx[7];
+ 	const u8 *addr[7];
+ 	int ret, naddr = 0;
++	const struct dev_addr_list *d;
+ 	const struct netdev_hw_addr *ha;
+-	int uc_cnt = netdev_uc_count(dev);
+-	int mc_cnt = netdev_mc_count(dev);
++	int uc_cnt = ((&(dev)->uc)->count);
+ 	const struct port_info *pi = netdev_priv(dev);
+ 	unsigned int mb = pi->adapter->fn;
+
+ 	/* first do the secondary unicast addresses */
+-	netdev_for_each_uc_addr(ha, dev) {
++	list_for_each_entry(ha, &(&(dev)->uc)->list, list) {
+ 		addr[naddr++] = ha->addr;
+ 		if (--uc_cnt == 0 || naddr >= ARRAY_SIZE(addr)) {
+ 			ret = t4_alloc_mac_filt(pi->adapter, mb, pi->viid, free,
+@@ -354,9 +354,9 @@ static int set_addr_filters(const struct net_device *dev, bool sleep)
+ 	}
+
+ 	/* next set up the multicast addresses */
+-	netdev_for_each_mc_addr(ha, dev) {
+-		addr[naddr++] = ha->addr;
+-		if (--mc_cnt == 0 || naddr >= ARRAY_SIZE(addr)) {
++	netdev_for_each_mc_addr(d, dev) {
++		addr[naddr++] = d->dmi_addr;
++		if (naddr >= ARRAY_SIZE(addr) || d->next == NULL) {
+ 			ret = t4_alloc_mac_filt(pi->adapter, mb, pi->viid, free,
+ 					naddr, addr, filt_idx, &mhash, sleep);
+ 			if (ret < 0)
+@@ -1891,8 +1891,7 @@ static int set_flags(struct net_device *dev, u32 flags)
+ 	int err;
+ 	unsigned long old_feat = dev->features;
+
+-	err = ethtool_op_set_flags(dev, flags, ETH_FLAG_RXHASH |
+-				   ETH_FLAG_RXVLAN | ETH_FLAG_TXVLAN);
++	err = ethtool_op_set_flags(dev, flags);
+ 	if (err)
+ 		return err;
+
+@@ -1908,35 +1907,6 @@ static int set_flags(struct net_device *dev, u32 flags)
+ 	return err;
+ }
+
+-static int get_rss_table(struct net_device *dev, struct ethtool_rxfh_indir *p)
+-{
+-	const struct port_info *pi = netdev_priv(dev);
+-	unsigned int n = min_t(unsigned int, p->size, pi->rss_size);
+-
+-	p->size = pi->rss_size;
+-	while (n--)
+-		p->ring_index[n] = pi->rss[n];
+-	return 0;
+-}
+-
+-static int set_rss_table(struct net_device *dev,
+-			 const struct ethtool_rxfh_indir *p)
+-{
+-	unsigned int i;
+-	struct port_info *pi = netdev_priv(dev);
+-
+-	if (p->size != pi->rss_size)
+-		return -EINVAL;
+-	for (i = 0; i < p->size; i++)
+-		if (p->ring_index[i] >= pi->nqsets)
+-			return -EINVAL;
+-	for (i = 0; i < p->size; i++)
+-		pi->rss[i] = p->ring_index[i];
+-	if (pi->adapter->flags & FULL_INIT_DONE)
+-		return write_rss(pi, pi->rss);
+-	return 0;
+-}
+-
+ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+ 		     void *rules)
+ {
+@@ -2032,8 +2002,6 @@ static struct ethtool_ops cxgb_ethtool_ops = {
+ 	.set_tso           = set_tso,
+ 	.set_flags         = set_flags,
+ 	.get_rxnfc         = get_rxnfc,
+-	.get_rxfh_indir    = get_rss_table,
+-	.set_rxfh_indir    = set_rss_table,
+ 	.flash_device      = set_flash,
+ };
+
+@@ -2743,48 +2711,6 @@ static int cxgb_close(struct net_device *dev)
+ 	return t4_enable_vi(adapter, adapter->fn, pi->viid, false, false);
+ }
+
+-static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
+-						struct rtnl_link_stats64 *ns)
+-{
+-	struct port_stats stats;
+-	struct port_info *p = netdev_priv(dev);
+-	struct adapter *adapter = p->adapter;
+-
+-	spin_lock(&adapter->stats_lock);
+-	t4_get_port_stats(adapter, p->tx_chan, &stats);
+-	spin_unlock(&adapter->stats_lock);
+-
+-	ns->tx_bytes   = stats.tx_octets;
+-	ns->tx_packets = stats.tx_frames;
+-	ns->rx_bytes   = stats.rx_octets;
+-	ns->rx_packets = stats.rx_frames;
+-	ns->multicast  = stats.rx_mcast_frames;
+-
+-	/* detailed rx_errors */
+-	ns->rx_length_errors = stats.rx_jabber + stats.rx_too_long +
+-			       stats.rx_runt;
+-	ns->rx_over_errors   = 0;
+-	ns->rx_crc_errors    = stats.rx_fcs_err;
+-	ns->rx_frame_errors  = stats.rx_symbol_err;
+-	ns->rx_fifo_errors   = stats.rx_ovflow0 + stats.rx_ovflow1 +
+-			       stats.rx_ovflow2 + stats.rx_ovflow3 +
+-			       stats.rx_trunc0 + stats.rx_trunc1 +
+-			       stats.rx_trunc2 + stats.rx_trunc3;
+-	ns->rx_missed_errors = 0;
+-
+-	/* detailed tx_errors */
+-	ns->tx_aborted_errors   = 0;
+-	ns->tx_carrier_errors   = 0;
+-	ns->tx_fifo_errors      = 0;
+-	ns->tx_heartbeat_errors = 0;
+-	ns->tx_window_errors    = 0;
+-
+-	ns->tx_errors = stats.tx_error_frames;
+-	ns->rx_errors = stats.rx_symbol_err + stats.rx_fcs_err +
+-		ns->rx_length_errors + stats.rx_len_err + ns->rx_fifo_errors;
+-	return ns;
+-}
+-
+ static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
+ {
+ 	unsigned int mbox;
+@@ -2884,7 +2810,6 @@ static const struct net_device_ops cxgb4_netdev_ops = {
+ 	.ndo_open             = cxgb_open,
+ 	.ndo_stop             = cxgb_close,
+ 	.ndo_start_xmit       = t4_eth_xmit,
+-	.ndo_get_stats64      = cxgb_get_stats,
+ 	.ndo_set_rx_mode      = cxgb_set_rxmode,
+ 	.ndo_set_mac_address  = cxgb_set_mac_addr,
+ 	.ndo_validate_addr    = eth_validate_addr,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index 1dcf0fd..c935ae9 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -1530,8 +1530,6 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
+ 	skb->truesize += skb->data_len;
+ 	skb->ip_summed = CHECKSUM_UNNECESSARY;
+ 	skb_record_rx_queue(skb, rxq->rspq.idx);
+-	if (rxq->rspq.netdev->features & NETIF_F_RXHASH)
+-		skb->rxhash = (__force u32)pkt->rsshdr.hash_val;
+
+ 	if (unlikely(pkt->vlan_ex)) {
+ 		__vlan_hwaccel_put_tag(skb, ntohs(pkt->vlan));
+@@ -1584,8 +1582,6 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
+ 	__skb_pull(skb, RX_PKT_PAD);      /* remove ethernet header padding */
+ 	skb->protocol = eth_type_trans(skb, q->netdev);
+ 	skb_record_rx_queue(skb, q->idx);
+-	if (skb->dev->features & NETIF_F_RXHASH)
+-		skb->rxhash = (__force u32)pkt->rsshdr.hash_val;
+
+ 	pi = netdev_priv(skb->dev);
+ 	rxq->stats.pkts++;
+--
+1.7.1
+

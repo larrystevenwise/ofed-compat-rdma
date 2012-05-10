@@ -1,0 +1,74 @@
+From 05e7163348fbef11a2307c52259e75ff19d46cf1 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 17:52:47 +0530
+Subject: [PATCH 14/14] cxgb4: Fix packet counters
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   43 +++++++++++++++++++++++
+ 1 files changed, 43 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index a669aad..90390c3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -2711,6 +2711,48 @@ static int cxgb_close(struct net_device *dev)
+ 	return t4_enable_vi(adapter, adapter->fn, pi->viid, false, false);
+ }
+
++static struct net_device_stats *cxgb_get_stats(struct net_device *dev)
++{
++	struct port_stats stats;
++	struct port_info *p = netdev_priv(dev);
++	struct adapter *adapter = p->adapter;
++	struct net_device_stats *ns = &dev->stats;
++
++	spin_lock(&adapter->stats_lock);
++	t4_get_port_stats(adapter, p->tx_chan, &stats);
++	spin_unlock(&adapter->stats_lock);
++
++	ns->tx_bytes   = stats.tx_octets;
++	ns->tx_packets = stats.tx_frames;
++	ns->rx_bytes   = stats.rx_octets;
++	ns->rx_packets = stats.rx_frames;
++	ns->multicast  = stats.rx_mcast_frames;
++
++	/* detailed rx_errors */
++	ns->rx_length_errors = stats.rx_jabber + stats.rx_too_long +
++		stats.rx_runt;
++	ns->rx_over_errors   = 0;
++	ns->rx_crc_errors    = stats.rx_fcs_err;
++	ns->rx_frame_errors  = stats.rx_symbol_err;
++	ns->rx_fifo_errors   = stats.rx_ovflow0 + stats.rx_ovflow1 +
++		stats.rx_ovflow2 + stats.rx_ovflow3 +
++		stats.rx_trunc0 + stats.rx_trunc1 +
++		stats.rx_trunc2 + stats.rx_trunc3;
++	ns->rx_missed_errors = 0;
++
++	/* detailed tx_errors */
++	ns->tx_aborted_errors   = 0;
++	ns->tx_carrier_errors   = 0;
++	ns->tx_fifo_errors      = 0;
++	ns->tx_heartbeat_errors = 0;
++	ns->tx_window_errors    = 0;
++
++	ns->tx_errors = stats.tx_error_frames;
++	ns->rx_errors = stats.rx_symbol_err + stats.rx_fcs_err +
++		ns->rx_length_errors + stats.rx_len_err + ns->rx_fifo_errors;
++	return ns;
++}
++
+ static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
+ {
+ 	unsigned int mbox;
+@@ -2810,6 +2852,7 @@ static const struct net_device_ops cxgb4_netdev_ops = {
+ 	.ndo_open             = cxgb_open,
+ 	.ndo_stop             = cxgb_close,
+ 	.ndo_start_xmit       = t4_eth_xmit,
++	.ndo_get_stats	      = cxgb_get_stats,
+ 	.ndo_set_rx_mode      = cxgb_set_rxmode,
+ 	.ndo_set_mac_address  = cxgb_set_mac_addr,
+ 	.ndo_validate_addr    = eth_validate_addr,
+--
+1.7.1
+

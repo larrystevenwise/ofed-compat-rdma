@@ -1,0 +1,75 @@
+From d80b776c844c1a35f32a55150021f2e8635b7323 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 10 May 2012 15:39:37 +0530
+Subject: [PATCH 05/14] iw_cxgb4: Add RHEL6.2 backports
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c |   30 +++++++++++++++++++++---------
+ 1 files changed, 21 insertions(+), 9 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 0747004..15b903c 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -316,12 +316,24 @@ static struct rtable *find_route(struct c4iw_dev *dev, __be32 local_ip,
+ 				 __be16 peer_port, u8 tos)
+ {
+ 	struct rtable *rt;
+-	struct flowi4 fl4;
+-
+-	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
+-				   peer_port, local_port, IPPROTO_TCP,
+-				   tos, 0);
+-	if (IS_ERR(rt))
++	struct flowi fl = {
++		.oif = 0,
++		.nl_u = {
++			.ip4_u = {
++				.daddr = peer_ip,
++				.saddr = local_ip,
++				.tos = tos
++			}
++		},
++		.proto = IPPROTO_TCP,
++		.uli_u = {
++			.ports = {
++				.sport = local_port,
++				.dport = peer_port
++			}
++		}
++	};
++	if (ip_route_output_flow(&init_net, &rt, &fl, NULL, false))
+ 		return NULL;
+ 	return rt;
+ }
+@@ -1595,7 +1607,7 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
+ 		       __func__);
+ 		goto reject;
+ 	}
+-	dst = &rt->dst;
++	dst = &rt->u.dst;
+ 	rcu_read_lock();
+ 	neigh = dst_get_neighbour(dst);
+ 	if (neigh->dev->flags & IFF_LOOPBACK) {
+@@ -1822,7 +1834,7 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
+ 		err = -EHOSTUNREACH;
+ 		goto fail3;
+ 	}
+-	ep->dst = &rt->dst;
++	ep->dst = &rt->u.dst;
+
+ 	rcu_read_lock();
+ 	neigh = dst_get_neighbour(ep->dst);
+@@ -2305,7 +2317,7 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 		err = -EHOSTUNREACH;
+ 		goto fail3;
+ 	}
+-	ep->dst = &rt->dst;
++	ep->dst = &rt->u.dst;
+
+ 	rcu_read_lock();
+ 	neigh = dst_get_neighbour(ep->dst);
+--
+1.7.1
+
