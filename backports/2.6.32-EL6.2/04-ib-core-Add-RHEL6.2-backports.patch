@@ -55,7 +55,7 @@ index e9cf51b..f72272c 100644
  	}
  	src_in->sin_family = AF_INET;
 -	src_in->sin_addr.s_addr = fl4.saddr;
-+	src_in->sin_addr.s_addr = src_ip;
++	src_in->sin_addr.s_addr = rt->rt_src;
  
 -	if (rt->dst.dev->flags & IFF_LOOPBACK) {
 +	if (rt->idev->dev->flags & IFF_LOOPBACK) {
