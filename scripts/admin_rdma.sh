@@ -33,7 +33,6 @@ usage() {
 	printf "${GREEN}%10s${NORMAL} - get and apply pending-stable/ fixes purging old files there\n" "-s"
 	printf "${GREEN}%10s${NORMAL} - apply the patches linux-next-cherry-picks directory\n" "-n"
 	printf "${GREEN}%10s${NORMAL} - apply the patches on the linux-next-pending directory\n" "-p"
-	printf "${GREEN}%10s${NORMAL} - apply the patches on the crap directory\n" "-c"
 }
 
 # Execute command w/ echo and exit if it fail
@@ -121,7 +120,7 @@ nagometer() {
 
 }
 
-EXTRA_PATCHES="patches"
+EXTRA_PATCHES="patches crap"
 REFRESH="n"
 GET_STABLE_PENDING="n"
 POSTFIX_RELEASE_TAG=""
@@ -150,11 +149,6 @@ if [ $# -ge 1 ]; then
 		if [[ "$1" = "-p" ]]; then
 			EXTRA_PATCHES="${EXTRA_PATCHES} linux-next-pending"
 			POSTFIX_RELEASE_TAG="${POSTFIX_RELEASE_TAG}p"
-			shift; continue;
-		fi
-		if [[ "$1" = "-c" ]]; then
-			EXTRA_PATCHES="${EXTRA_PATCHES} crap"
-			POSTFIX_RELEASE_TAG="${POSTFIX_RELEASE_TAG}c"
 			shift; continue;
 		fi
 		if [[ "$1" = "refresh" ]]; then
