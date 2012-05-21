@@ -1,0 +1,10 @@
+diff -rup a/drivers/infiniband/core/Makefile b/drivers/infiniband/core/Makefile
+--- a/drivers/infiniband/core/Makefile	2012-05-18 13:16:13.000000000 -0400
++++ b/drivers/infiniband/core/Makefile	2012-05-18 13:17:57.000000000 -0400
+@@ -30,3 +30,6 @@ ib_umad-y :=			user_mad.o
+ ib_ucm-y :=			ucm.o
+ 
+ ib_uverbs-y :=			uverbs_main.o uverbs_cmd.o uverbs_marshall.o
++
++# sles11sp2 specific
++CFLAGS_netlink.o += -DNEED_MIN_DUMP_ALLOC_ARG
