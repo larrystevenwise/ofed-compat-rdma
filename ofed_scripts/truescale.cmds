@@ -245,7 +245,7 @@ set_irq_affinity()
 	    fi
 	done
     else
-	nunits=$(ls -1d ${qb}* | wc -l)
+	nunits=$(ls -1d ${qb}* 2> /dev/null | wc -l)
 	for ((unit=0 ; ${unit}<${nunits} ; unit++ )); do
 	    pcibus=$(readlink -m ${qb}${unit}/device)
 	    if [ -f ${pcibus}/local_cpulist ]; then
