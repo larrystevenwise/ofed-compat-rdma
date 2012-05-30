@@ -1,0 +1,37 @@
+Fix for reset which happens right after sending a terminate message.
+Terminate timer is not deleted when the connection is closed.
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+Signed-off-by: Faisal Latif <Faisal.Latif@intel.com>
+---
+
+diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
+index fc050aa..793ccd6 100644
+--- a/drivers/infiniband/hw/nes/nes_cm.c
++++ b/drivers/infiniband/hw/nes/nes_cm.c
+@@ -2841,6 +2841,7 @@ static int nes_cm_disconn_true(struct nes_qp *nesqp)
+ 		issue_disconn = 1;
+ 		issue_close = 1;
+ 		nesqp->cm_id = NULL;
++		del_timer(&nesqp->terminate_timer);
+ 		if (nesqp->flush_issued == 0) {
+ 			nesqp->flush_issued = 1;
+ 			issue_flush = 1;
+diff --git a/drivers/infiniband/hw/nes/nes_hw.c b/drivers/infiniband/hw/nes/nes_hw.c
+index 355786c..5bcd645 100644
+--- a/drivers/infiniband/hw/nes/nes_hw.c
++++ b/drivers/infiniband/hw/nes/nes_hw.c
+@@ -3619,10 +3619,6 @@ static void nes_process_iwarp_aeqe(struct nes_device *nesdev,
+ 			}
+ 			break;
+ 		case NES_AEQE_AEID_LLP_CLOSE_COMPLETE:
+-			if (nesqp->term_flags) {
+-				nes_terminate_done(nesqp, 0);
+-				return;
+-			}
+ 			spin_lock_irqsave(&nesqp->lock, flags);
+ 			nesqp->hw_iwarp_state = iwarp_state;
+ 			nesqp->hw_tcp_state = tcp_state;
+--
+1.7.1
+
