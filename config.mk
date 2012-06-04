@@ -32,6 +32,16 @@ COMPAT_RHEL_VERSIONS := $(shell I=$(RHEL_MINOR); while [ "$$I" -ge 0 ]; do echo 
 $(foreach ver,$(COMPAT_RHEL_VERSIONS),$(eval CONFIG_COMPAT_RHEL_$(RHEL_MAJOR)_$(ver)=y))
 endif
 
+KLIB_SOURCE := $(subst build,source,$(KLIB_BUILD))
+NAME := $(shell grep ^NAME $(KLIB_SOURCE)/Makefile | sed -n 's/.*= *\(.*\)/\1/p')
+ifneq ($(NAME),)
+ifeq ("$(strip $(NAME))","Sneaky Weasel")
+SLES_MAJOR := "11"
+SLES_MINOR := "2"
+CONFIG_COMPAT_SLES_11_2 := y
+endif
+endif
+
 endif # kernel Makefile check
 
 ifdef CONFIG_COMPAT_KERNEL_2_6_36

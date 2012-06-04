@@ -21,6 +21,11 @@ CFLAGS += \
 	-DCOMPAT_PROJECT="\"Compat-rdma\"" \
 	-DCOMPAT_VERSION="\"$(shell cat compat_version)\"" \
 
+ifneq ($(CONFIG_COMPAT_SLES_11_2),)
+CFLAGS += \
+	-DCONFIG_COMPAT_SLES_11_2=$(CONFIG_COMPAT_SLES_11_2)
+endif
+
 DEPMOD  = /sbin/depmod
 INSTALL_MOD_DIR ?= $(shell test -f /etc/redhat-release && echo extra/ofa_kernel || echo updates)
 
