@@ -46,7 +46,7 @@ do
 	ex "" pushd $tmpdir/$project-$backport
 	version=`./scripts/setlocalversion`
 	ex $tmpdir/$project-$backport.log \
-        ./scripts/admin_rdma.sh
+        ./scripts/admin_rdma.sh -n
 	ex $tmpdir/$project-$backport.log \
         ./ofed_scripts/ofed_patch.sh --with-backport=$backport
 	#Some QUILT versions create files with 0 permissions
