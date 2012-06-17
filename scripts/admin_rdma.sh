@@ -11,7 +11,7 @@
 GIT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
 GIT_COMPAT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/compat.git"
 
-FILES="scripts/checkout_files"
+FILES="ofed_scripts/checkout_files"
 SRC=${SRC:-'.'}
 
 # Pretty colors
