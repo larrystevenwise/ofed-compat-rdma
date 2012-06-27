@@ -112,16 +112,21 @@ function find_mac()
 {
 	ibdevs=$(ls /sys/class/infiniband/)
 	for ibdev in $ibdevs; do
+		type=$(cat /sys/class/infiniband/$ibdev/node_type|cut -d ' ' -f 2)
 		ports=$(ls /sys/class/infiniband/$ibdev/ports/)
 		for port in $ports; do
 			gids=$(ls /sys/class/infiniband/$ibdev/ports/$port/gids)
 			for gid in $gids; do
-				first=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21-22)
-				first=$(( first ^ 2 ))
-				first=$(printf "%02x" $first)
-				second=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21- | sed -e 's/://g' | cut -b 3-6)
-				third=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21- | sed -e 's/://g' | cut -b 11-)
-				pmac=$first$second$third
+				if [[ "$type" = "RNIC" ]]; then
+					pmac=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 1-14|sed -e 's/://g')
+				else
+					first=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21-22)
+					first=$(( first ^ 2 ))
+					first=$(printf "%02x" $first)
+					second=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21- | sed -e 's/://g' | cut -b 3-6)
+					third=$(cat /sys/class/infiniband/$ibdev/ports/$port/gids/$gid | cut -b 21- | sed -e 's/://g' | cut -b 11-)
+					pmac=$first$second$third
+				fi
 				if [ x$pmac == x$1 ]; then
 					print_line $ibdev $port $2
 				fi
