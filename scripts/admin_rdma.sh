@@ -9,7 +9,7 @@
 #
 
 GIT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git"
-GIT_COMPAT_URL="git://git.kernel.org/pub/scm/linux/kernel/git/mcgrof/compat.git"
+GIT_COMPAT_URL="git://github.com/mcgrof/compat.git"
 
 FILES="ofed_scripts/checkout_files"
 SRC=${SRC:-'.'}
@@ -33,6 +33,7 @@ usage() {
 	printf "${GREEN}%10s${NORMAL} - get and apply pending-stable/ fixes purging old files there\n" "-s"
 	printf "${GREEN}%10s${NORMAL} - apply the patches linux-next-cherry-picks directory\n" "-n"
 	printf "${GREEN}%10s${NORMAL} - apply the patches on the linux-next-pending directory\n" "-p"
+	printf "${GREEN}%10s${NORMAL} - apply the patches on the crap directory\n" "-c"
 }
 
 # Execute command w/ echo and exit if it fail
@@ -149,6 +150,11 @@ if [ $# -ge 1 ]; then
 		if [[ "$1" = "-p" ]]; then
 			EXTRA_PATCHES="${EXTRA_PATCHES} linux-next-pending"
 			POSTFIX_RELEASE_TAG="${POSTFIX_RELEASE_TAG}p"
+			shift; continue;
+		fi
+		if [[ "$1" = "-c" ]]; then
+			EXTRA_PATCHES="${EXTRA_PATCHES} crap"
+			POSTFIX_RELEASE_TAG="${POSTFIX_RELEASE_TAG}c"
 			shift; continue;
 		fi
 		if [[ "$1" = "refresh" ]]; then
@@ -271,8 +277,8 @@ if [[ "$GET_STABLE_PENDING" = y ]]; then
 	fi
 	echo -e "${GREEN}Generating stable cherry picks... ${NORMAL}"
 	echo -e "\nUsing command on directory $PWD:"
-	echo -e "\ngit format-patch --grep=\"stable@kernel.org\" -o $PENDING_STABLE_DIR ${LAST_STABLE_UPDATE}.. $WSTABLE"
-	git format-patch --grep="stable@kernel.org" -o $PENDING_STABLE_DIR ${LAST_STABLE_UPDATE}.. $WSTABLE
+	echo -e "\ngit format-patch --grep=\"stable@vger.kernel.org\" -o $PENDING_STABLE_DIR ${LAST_STABLE_UPDATE}.. $WSTABLE"
+	git format-patch --grep="stable@vger.kernel.org" -o $PENDING_STABLE_DIR ${LAST_STABLE_UPDATE}.. $WSTABLE
 	if [ ! -d ${LAST_DIR}/${PENDING_STABLE_DIR} ]; then
 		echo -e "Assumption that ${LAST_DIR}/${PENDING_STABLE_DIR} directory exists failed"
 		exit 1
@@ -351,7 +357,7 @@ for dir in $EXTRA_PATCHES; do
 	if [ $FOUND -eq 0 ]; then
 		continue
 	fi
-	for i in $dir/*.patch; do
+	for i in $(ls -v $dir/*.patch); do
 		echo -e "${GREEN}Applying backport patch${NORMAL}: ${BLUE}$i${NORMAL}"
 		patch -p1 -N -t < $i
 		RET=$?
@@ -372,6 +378,11 @@ GIT_REMOTE=$(git config branch.${GIT_BRANCH}.remote)
 GIT_REMOTE=${GIT_REMOTE:-origin}
 GIT_REMOTE_URL=$(git config remote.${GIT_REMOTE}.url)
 GIT_REMOTE_URL=${GIT_REMOTE_URL:-unknown}
+
+cd $GIT_COMPAT_TREE
+git describe > $DIR/compat_base
+cd $DIR
+
 echo -e "${GREEN}Updated${NORMAL} from local tree: ${BLUE}${GIT_TREE}${NORMAL}"
 echo -e "Origin remote URL: ${CYAN}${GIT_REMOTE_URL}${NORMAL}"
 cd $DIR
@@ -390,15 +401,13 @@ if [ -d ./.git ]; then
 
 	case $TREE_NAME in
 	"linux-next.git") # The linux-next integration testing tree
-		MASTER_TAG=$(git tag -l| grep next | tail -1)
-		echo $MASTER_TAG > $DIR/master-tag
-		echo -e "This is a ${RED}bleeding edge${NORMAL} compat-rdma release"
+		echo -e "This is a ${RED}linux-next.git${NORMAL} compat-wireless release"
 		;;
-	"linux-2.6-allstable.git") # HPA's all stable tree
-		echo -e "This is a ${GREEN}stable${NORMAL} compat-rdma release"
+	"linux-stable.git") # Greg's all stable tree
+		echo -e "This is a ${GREEN}linux-stable.git${NORMAL} compat-wireless release"
 		;;
 	"linux-2.6.git") # Linus' 2.6 tree
-		echo -e "This is a ${GREEN}stable${NORMAL} compat-rdma release"
+		echo -e "This is a ${GREEN}linux-2.6.git${NORMAL} compat-wireless release"
 		;;
 	*)
 		;;
@@ -407,6 +416,7 @@ if [ -d ./.git ]; then
 	cd $DIR
 	echo -e "\nBase tree: ${GREEN}$(cat compat_base_tree)${NORMAL}" >> $CODE_METRICS
 	echo -e "Base tree version: ${PURPLE}$(cat compat_base_tree_version)${NORMAL}" >> $CODE_METRICS
+	echo -e "compat.git: ${CYAN}$(cat compat_base)${NORMAL}" >> $CODE_METRICS
 	echo -e "compat-rdma release: ${YELLOW}$(cat compat_version)${NORMAL}" >> $CODE_METRICS
 
 	cat $CODE_METRICS
