@@ -16,6 +16,7 @@ export CREL=$(shell cat $(CWD)/compat_version)
 export CREL_PRE:=.compat_autoconf_
 export CREL_CHECK:=$(CREL_PRE)$(CREL)
 CFLAGS += \
+	-DCOMPAT_BASE="\"$(shell cat compat_base)\"" \
 	-DCOMPAT_BASE_TREE="\"$(shell cat compat_base_tree)\"" \
 	-DCOMPAT_BASE_TREE_VERSION="\"$(shell cat compat_base_tree_version)\"" \
 	-DCOMPAT_PROJECT="\"Compat-rdma\"" \
