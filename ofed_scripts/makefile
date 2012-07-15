@@ -31,6 +31,11 @@ install: install_kernel
 install_kernel: install_modules
 
 autoconf_h=$(shell /bin/ls -1 $(KSRC)/include/*/autoconf.h | head -1)
+kconfig_h=$(shell /bin/ls -1 $(KSRC)/include/*/kconfig.h | head -1)
+
+ifneq ($(kconfig_h),)
+KCONFIG_H = -include $(kconfig_h)
+endif
 
 V ?= 1
 
@@ -102,6 +107,7 @@ kernel:
 		-D__OFED_BUILD__ \
 		-include $(autoconf_h) \
 		-include $(CWD)/include/linux/autoconf.h \
+		$(KCONFIG_H) \
 		$(BACKPORT_INCLUDES) \
 		$(KERNEL_MEMTRACK_CFLAGS) \
 		$(KERNEL_NFS_FS_CFLAGS) \
@@ -116,6 +122,7 @@ kernel:
 		-Iinclude \
 		$$(if $$(KBUILD_SRC),-Iinclude2 -I$$(srctree)/include) \
 		-I$$(srctree)/arch/$$(SRCARCH)/include \
+		-Iarch/$$(SRCARCH)/include/generated \
 		' \
 		modules
 
