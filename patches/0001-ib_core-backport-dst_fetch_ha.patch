@@ -9,26 +9,48 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  1 files changed, 36 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
-index 6ef660c..e00422b 100644
+index 9c9ac92..16147cc 100644
 --- a/drivers/infiniband/core/addr.c
 +++ b/drivers/infiniband/core/addr.c
-@@ -38,6 +38,7 @@
- #include <linux/slab.h>
- #include <linux/workqueue.h>
- #include <linux/module.h>
-+#include <linux/version.h>
- #include <net/arp.h>
- #include <net/neighbour.h>
- #include <net/route.h>
-@@ -178,6 +179,7 @@ static void queue_req(struct addr_req *req)
+@@ -178,28 +178,45 @@ static void queue_req(struct addr_req *req)
  	mutex_unlock(&lock);
  }
  
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
  static int dst_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr, void *daddr)
++#else
++static int dst_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *addr)
++#endif
  {
  	struct neighbour *n;
-@@ -200,6 +202,7 @@ static int dst_fetch_ha(struct dst_entry *dst, struct rdma_dev_addr *dev_addr, v
+ 	int ret;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+ 	n = dst_neigh_lookup(dst, daddr);
++#endif
+ 
+ 	rcu_read_lock();
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0)
++	n = dst_get_neighbour(dst);
++#endif
+ 	if (!n || !(n->nud_state & NUD_VALID)) {
+ 		if (n)
+ 			neigh_event_send(n, NULL);
+ 		ret = -ENODATA;
+ 	} else {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+ 		ret = rdma_copy_addr(dev_addr, dst->dev, n->ha);
++#else
++		ret = rdma_copy_addr(addr, dst->dev, n->ha);
++#endif
+ 	}
+ 	rcu_read_unlock();
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
+ 	if (n)
+ 		neigh_release(n);
++#endif
  
  	return ret;
  }
@@ -36,7 +58,7 @@ index 6ef660c..e00422b 100644
  
  static int addr4_resolve(struct sockaddr_in *src_in,
  			 struct sockaddr_in *dst_in,
-@@ -231,12 +234,33 @@ static int addr4_resolve(struct sockaddr_in *src_in,
+@@ -250,12 +267,37 @@ static int addr4_resolve(struct sockaddr_in *src_in,
  	}
  
  	/* If the device does ARP internally, return 'done' */
@@ -46,7 +68,11 @@ index 6ef660c..e00422b 100644
  		goto put;
  	}
  
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
  	ret = dst_fetch_ha(&rt->dst, addr, &fl4.daddr);
++#else
++	ret = dst_fetch_ha(&rt->dst, addr);
++#endif
 +#else
 +	if (rt->idev->dev->flags & IFF_NOARP) {
 +		ret = rdma_copy_addr(addr, rt->idev->dev, NULL);
@@ -70,12 +96,16 @@ index 6ef660c..e00422b 100644
  put:
  	ip_rt_put(rt);
  out:
-@@ -284,7 +308,19 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
+@@ -329,7 +371,23 @@ static int addr6_resolve(struct sockaddr_in6 *src_in,
  		goto put;
  	}
  
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)
  	ret = dst_fetch_ha(dst, addr, &fl6.daddr);
++#else
++	ret = dst_fetch_ha(dst, addr);
++#endif
 +#else
 +	neigh = dst->neighbour;
 +	if (!neigh || !(neigh->nud_state & NUD_VALID)) {
