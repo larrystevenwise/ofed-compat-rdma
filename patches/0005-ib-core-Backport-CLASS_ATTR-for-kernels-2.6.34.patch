@@ -1,7 +1,7 @@
-From b9bb7ce447837b2b8f732f06196b4590df1128d7 Mon Sep 17 00:00:00 2001
+From 12dcf9f472a1fc297b9909e84a4c7b2a82faeaa1 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Tue, 10 Jul 2012 18:06:16 +0300
-Subject: [PATCH 5/5] ib/core: Backport CLASS_ATTR for kernels < 2.6.34
+Subject: [PATCH 5/8] ib/core: Backport CLASS_ATTR for kernels < 2.6.34
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
@@ -134,5 +134,5 @@ index 604556d..4b0d8f3 100644
  		printk(KERN_ERR "user_verbs: couldn't create abi_version attribute\n");
  		goto out_class;
 -- 
-1.7.1
+1.7.0.4
 
