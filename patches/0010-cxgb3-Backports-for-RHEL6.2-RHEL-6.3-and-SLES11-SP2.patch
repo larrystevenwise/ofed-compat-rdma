@@ -1,0 +1,636 @@
+From 309e01c042f77e96dbd705178f43235ec6a23cbf Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <root@silicon.(none)>
+Date: Mon, 30 Jul 2012 19:08:37 +0530
+Subject: [PATCH] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb3/adapter.h       |   19 +++
+ drivers/net/ethernet/chelsio/cxgb3/common.h        |    3 +
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  165 +++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |   25 +++
+ drivers/net/ethernet/chelsio/cxgb3/l2t.c           |    4 +
+ drivers/net/ethernet/chelsio/cxgb3/sge.c           |   49 ++++++
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 ++-
+ 7 files changed, 280 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
+index 8b395b5..27bd384 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/adapter.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
+@@ -45,10 +45,20 @@
+ #include "t3cdev.h"
+ #include <asm/io.h>
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
++struct vlan_group;
++#endif
+ struct adapter;
+ struct sge_qset;
+ struct port_info;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++enum {                 /* rx_offload flags */
++	T3_RX_CSUM      = 1 << 0,
++	T3_LRO          = 1 << 1,
++};
++#endif
++
+ enum mac_idx_types {
+ 	LAN_MAC_IDX	= 0,
+ 	SAN_MAC_IDX,
+@@ -65,8 +75,14 @@ struct iscsi_config {
+ 
+ struct port_info {
+ 	struct adapter *adapter;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
++	struct vlan_group *vlan_grp;
++#endif
+ 	struct sge_qset *qs;
+ 	u8 port_id;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++	u8 rx_offload;
++#endif
+ 	u8 nqsets;
+ 	u8 first_qset;
+ 	struct cphy phy;
+@@ -204,6 +220,9 @@ struct sge_qset {		/* an SGE queue set */
+ 	struct sge_fl fl[SGE_RXQ_PER_SET];
+ 	struct sge_txq txq[SGE_TXQ_PER_SET];
+ 	int nomem;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++	int lro_enabled;
++#endif
+ 	void *lro_va;
+ 	struct net_device *netdev;
+ 	struct netdev_queue *tx_q;	/* associated netdev TX queue */
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/common.h b/drivers/net/ethernet/chelsio/cxgb3/common.h
+index df01b63..9ef8b57 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/common.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/common.h
+@@ -317,6 +317,9 @@ struct tp_params {
+ 
+ struct qset_params {		/* SGE queue set parameters */
+ 	unsigned int polling;	/* polling/interrupt service for rspq */
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++	unsigned int lro;	/* large receive offload */
++#endif
+ 	unsigned int coalesce_usecs;	/* irq coalescing timer */
+ 	unsigned int rspq_size;	/* # of entries in response queue */
+ 	unsigned int fl_size;	/* # of entries in regular free list */
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index abb6ce7..a4c4f6a 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -643,6 +643,28 @@ static void enable_all_napi(struct adapter *adap)
+ 			napi_enable(&adap->sge.qs[i].napi);
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++/**
++ *	set_qset_lro - Turn a queue set's LRO capability on and off
++ *	@dev: the device the qset is attached to
++ *	@qset_idx: the queue set index
++ *	@val: the LRO switch
++ *
++ *	Sets LRO on or off for a particular queue set.
++ *	the device's features flag is updated to reflect the LRO
++ *	capability when all queues belonging to the device are
++ *	in the same state.
++ */
++static void set_qset_lro(struct net_device *dev, int qset_idx, int val)
++{
++	struct port_info *pi = netdev_priv(dev);
++	struct adapter *adapter = pi->adapter;
++
++	adapter->params.sge.qset[qset_idx].lro = !!val;
++	adapter->sge.qs[qset_idx].lro_enabled = !!val;
++}
++#endif
++
+ /**
+  *	setup_sge_qsets - configure SGE Tx/Rx/response queues
+  *	@adap: the adapter
+@@ -665,6 +687,9 @@ static int setup_sge_qsets(struct adapter *adap)
+ 
+ 		pi->qs = &adap->sge.qs[pi->first_qset];
+ 		for (j = 0; j < pi->nqsets; ++j, ++qset_idx) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++			set_qset_lro(dev, qset_idx, pi->rx_offload & T3_LRO);
++#endif
+ 			err = t3_sge_alloc_qset(adap, qset_idx, 1,
+ 				(adap->flags & USING_MSIX) ? qset_idx + 1 :
+ 							     irq_idx,
+@@ -1170,6 +1195,7 @@ static void t3_synchronize_rx(struct adapter *adap, const struct port_info *p)
+ 	}
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
+ {
+ 	struct port_info *pi = netdev_priv(dev);
+@@ -1190,6 +1216,26 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
+ 	}
+ 	t3_synchronize_rx(adapter, pi);
+ }
++#else
++static void vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
++{
++	struct port_info *pi = netdev_priv(dev);
++	struct adapter *adapter = pi->adapter;
++
++	pi->vlan_grp = grp;
++	if (adapter->params.rev > 0)
++		t3_set_vlan_accel(adapter, 1 << pi->port_id, grp != NULL);
++	else {
++		/* single control for all ports */
++		unsigned int i, have_vlans = 0;
++		for_each_port(adapter, i)
++			have_vlans |= adap2pinfo(adapter, i)->vlan_grp != NULL;
++
++		t3_set_vlan_accel(adapter, 1, have_vlans);
++	}
++	t3_synchronize_rx(adapter, pi);
++}
++#endif
+ 
+ /**
+  *	cxgb_up - enable the adapter
+@@ -1203,7 +1249,10 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
+  */
+ static int cxgb_up(struct adapter *adap)
+ {
+-	int i, err;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
++	int i;
++#endif
++	int err;
+ 
+ 	if (!(adap->flags & FULL_INIT_DONE)) {
+ 		err = t3_check_fw_version(adap);
+@@ -1240,8 +1289,10 @@ static int cxgb_up(struct adapter *adap)
+ 		if (err)
+ 			goto out;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 		for_each_port(adap, i)
+ 			cxgb_vlan_mode(adap->port[i], adap->port[i]->features);
++#endif
+ 
+ 		setup_rss(adap);
+ 		if (!(adap->flags & NAPI_INIT))
+@@ -1383,7 +1434,9 @@ out:
+ static int offload_close(struct t3cdev *tdev)
+ {
+ 	struct adapter *adapter = tdev2adap(tdev);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 38)
+ 	struct t3c_data *td = T3C_DATA(tdev);
++#endif
+ 
+ 	if (!test_bit(OFFLOAD_DEVMAP_BIT, &adapter->open_device_map))
+ 		return 0;
+@@ -1394,7 +1447,11 @@ static int offload_close(struct t3cdev *tdev)
+ 	sysfs_remove_group(&tdev->lldev->dev.kobj, &offload_attr_group);
+ 
+ 	/* Flush work scheduled while releasing TIDs */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 38)
+ 	flush_work_sync(&td->tid_release_task);
++#else
++	flush_scheduled_work();
++#endif
+ 
+ 	tdev->lldev = NULL;
+ 	cxgb3_set_dummy_ops(tdev);
+@@ -1771,6 +1828,7 @@ static int restart_autoneg(struct net_device *dev)
+ 	return 0;
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ static int set_phys_id(struct net_device *dev,
+ 		       enum ethtool_phys_id_state state)
+ {
+@@ -1793,6 +1851,28 @@ static int set_phys_id(struct net_device *dev,
+ 
+ 	return 0;
+ }
++#else
++static int cxgb3_phys_id(struct net_device *dev, u32 data)
++{
++	struct port_info *pi = netdev_priv(dev);
++	struct adapter *adapter = pi->adapter;
++	int i;
++
++	if (data == 0)
++		data = 2;
++
++	for (i = 0; i < data * 2; i++) {
++		t3_set_reg_field(adapter, A_T3DBG_GPIO_EN, F_GPIO0_OUT_VAL,
++				 (i & 1) ? F_GPIO0_OUT_VAL : 0);
++		if (msleep_interruptible(500))
++			break;
++	}
++
++	t3_set_reg_field(adapter, A_T3DBG_GPIO_EN, F_GPIO0_OUT_VAL,
++			 F_GPIO0_OUT_VAL);
++	return 0;
++}
++#endif
+ 
+ static int get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ {
+@@ -1934,6 +2014,31 @@ static int set_pauseparam(struct net_device *dev,
+ 	return 0;
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++static u32 get_rx_csum(struct net_device *dev)
++{
++	struct port_info *p = netdev_priv(dev);
++
++	return p->rx_offload & T3_RX_CSUM;
++}
++
++static int set_rx_csum(struct net_device *dev, u32 data)
++{
++	struct port_info *p = netdev_priv(dev);
++
++	if (data) {
++		p->rx_offload |= T3_RX_CSUM;
++	} else {
++		int i;
++
++		p->rx_offload &= ~(T3_RX_CSUM | T3_LRO);
++		for (i = p->first_qset; i < p->first_qset + p->nqsets; i++)
++			set_qset_lro(dev, i, 0);
++	}
++	return 0;
++}
++#endif
++
+ static void get_sge_param(struct net_device *dev, struct ethtool_ringparam *e)
+ {
+ 	struct port_info *pi = netdev_priv(dev);
+@@ -2104,15 +2209,28 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.set_eeprom = set_eeprom,
+ 	.get_pauseparam = get_pauseparam,
+ 	.set_pauseparam = set_pauseparam,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++	.get_rx_csum = get_rx_csum,
++	.set_rx_csum = set_rx_csum,
++	.set_tx_csum = ethtool_op_set_tx_csum,
++	.set_sg = ethtool_op_set_sg,
++#endif
+ 	.get_link = ethtool_op_get_link,
+ 	.get_strings = get_strings,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	.set_phys_id = set_phys_id,
++#else
++	.phys_id = cxgb3_phys_id,
++#endif
+ 	.nway_reset = restart_autoneg,
+ 	.get_sset_count = get_sset_count,
+ 	.get_ethtool_stats = get_stats,
+ 	.get_regs_len = get_regs_len,
+ 	.get_regs = get_regs,
+ 	.get_wol = get_wol,
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++	.set_tso = ethtool_op_set_tso,
++#endif
+ };
+ 
+ static int in_range(int val, int lo, int hi)
+@@ -2160,6 +2278,17 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 			      MAX_RSPQ_ENTRIES))
+ 			return -EINVAL;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++		if ((adapter->flags & FULL_INIT_DONE) && t.lro > 0)
++			for_each_port(adapter, i) {
++				pi = adap2pinfo(adapter, i);
++				if (t.qset_idx >= pi->first_qset &&
++				    t.qset_idx < pi->first_qset + pi->nqsets &&
++				    !(pi->rx_offload & T3_RX_CSUM))
++					return -EINVAL;
++			}
++#endif
++
+ 		if ((adapter->flags & FULL_INIT_DONE) &&
+ 			(t.rspq_size >= 0 || t.fl_size[0] >= 0 ||
+ 			t.fl_size[1] >= 0 || t.txq_size[0] >= 0 ||
+@@ -2221,6 +2350,7 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 			}
+ 		}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		if (t.lro >= 0) {
+ 			if (t.lro)
+ 				dev->wanted_features |= NETIF_F_GRO;
+@@ -2228,6 +2358,10 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 				dev->wanted_features &= ~NETIF_F_GRO;
+ 			netdev_update_features(dev);
+ 		}
++#else
++		if (t.lro >= 0)
++			set_qset_lro(dev, t.qset_idx, t.lro);
++#endif
+ 
+ 		break;
+ 	}
+@@ -2261,7 +2395,11 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+ 		t.fl_size[0] = q->fl_size;
+ 		t.fl_size[1] = q->jumbo_size;
+ 		t.polling = q->polling;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		t.lro = !!(dev->features & NETIF_F_GRO);
++#else
++		t.lro = q->lro;
++#endif
+ 		t.intr_lat = q->coalesce_usecs;
+ 		t.cong_thres = q->cong_thres;
+ 		t.qnum = q1;
+@@ -2553,6 +2691,7 @@ static int cxgb_set_mac_addr(struct net_device *dev, void *p)
+ 	return 0;
+ }
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ static netdev_features_t cxgb_fix_features(struct net_device *dev,
+ 	netdev_features_t features)
+ {
+@@ -2577,6 +2716,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+ 
+ 	return 0;
+ }
++#endif
+ 
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ static void cxgb_netpoll(struct net_device *dev)
+@@ -3158,8 +3298,12 @@ static const struct net_device_ops cxgb_netdev_ops = {
+ 	.ndo_do_ioctl		= cxgb_ioctl,
+ 	.ndo_change_mtu		= cxgb_change_mtu,
+ 	.ndo_set_mac_address	= cxgb_set_mac_addr,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	.ndo_fix_features	= cxgb_fix_features,
+ 	.ndo_set_features	= cxgb_set_features,
++#else
++	.ndo_vlan_rx_register   = vlan_rx_register,
++#endif
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller	= cxgb_netpoll,
+ #endif
+@@ -3285,17 +3429,36 @@ static int __devinit init_one(struct pci_dev *pdev,
+ 		adapter->port[i] = netdev;
+ 		pi = netdev_priv(netdev);
+ 		pi->adapter = adapter;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++		pi->rx_offload = T3_RX_CSUM | T3_LRO;
++#endif
+ 		pi->port_id = i;
+ 		netif_carrier_off(netdev);
+ 		netdev->irq = pdev->irq;
+ 		netdev->mem_start = mmio_start;
+ 		netdev->mem_end = mmio_start + mmio_len - 1;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
++#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0)
++		netdev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM |
++			NETIF_F_TSO | NETIF_F_RXCSUM;
++		netdev->features |= netdev->hw_features |
++			NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
++
++#else
+ 		netdev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM |
+ 			NETIF_F_TSO | NETIF_F_RXCSUM | NETIF_F_HW_VLAN_RX;
+ 		netdev->features |= netdev->hw_features | NETIF_F_HW_VLAN_TX;
++#endif	/* LINUX_VERSION_CODE > KERNEL_VERSION(3,0, 0) */
++#else
++		netdev->features |= NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_TSO;
++		netdev->features |= NETIF_F_GRO;
++#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0) */
+ 		if (pci_using_dac)
+ 			netdev->features |= NETIF_F_HIGHDMA;
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 0, 0)
++		netdev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX;
++#endif
+ 		netdev->netdev_ops = &cxgb_netdev_ops;
+ 		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
+ 	}
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+index 65e4b28..0dd8f2f 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+@@ -177,13 +177,26 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
+ 	int i;
+ 
+ 	for_each_port(adapter, i) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
++		struct vlan_group *grp;
++#endif
+ 		struct net_device *dev = adapter->port[i];
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
++		const struct port_info *p = netdev_priv(dev);
++#endif
+ 
+ 		if (!memcmp(dev->dev_addr, mac, ETH_ALEN)) {
+ 			if (vlan && vlan != VLAN_VID_MASK) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 				rcu_read_lock();
+ 				dev = __vlan_find_dev_deep(dev, vlan);
+ 				rcu_read_unlock();
++#else
++				grp = p->vlan_grp;
++				dev = NULL;
++				if (grp)
++					dev = vlan_group_get_device(grp, vlan);
++#endif
+ 			} else if (netif_is_bond_slave(dev)) {
+ 				while (dev->master)
+ 					dev = dev->master;
+@@ -969,7 +982,11 @@ static int nb_callback(struct notifier_block *self, unsigned long event,
+ 	case (NETEVENT_REDIRECT):{
+ 		struct netevent_redirect *nr = ctx;
+ 		cxgb_redirect(nr->old, nr->new);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ 		cxgb_neigh_update(dst_get_neighbour_noref(nr->new));
++#else
++		cxgb_neigh_update(dst_get_neighbour(nr->new));
++#endif
+ 		break;
+ 	}
+ 	default:
+@@ -1118,12 +1135,20 @@ static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new)
+ 	struct l2t_entry *e;
+ 	struct t3c_tid_entry *te;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ 	n = dst_get_neighbour_noref(old);
++#else
++	n = dst_get_neighbour(old);
++#endif
+ 	if (!n)
+ 		return;
+ 	olddev = n->dev;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ 	n = dst_get_neighbour_noref(new);
++#else
++	n = dst_get_neighbour(new);
++#endif
+ 	if (!n)
+ 		return;
+ 	newdev = n->dev;
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/l2t.c b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
+index 3fa3c88..4206b33 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/l2t.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
+@@ -311,7 +311,11 @@ struct l2t_entry *t3_l2t_get(struct t3cdev *cdev, struct dst_entry *dst,
+ 	int smt_idx;
+ 
+ 	rcu_read_lock();
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ 	neigh = dst_get_neighbour_noref(dst);
++#else
++	neigh = dst_get_neighbour(dst);
++#endif
+ 	if (!neigh)
+ 		goto done_rcu;
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
+index cfb60e1..2684f32 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c
+@@ -2020,7 +2020,11 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
+ 	skb_pull(skb, sizeof(*p) + pad);
+ 	skb->protocol = eth_type_trans(skb, adap->port[p->iff]);
+ 	pi = netdev_priv(skb->dev);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	if ((skb->dev->features & NETIF_F_RXCSUM) && p->csum_valid &&
++#else
++	if ((pi->rx_offload & T3_RX_CSUM) && p->csum_valid &&
++#endif
+ 	    p->csum == htons(0xffff) && !p->fragment) {
+ 		qs->port_stats[SGE_PSTAT_RX_CSUM_GOOD]++;
+ 		skb->ip_summed = CHECKSUM_UNNECESSARY;
+@@ -2028,11 +2032,37 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
+ 		skb_checksum_none_assert(skb);
+ 	skb_record_rx_queue(skb, qs - &adap->sge.qs[pi->first_qset]);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	if (p->vlan_valid) {
++#else
++	if (unlikely(p->vlan_valid)) {
++		struct vlan_group *grp = pi->vlan_grp;
++#endif
+ 		qs->port_stats[SGE_PSTAT_VLANEX]++;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 		__vlan_hwaccel_put_tag(skb, ntohs(p->vlan));
+ 	}
+ 	if (rq->polling) {
++#else
++	if (likely(grp))
++		if (lro)
++			vlan_gro_receive(&qs->napi, grp,
++					ntohs(p->vlan), skb);
++		else {
++			if (unlikely(pi->iscsic.flags)) {
++				unsigned short vtag = ntohs(p->vlan) &
++					VLAN_VID_MASK;
++				skb->dev = vlan_group_get_device(grp,
++						vtag);
++				cxgb3_process_iscsi_prov_pack(pi, skb);
++			}
++			__vlan_hwaccel_rx(skb, grp, ntohs(p->vlan),
++					rq->polling);
++		}
++	else
++		dev_kfree_skb_any(skb);
++	} else if (rq->polling) {
++#endif
+ 		if (lro)
+ 			napi_gro_receive(&qs->napi, skb);
+ 		else {
+@@ -2104,7 +2134,11 @@ static void lro_add_page(struct adapter *adap, struct sge_qset *qs,
+ 		offset = 2 + sizeof(struct cpl_rx_pkt);
+ 		cpl = qs->lro_va = sd->pg_chunk.va + 2;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		if ((qs->netdev->features & NETIF_F_RXCSUM) &&
++#else
++		if ((pi->rx_offload & T3_RX_CSUM) &&
++#endif
+ 		     cpl->csum_valid && cpl->csum == htons(0xffff)) {
+ 			skb->ip_summed = CHECKSUM_UNNECESSARY;
+ 			qs->port_stats[SGE_PSTAT_RX_CSUM_GOOD]++;
+@@ -2130,8 +2164,19 @@ static void lro_add_page(struct adapter *adap, struct sge_qset *qs,
+ 
+ 	skb_record_rx_queue(skb, qs - &adap->sge.qs[pi->first_qset]);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	if (cpl->vlan_valid)
+ 		__vlan_hwaccel_put_tag(skb, ntohs(cpl->vlan));
++#else
++	if (unlikely(cpl->vlan_valid)) {
++		struct vlan_group *grp = pi->vlan_grp;
++
++		if (likely(grp != NULL)) {
++			vlan_gro_frags(&qs->napi, grp, ntohs(cpl->vlan));
++			return;
++		}
++	}
++#endif
+ 	napi_gro_frags(&qs->napi);
+ }
+ 
+@@ -2263,8 +2308,12 @@ static int process_responses(struct adapter *adap, struct sge_qset *qs,
+ 	q->next_holdoff = q->holdoff_tmr;
+ 
+ 	while (likely(budget_left && is_new_response(r, q))) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		int packet_complete, eth, ethpad = 2;
+ 		int lro = !!(qs->netdev->features & NETIF_F_GRO);
++#else
++		int packet_complete, eth, ethpad = 2, lro = qs->lro_enabled;
++#endif
+ 		struct sk_buff *skb = NULL;
+ 		u32 len, flags;
+ 		__be32 rss_hi, rss_lo;
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
+index 3af19a5..b3c99fd 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
+@@ -311,17 +311,32 @@ int t3_mac_set_rx_mode(struct cmac *mac, struct net_device *dev)
+ 	if (dev->flags & IFF_ALLMULTI)
+ 		hash_lo = hash_hi = 0xffffffff;
+ 	else {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 		struct netdev_hw_addr *ha;
++#else
++		struct dev_mc_list *dmi;
++#endif
+ 		int exact_addr_idx = mac->nucast;
+ 
+ 		hash_lo = hash_hi = 0;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 		netdev_for_each_mc_addr(ha, dev)
++#else
++		netdev_for_each_mc_addr(dmi, dev)
++#endif
+ 			if (exact_addr_idx < EXACT_ADDR_FILTERS)
+ 				set_addr_filter(mac, exact_addr_idx++,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 						ha->addr);
++#else
++						dmi->dmi_addr);
++#endif
+ 			else {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 				int hash = hash_hw_addr(ha->addr);
+-
++#else
++				int hash = hash_hw_addr(dmi->dmi_addr);
++#endif
+ 				if (hash < 32)
+ 					hash_lo |= (1 << hash);
+ 				else
+-- 
+1.7.1
+

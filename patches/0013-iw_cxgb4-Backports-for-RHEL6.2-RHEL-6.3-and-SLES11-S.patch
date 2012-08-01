@@ -1,0 +1,293 @@
+From c359992f6044321a92bccf3bc1f69a4356a1782d Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <root@silicon.(none)>
+Date: Mon, 30 Jul 2012 16:59:42 +0530
+Subject: [PATCH] iw_cxgb4: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+
+Signed-off-by: Vipul Pandya <root@silicon.(none)>
+---
+ drivers/infiniband/hw/cxgb4/cm.c       |   45 ++++++++++++++++++++++++++++++++
+ drivers/infiniband/hw/cxgb4/cq.c       |   12 ++++++++
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h |    4 +++
+ drivers/infiniband/hw/cxgb4/mem.c      |    8 +++++
+ drivers/infiniband/hw/cxgb4/qp.c       |   17 +++++++++++-
+ drivers/infiniband/hw/cxgb4/t4.h       |   12 ++++++++
+ 6 files changed, 97 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index b18870c..c1805bd 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -316,12 +316,33 @@ static struct rtable *find_route(struct c4iw_dev *dev, __be32 local_ip,
+ 				 __be16 peer_port, u8 tos)
+ {
+ 	struct rtable *rt;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	struct flowi4 fl4;
+ 
+ 	rt = ip_route_output_ports(&init_net, &fl4, NULL, peer_ip, local_ip,
+ 				   peer_port, local_port, IPPROTO_TCP,
+ 				   tos, 0);
+ 	if (IS_ERR(rt))
++#else
++	struct flowi fl = {
++		.oif = 0,
++		.nl_u = {
++			.ip4_u = {
++				.daddr = peer_ip,
++				.saddr = local_ip,
++				.tos = tos
++			}
++		},
++		.proto = IPPROTO_TCP,
++		.uli_u = {
++			.ports = {
++				.sport = local_port,
++				.dport = peer_port
++			}
++		}
++	};
++	if (ip_route_output_flow(&init_net, &rt, &fl, NULL, false))
++#endif
+ 		return NULL;
+ 	return rt;
+ }
+@@ -1583,11 +1604,23 @@ static int import_ep(struct c4iw_ep *ep, __be32 peer_ip, struct dst_entry *dst,
+ 	struct neighbour *n;
+ 	int err, step;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
+ 	n = dst_neigh_lookup(dst, &peer_ip);
+ 	if (!n)
+ 		return -ENODEV;
+ 
+ 	rcu_read_lock();
++#else
++	rcu_read_lock();
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
++	n = dst_get_neighbour_noref(dst);
++#else
++	n = dst_get_neighbour(dst);
++#endif
++	err = -ENODEV;
++	if (!n)
++		goto out;
++#endif
+ 	err = -ENOMEM;
+ 	if (n->dev->flags & IFF_LOOPBACK) {
+ 		struct net_device *pdev;
+@@ -1676,7 +1709,11 @@ static int pass_accept_req(struct c4iw_dev *dev, struct sk_buff *skb)
+ 		       __func__);
+ 		goto reject;
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	dst = &rt->dst;
++#else
++	dst = &rt->u.dst;
++#endif
+ 
+ 	child_ep = alloc_ep(sizeof(*child_ep), GFP_KERNEL);
+ 	if (!child_ep) {
+@@ -1868,7 +1905,11 @@ static int c4iw_reconnect(struct c4iw_ep *ep)
+ 		err = -EHOSTUNREACH;
+ 		goto fail3;
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	ep->dst = &rt->dst;
++#else
++	ep->dst = &rt->u.dst;
++#endif
+ 
+ 	err = import_ep(ep, ep->com.cm_id->remote_addr.sin_addr.s_addr,
+ 			ep->dst, ep->com.dev, false);
+@@ -2311,7 +2352,11 @@ int c4iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 		err = -EHOSTUNREACH;
+ 		goto fail3;
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	ep->dst = &rt->dst;
++#else
++	ep->dst = &rt->u.dst;
++#endif
+ 
+ 	err = import_ep(ep, cm_id->remote_addr.sin_addr.s_addr,
+ 			ep->dst, ep->com.dev, true);
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index 0f1607c..4046852 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -70,7 +70,11 @@ static int destroy_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
+ 	kfree(cq->sw_queue);
+ 	dma_free_coherent(&(rdev->lldi.pdev->dev),
+ 			  cq->memsize, cq->queue,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 			  dma_unmap_addr(cq, mapping));
++#else
++			  pci_unmap_addr(cq, mapping));
++#endif
+ 	c4iw_put_cqid(rdev, cq->cqid, uctx);
+ 	return ret;
+ }
+@@ -105,7 +109,11 @@ static int create_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
+ 		ret = -ENOMEM;
+ 		goto err3;
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	dma_unmap_addr_set(cq, mapping, cq->dma_addr);
++#else
++	pci_unmap_addr_set(cq, mapping, cq->dma_addr);
++#endif
+ 	memset(cq->queue, 0, cq->memsize);
+ 
+ 	/* build fw_ri_res_wr */
+@@ -165,7 +173,11 @@ static int create_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
+ 	return 0;
+ err4:
+ 	dma_free_coherent(&rdev->lldi.pdev->dev, cq->memsize, cq->queue,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 			  dma_unmap_addr(cq, mapping));
++#else
++			  pci_unmap_addr(cq, mapping));
++#endif
+ err3:
+ 	kfree(cq->sw_queue);
+ err2:
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 9beb3a9..9a9df48 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -359,7 +359,11 @@ static inline struct c4iw_mw *to_c4iw_mw(struct ib_mw *ibmw)
+ 
+ struct c4iw_fr_page_list {
+ 	struct ib_fast_reg_page_list ibpl;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	DEFINE_DMA_UNMAP_ADDR(mapping);
++#else
++	DECLARE_PCI_UNMAP_ADDR(mapping);
++#endif
+ 	dma_addr_t dma_addr;
+ 	struct c4iw_dev *dev;
+ 	int size;
+diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
+index 57e07c6..375da95 100644
+--- a/drivers/infiniband/hw/cxgb4/mem.c
++++ b/drivers/infiniband/hw/cxgb4/mem.c
+@@ -764,7 +764,11 @@ struct ib_fast_reg_page_list *c4iw_alloc_fastreg_pbl(struct ib_device *device,
+ 	if (!c4pl)
+ 		return ERR_PTR(-ENOMEM);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	dma_unmap_addr_set(c4pl, mapping, dma_addr);
++#else
++	pci_unmap_addr_set(c4pl, mapping, dma_addr);
++#endif
+ 	c4pl->dma_addr = dma_addr;
+ 	c4pl->dev = dev;
+ 	c4pl->size = size;
+@@ -779,7 +783,11 @@ void c4iw_free_fastreg_pbl(struct ib_fast_reg_page_list *ibpl)
+ 	struct c4iw_fr_page_list *c4pl = to_c4iw_fr_page_list(ibpl);
+ 
+ 	dma_free_coherent(&c4pl->dev->rdev.lldi.pdev->dev, c4pl->size,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 			  c4pl, dma_unmap_addr(c4pl, mapping));
++#else
++			  c4pl, pci_unmap_addr(c4pl, mapping));
++#endif
+ }
+ 
+ int c4iw_dereg_mr(struct ib_mr *ib_mr)
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 45aedf1..e83249c 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -109,7 +109,11 @@ static int destroy_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 	 */
+ 	dma_free_coherent(&(rdev->lldi.pdev->dev),
+ 			  wq->rq.memsize, wq->rq.queue,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 			  dma_unmap_addr(&wq->rq, mapping));
++#else
++			  pci_unmap_addr(&wq->rq, mapping));
++#endif
+ 	dealloc_sq(rdev, &wq->sq);
+ 	c4iw_rqtpool_free(rdev, wq->rq.rqt_hwaddr, wq->rq.rqt_size);
+ 	kfree(wq->rq.sw_rq);
+@@ -167,7 +171,11 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		if (alloc_host_sq(rdev, &wq->sq))
+ 			goto err5;
+ 	memset(wq->sq.queue, 0, wq->sq.memsize);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	dma_unmap_addr_set(&wq->sq, mapping, wq->sq.dma_addr);
++#else
++	pci_unmap_addr_set(&wq->sq, mapping, wq->sq.dma_addr);
++#endif
+ 
+ 	wq->rq.queue = dma_alloc_coherent(&(rdev->lldi.pdev->dev),
+ 					  wq->rq.memsize, &(wq->rq.dma_addr),
+@@ -180,8 +188,11 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		wq->rq.queue,
+ 		(unsigned long long)virt_to_phys(wq->rq.queue));
+ 	memset(wq->rq.queue, 0, wq->rq.memsize);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	dma_unmap_addr_set(&wq->rq, mapping, wq->rq.dma_addr);
+-
++#else
++	pci_unmap_addr_set(&wq->rq, mapping, wq->rq.dma_addr);
++#endif
+ 	wq->db = rdev->lldi.db_reg;
+ 	wq->gts = rdev->lldi.gts_reg;
+ 	if (user) {
+@@ -279,7 +290,11 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ err7:
+ 	dma_free_coherent(&(rdev->lldi.pdev->dev),
+ 			  wq->rq.memsize, wq->rq.queue,
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 			  dma_unmap_addr(&wq->rq, mapping));
++#else
++			  pci_unmap_addr(&wq->rq, mapping));
++#endif
+ err6:
+ 	dealloc_sq(rdev, &wq->sq);
+ err5:
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index 16f26ab..cafdb7c 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -296,7 +296,11 @@ enum {
+ struct t4_sq {
+ 	union t4_wr *queue;
+ 	dma_addr_t dma_addr;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	DEFINE_DMA_UNMAP_ADDR(mapping);
++#else
++	DECLARE_PCI_UNMAP_ADDR(mapping);
++#endif
+ 	unsigned long phys_addr;
+ 	struct t4_swsqe *sw_sq;
+ 	struct t4_swsqe *oldest_read;
+@@ -318,7 +322,11 @@ struct t4_swrqe {
+ struct t4_rq {
+ 	union  t4_recv_wr *queue;
+ 	dma_addr_t dma_addr;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	DEFINE_DMA_UNMAP_ADDR(mapping);
++#else
++	DECLARE_PCI_UNMAP_ADDR(mapping);
++#endif
+ 	struct t4_swrqe *sw_rq;
+ 	u64 udb;
+ 	size_t memsize;
+@@ -476,7 +484,11 @@ static inline int t4_wq_db_enabled(struct t4_wq *wq)
+ struct t4_cq {
+ 	struct t4_cqe *queue;
+ 	dma_addr_t dma_addr;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 	DEFINE_DMA_UNMAP_ADDR(mapping);
++#else
++	DECLARE_PCI_UNMAP_ADDR(mapping);
++#endif
+ 	struct t4_cqe *sw_queue;
+ 	void __iomem *gts;
+ 	struct c4iw_rdev *rdev;
+-- 
+1.7.1
+
