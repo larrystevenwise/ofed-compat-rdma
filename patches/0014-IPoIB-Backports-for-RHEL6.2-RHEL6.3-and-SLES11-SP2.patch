@@ -1,0 +1,206 @@
+From c2ecb52764e5787acd7c0731b613dcfc8c101bfc Mon Sep 17 00:00:00 2001
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Date: Thu, 2 Aug 2012 16:12:39 +0300
+Subject: [PATCH] IPoIB: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ drivers/infiniband/ulp/ipoib/ipoib.h           |    3 +++
+ drivers/infiniband/ulp/ipoib/ipoib_cm.c        |   21 +++++++++++++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_main.c      |   18 ++++++++++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_multicast.c |   19 +++++++++++++++++++
+ 4 files changed, 61 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib.h b/drivers/infiniband/ulp/ipoib/ipoib.h
+index 86df632..a876f24 100644
+--- a/drivers/infiniband/ulp/ipoib/ipoib.h
++++ b/drivers/infiniband/ulp/ipoib/ipoib.h
+@@ -92,6 +92,9 @@ enum {
+ 	IPOIB_STOP_REAPER	  = 7,
+ 	IPOIB_FLAG_ADMIN_CM	  = 9,
+ 	IPOIB_FLAG_UMCAST	  = 10,
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(2,6,39))
++	IPOIB_FLAG_CSUM           = 11,
++#endif
+ 
+ 	IPOIB_MAX_BACKOFF_SECONDS = 16,
+ 
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib_cm.c b/drivers/infiniband/ulp/ipoib/ipoib_cm.c
+index 014504d..b83efdf 100644
+--- a/drivers/infiniband/ulp/ipoib/ipoib_cm.c
++++ b/drivers/infiniband/ulp/ipoib/ipoib_cm.c
+@@ -1378,7 +1378,11 @@ static void ipoib_cm_skb_reap(struct work_struct *work)
+ 			icmp_send(skb, ICMP_DEST_UNREACH, ICMP_FRAG_NEEDED, htonl(mtu));
+ #if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+ 		else if (skb->protocol == htons(ETH_P_IPV6))
++#if  (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34))
+ 			icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu);
++#else
++			icmpv6_send(skb, ICMPV6_PKT_TOOBIG, 0, mtu, priv->dev);
++#endif
+ #endif
+ 		dev_kfree_skb_any(skb);
+ 
+@@ -1465,7 +1469,15 @@ static ssize_t set_mode(struct device *d, struct device_attribute *attr,
+ 		set_bit(IPOIB_FLAG_ADMIN_CM, &priv->flags);
+ 		ipoib_warn(priv, "enabling connected mode "
+ 			   "will cause multicast packet drops\n");
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 		netdev_update_features(dev);
++#else
++		dev->features &= ~(NETIF_F_IP_CSUM | NETIF_F_SG | NETIF_F_TSO);
++		if (ipoib_cm_max_mtu(dev) > priv->mcast_mtu)
++			ipoib_warn(priv, "mtu > %d will cause multicast packet drops.\n",
++				   priv->mcast_mtu);
++		dev_set_mtu(dev, ipoib_cm_max_mtu(dev));
++#endif
+ 		rtnl_unlock();
+ 		priv->tx_wr.send_flags &= ~IB_SEND_IP_CSUM;
+ 
+@@ -1475,7 +1487,16 @@ static ssize_t set_mode(struct device *d, struct device_attribute *attr,
+ 
+ 	if (!strcmp(buf, "datagram\n")) {
+ 		clear_bit(IPOIB_FLAG_ADMIN_CM, &priv->flags);
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 		netdev_update_features(dev);
++#else
++		if (test_bit(IPOIB_FLAG_CSUM, &priv->flags)) {
++			dev->features |= NETIF_F_IP_CSUM | NETIF_F_SG;
++			priv->dev->features |= NETIF_F_GRO;
++			if (priv->hca_caps & IB_DEVICE_UD_TSO)
++				dev->features |= NETIF_F_TSO;
++		} 
++#endif
+ 		dev_set_mtu(dev, min(priv->mcast_mtu, dev->mtu));
+ 		rtnl_unlock();
+ 		ipoib_flush_paths(dev);
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib_main.c b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+index 3974c29..f35bd5c 100644
+--- a/drivers/infiniband/ulp/ipoib/ipoib_main.c
++++ b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+@@ -171,6 +171,7 @@ static int ipoib_stop(struct net_device *dev)
+ 	return 0;
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ static netdev_features_t ipoib_fix_features(struct net_device *dev, netdev_features_t features)
+ {
+ 	struct ipoib_dev_priv *priv = netdev_priv(dev);
+@@ -180,6 +181,7 @@ static netdev_features_t ipoib_fix_features(struct net_device *dev, netdev_featu
+ 
+ 	return features;
+ }
++#endif
+ 
+ static int ipoib_change_mtu(struct net_device *dev, int new_mtu)
+ {
+@@ -715,7 +717,11 @@ static int ipoib_start_xmit(struct sk_buff *skb, struct net_device *dev)
+ 
+ 	rcu_read_lock();
+ 	if (likely(skb_dst(skb))) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ 		n = dst_get_neighbour_noref(skb_dst(skb));
++#else
++		n = dst_get_neighbour(skb_dst(skb));
++#endif
+ 		if (!n) {
+ 			++dev->stats.tx_dropped;
+ 			dev_kfree_skb_any(skb);
+@@ -986,7 +992,9 @@ static const struct net_device_ops ipoib_netdev_ops = {
+ 	.ndo_open		 = ipoib_open,
+ 	.ndo_stop		 = ipoib_stop,
+ 	.ndo_change_mtu		 = ipoib_change_mtu,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ 	.ndo_fix_features	 = ipoib_fix_features,
++#endif
+ 	.ndo_start_xmit	 	 = ipoib_start_xmit,
+ 	.ndo_tx_timeout		 = ipoib_timeout,
+ 	.ndo_set_rx_mode	 = ipoib_set_mcast_list,
+@@ -1167,6 +1175,7 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+ 	kfree(device_attr);
+ 
+ 	if (priv->hca_caps & IB_DEVICE_UD_IP_CSUM) {
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39))
+ 		priv->dev->hw_features = NETIF_F_SG |
+ 			NETIF_F_IP_CSUM | NETIF_F_RXCSUM;
+ 
+@@ -1174,6 +1183,13 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+ 			priv->dev->hw_features |= NETIF_F_TSO;
+ 
+ 		priv->dev->features |= priv->dev->hw_features;
++#else
++		priv->dev->features |= NETIF_F_SG |
++			NETIF_F_IP_CSUM | NETIF_F_RXCSUM;
++
++		if (priv->hca_caps & IB_DEVICE_UD_TSO)
++			priv->dev->features |= NETIF_F_TSO;
++#endif
+ 	}
+ 
+ 	return 0;
+@@ -1205,7 +1221,9 @@ static struct net_device *ipoib_add_port(const char *format,
+ 	priv->dev->mtu  = IPOIB_UD_MTU(priv->max_ib_mtu);
+ 	priv->mcast_mtu  = priv->admin_mtu = priv->dev->mtu;
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ 	priv->dev->neigh_priv_len = sizeof(struct ipoib_neigh);
++#endif
+ 
+ 	result = ib_query_pkey(hca, port, 0, &priv->pkey);
+ 	if (result) {
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib_multicast.c b/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
+index 20ebc6f..4a4c64a 100644
+--- a/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
++++ b/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
+@@ -720,7 +720,11 @@ out:
+ 
+ 		rcu_read_lock();
+ 		if (dst)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,3,0))
+ 			n = dst_get_neighbour_noref(dst);
++#else
++			n = dst_get_neighbour(dst);
++#endif
+ 		if (n && !*to_ipoib_neigh(n)) {
+ 			struct ipoib_neigh *neigh = ipoib_neigh_alloc(n,
+ 								      skb->dev);
+@@ -788,7 +792,11 @@ void ipoib_mcast_restart_task(struct work_struct *work)
+ 	struct ipoib_dev_priv *priv =
+ 		container_of(work, struct ipoib_dev_priv, restart_task);
+ 	struct net_device *dev = priv->dev;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	struct netdev_hw_addr *ha;
++#else
++	struct dev_mc_list *mclist;
++#endif
+ 	struct ipoib_mcast *mcast, *tmcast;
+ 	LIST_HEAD(remove_list);
+ 	unsigned long flags;
+@@ -813,6 +821,7 @@ void ipoib_mcast_restart_task(struct work_struct *work)
+ 		clear_bit(IPOIB_MCAST_FLAG_FOUND, &mcast->flags);
+ 
+ 	/* Mark all of the entries that are found or don't exist */
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,35))
+ 	netdev_for_each_mc_addr(ha, dev) {
+ 		union ib_gid mgid;
+ 
+@@ -820,6 +829,16 @@ void ipoib_mcast_restart_task(struct work_struct *work)
+ 			continue;
+ 
+ 		memcpy(mgid.raw, ha->addr + 4, sizeof mgid);
++#else
++	for (mclist = dev->mc_list; mclist; mclist = mclist->next) {
++		union ib_gid mgid;
++
++		if (!ipoib_mcast_addr_is_valid(mclist->dmi_addr,
++						dev->broadcast))
++			continue;
++
++		memcpy(mgid.raw, mclist->dmi_addr + 4, sizeof mgid);
++#endif
+ 
+ 		mcast = __ipoib_mcast_find(dev, &mgid);
+ 		if (!mcast || test_bit(IPOIB_MCAST_FLAG_SENDONLY, &mcast->flags)) {
+-- 
+1.7.5.4
+
