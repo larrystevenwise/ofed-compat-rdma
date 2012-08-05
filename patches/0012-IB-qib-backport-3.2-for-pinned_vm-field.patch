@@ -1,6 +1,12 @@
-IB/qib: backport < 3.2 for pinned_vm field
+From 7996c9a696ae6954721ce66a8ab300c9df8b7f2e Mon Sep 17 00:00:00 2001
+From: Mike Marciniszyn <mike.marciniszyn@intel.com>
+Date: Thu, 2 Aug 2012 18:11:27 +0300
+Subject: [PATCH 12/19] IB/qib: backport < 3.2 for pinned_vm field
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
+---
+ drivers/infiniband/hw/qib/qib_user_pages.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_user_pages.c b/drivers/infiniband/hw/qib/qib_user_pages.c
 index 2bc1d2b..80d6ea5 100644
@@ -30,3 +36,6 @@ index 2bc1d2b..80d6ea5 100644
  		up_write(&current->mm->mmap_sem);
  	}
  }
+-- 
+1.7.0.4
+

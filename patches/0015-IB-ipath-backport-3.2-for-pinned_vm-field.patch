@@ -1,6 +1,12 @@
-IB/ipath: backport < 3.2 for pinned_vm field
+From 4c438e025af2c1e3b6da2e80aa4cdeb22879b233 Mon Sep 17 00:00:00 2001
+From: Mike Marciniszyn <mike.marciniszyn@intel.com>
+Date: Thu, 2 Aug 2012 18:11:27 +0300
+Subject: [PATCH 15/19] IB/ipath: backport < 3.2 for pinned_vm field
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
+---
+ drivers/infiniband/hw/ipath/ipath_user_pages.c |   12 ++++++++++++
+ 1 files changed, 12 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/hw/ipath/ipath_user_pages.c b/drivers/infiniband/hw/ipath/ipath_user_pages.c
 index dc66c45..f2858e6 100644
@@ -42,3 +48,6 @@ index dc66c45..f2858e6 100644
  	up_write(&work->mm->mmap_sem);
  	mmput(work->mm);
  	kfree(work);
+-- 
+1.7.0.4
+

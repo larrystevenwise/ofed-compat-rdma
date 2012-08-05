@@ -1,7 +1,7 @@
-From 80aaf4b94ca74d3d0c661932ec05d46da4c42022 Mon Sep 17 00:00:00 2001
+From 5b576bba91da600067fb95cc76b13d57433b0767 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Mon, 16 Jul 2012 17:14:31 +0300
-Subject: [PATCH 8/8] RDMA/nes: Backports for RHEL 6.2 and 6.3
+Subject: [PATCH 08/19] RDMA/nes: Backports for RHEL 6.2 and 6.3
 
 Backports for linux-3.5 nes to RHEL-6.2 and RHEL-6.3
 

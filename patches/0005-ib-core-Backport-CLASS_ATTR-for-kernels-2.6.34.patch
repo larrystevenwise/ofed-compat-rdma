@@ -1,7 +1,7 @@
-From 12dcf9f472a1fc297b9909e84a4c7b2a82faeaa1 Mon Sep 17 00:00:00 2001
+From 83914b4f3d83330c6ad822f9452d4b2c81f328bd Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Tue, 10 Jul 2012 18:06:16 +0300
-Subject: [PATCH 5/8] ib/core: Backport CLASS_ATTR for kernels < 2.6.34
+Subject: [PATCH 05/19] ib/core: Backport CLASS_ATTR for kernels < 2.6.34
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---

@@ -1,7 +1,7 @@
-From 0bdb36768a4a4b5ed3984c671e76f29dbcc20ee6 Mon Sep 17 00:00:00 2001
+From 0038f903e7318e5e0ef15949acd78290b9c665a3 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Tue, 10 Jul 2012 15:57:24 +0300
-Subject: [PATCH 1/8] ib_core: backport dst_fetch_ha
+Subject: [PATCH 01/19] ib_core: backport dst_fetch_ha
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---

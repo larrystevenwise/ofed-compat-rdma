@@ -1,6 +1,12 @@
-IB/ipath: backport qib_fs.c before 2.6.35
+From 6de2e2a1dec734bab9788b2602edcbda1ce34cf2 Mon Sep 17 00:00:00 2001
+From: Mike Marciniszyn <mike.marciniszyn@intel.com>
+Date: Thu, 2 Aug 2012 18:11:27 +0300
+Subject: [PATCH 14/19] IB/ipath: backport qib_fs.c before 2.6.35
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
+---
+ drivers/infiniband/hw/ipath/ipath_fs.c |   26 ++++++++++++++++++++++++++
+ 1 files changed, 26 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/hw/ipath/ipath_fs.c b/drivers/infiniband/hw/ipath/ipath_fs.c
 index a4de9d5..5ec9c66 100644
@@ -74,3 +80,6 @@ index a4de9d5..5ec9c66 100644
  	.kill_sb =	ipathfs_kill_super,
  };
  
+-- 
+1.7.0.4
+

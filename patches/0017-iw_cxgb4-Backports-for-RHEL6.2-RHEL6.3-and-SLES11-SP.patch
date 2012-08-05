@@ -1,7 +1,7 @@
-From c359992f6044321a92bccf3bc1f69a4356a1782d Mon Sep 17 00:00:00 2001
+From 7042b9602eddcccd36c970f11d5123db52883b0c Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <root@silicon.(none)>
 Date: Mon, 30 Jul 2012 16:59:42 +0530
-Subject: [PATCH] iw_cxgb4: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH 17/19] iw_cxgb4: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <root@silicon.(none)>
 ---
@@ -112,7 +112,7 @@ index b18870c..c1805bd 100644
  	err = import_ep(ep, cm_id->remote_addr.sin_addr.s_addr,
  			ep->dst, ep->com.dev, true);
 diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
-index 0f1607c..4046852 100644
+index 0f1607c..550eb82 100644
 --- a/drivers/infiniband/hw/cxgb4/cq.c
 +++ b/drivers/infiniband/hw/cxgb4/cq.c
 @@ -70,7 +70,11 @@ static int destroy_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
@@ -289,5 +289,5 @@ index 16f26ab..cafdb7c 100644
  	void __iomem *gts;
  	struct c4iw_rdev *rdev;
 -- 
-1.7.1
+1.7.0.4
 

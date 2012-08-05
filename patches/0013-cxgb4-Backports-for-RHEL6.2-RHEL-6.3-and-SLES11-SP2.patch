@@ -1,7 +1,7 @@
-From 867d62561a8a95e35469b72b4c82589524e069b3 Mon Sep 17 00:00:00 2001
+From b316d1c7c58e9a499efd68a4072d7e566b50d733 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
 Date: Mon, 30 Jul 2012 12:06:12 +0530
-Subject: [PATCH 1/4] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
+Subject: [PATCH 13/19] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
@@ -50,7 +50,7 @@ index ec2dafe..84fa932 100644
  	unsigned int nfrags;              /* # of fragments */
  	unsigned int tot_len;             /* total length of fragments */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index e1f96fb..12a0dba 100644
+index e1f96fb..ec57e1c 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -31,7 +31,9 @@
@@ -414,7 +414,7 @@ index e1f96fb..12a0dba 100644
  		netdev->netdev_ops = &cxgb4_netdev_ops;
  		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index e111d97..e25544f 100644
+index e111d97..b97bea7 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
 @@ -216,8 +216,13 @@ static int map_skb(struct device *dev, const struct sk_buff *skb,
@@ -594,5 +594,5 @@ index e111d97..e25544f 100644
  				restore_rx_bufs(&si, &rxq->fl, frags);
  		} else if (likely(rsp_type == RSP_TYPE_CPL)) {
 -- 
-1.7.1
+1.7.0.4
 

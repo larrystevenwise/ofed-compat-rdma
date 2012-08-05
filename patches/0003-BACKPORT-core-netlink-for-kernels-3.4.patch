@@ -1,7 +1,7 @@
-From 99c4d483228edc17d03d7b4ee21c36943b4bcaca Mon Sep 17 00:00:00 2001
+From 7692a8ee4653116ca742acfbf84b008ef98a2fa2 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Mon, 25 Jun 2012 22:28:24 +0300
-Subject: [PATCH 3/8] BACKPORT: core/netlink for kernels <= 3.4
+Subject: [PATCH 03/19] BACKPORT: core/netlink for kernels <= 3.4
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---

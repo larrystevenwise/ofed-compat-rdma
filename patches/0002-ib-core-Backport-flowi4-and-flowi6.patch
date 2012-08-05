@@ -1,7 +1,7 @@
-From bb3f1ecdb6baee2740a108b6df5710c7b69cd6f3 Mon Sep 17 00:00:00 2001
+From afcded5e038e760d131e231d5c4ef9b1aab47ef4 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Tue, 10 Jul 2012 17:21:25 +0300
-Subject: [PATCH 2/8] ib/core: Backport flowi4 and flowi6
+Subject: [PATCH 02/19] ib/core: Backport flowi4 and flowi6
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
