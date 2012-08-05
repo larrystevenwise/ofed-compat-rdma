@@ -569,6 +569,15 @@ KSRC=${KSRC:-/lib/modules/${KVERSION}/build}
 
 ARCH=${ARCH:-$(uname -m)}
 
+case $ARCH in
+	ppc*)
+	ARCH=powerpc
+	;;
+	i?86)
+	ARCH=i386
+	;;
+esac
+
 # Additional parameters to be passed to configure command
 CWD=$(pwd)
 CONFIG="configure.mk.kernel"
