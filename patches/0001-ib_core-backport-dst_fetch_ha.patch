@@ -1,7 +1,7 @@
-From 0038f903e7318e5e0ef15949acd78290b9c665a3 Mon Sep 17 00:00:00 2001
+From aab849d519467be361c92ecaf2c1c46df1d6466e Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Tue, 10 Jul 2012 15:57:24 +0300
-Subject: [PATCH 01/19] ib_core: backport dst_fetch_ha
+Subject: [PATCH 01/21] ib_core: backport dst_fetch_ha
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  1 files changed, 58 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
-index 6ef660c..b3f7918 100644
+index 6ef660c..984f61c 100644
 --- a/drivers/infiniband/core/addr.c
 +++ b/drivers/infiniband/core/addr.c
 @@ -178,28 +178,45 @@ static void queue_req(struct addr_req *req)
@@ -86,7 +86,7 @@ index 6ef660c..b3f7918 100644
 +		if (neigh)
 +			goto release;
 + 		goto put;
-+ 	}
++	}
 +
 +	ret = rdma_copy_addr(addr, neigh->dev, neigh->ha);
 +release:

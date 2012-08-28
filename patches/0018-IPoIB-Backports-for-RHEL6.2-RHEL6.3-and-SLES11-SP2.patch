@@ -1,7 +1,7 @@
-From fb296cd5f46e72878911b20e3e346b605ea84c4d Mon Sep 17 00:00:00 2001
+From a5eccddfb48b63a8cddec33b39544136aa3378ee Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Thu, 2 Aug 2012 16:12:39 +0300
-Subject: [PATCH 18/19] IPoIB: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH 18/21] IPoIB: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---

@@ -1,7 +1,7 @@
-From 62a485e26214924a1e2f4611460113c3f584038e Mon Sep 17 00:00:00 2001
+From 4a1c370f23ed0c15fa8a15b7cdd72fc4b8e9590b Mon Sep 17 00:00:00 2001
 From: Mike Marciniszyn <mike.marciniszyn@intel.com>
 Date: Thu, 2 Aug 2012 18:11:27 +0300
-Subject: [PATCH 10/19] IB/qib: backport qib_fs.c before 2.6.35
+Subject: [PATCH 10/21] IB/qib: backport qib_fs.c before 2.6.35
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 ---

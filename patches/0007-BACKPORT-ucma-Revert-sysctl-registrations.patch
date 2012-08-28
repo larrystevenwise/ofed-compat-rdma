@@ -1,7 +1,7 @@
-From 2db8dcb3b0cde969104eefb7fd59f9d912d258b6 Mon Sep 17 00:00:00 2001
+From 1473b7194e0bce6d1dd06b17bf006a7fae99c448 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Fri, 13 Jul 2012 00:24:56 +0300
-Subject: [PATCH 07/19] BACKPORT ucma: Revert sysctl registrations
+Subject: [PATCH 07/21] BACKPORT ucma: Revert sysctl registrations
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---

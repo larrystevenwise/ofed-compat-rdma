@@ -1,7 +1,7 @@
-From b316d1c7c58e9a499efd68a4072d7e566b50d733 Mon Sep 17 00:00:00 2001
+From 7498293c8d344b70376649277926d72b4250c674 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
 Date: Mon, 30 Jul 2012 12:06:12 +0530
-Subject: [PATCH 13/19] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
+Subject: [PATCH 13/21] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---

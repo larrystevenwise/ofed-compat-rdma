@@ -1,7 +1,7 @@
-From 1e960f512bff5b850142ff281598bdca4333fae4 Mon Sep 17 00:00:00 2001
+From 434d4d19533137c6936b9733743a934fd4946b63 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <root@silicon.(none)>
 Date: Mon, 30 Jul 2012 19:08:37 +0530
-Subject: [PATCH 11/19] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH 11/21] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
