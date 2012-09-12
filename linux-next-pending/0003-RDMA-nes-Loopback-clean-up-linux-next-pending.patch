@@ -1,0 +1,86 @@
+From 5061a057e8d166edd67d28d9531c0b1b4b8a8724 Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+Date: Fri, 7 Sep 2012 19:34:28 -0500
+Subject: [PATCH 3/4] RDMA/nes: Loopback clean up - linux-next-pending
+
+Necessary clean up for the loopback code
+
+(the patch is linux-next-pending)
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_cm.c |   30 ++++++------------------------
+ 1 file changed, 6 insertions(+), 24 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
+index d9fa245..8a2c301 100644
+--- a/drivers/infiniband/hw/nes/nes_cm.c
++++ b/drivers/infiniband/hw/nes/nes_cm.c
+@@ -1472,12 +1472,8 @@ static struct nes_cm_node *make_cm_node(struct nes_cm_core *cm_core,
+ 	cm_node->loopbackpartner = NULL;
+ 
+ 	/* get the mac addr for the remote node */
+-	if (ipv4_is_loopback(htonl(cm_node->rem_addr))) {
+-		arpindex = nes_arp_table(nesdev, ntohl(nesvnic->local_ipaddr), NULL, NES_ARP_RESOLVE);
+-	} else {
+-		oldarpindex = nes_arp_table(nesdev, cm_node->rem_addr, NULL, NES_ARP_RESOLVE);
+-		arpindex = nes_addr_resolve_neigh(nesvnic, cm_info->rem_addr, oldarpindex);
+-	}
++	oldarpindex = nes_arp_table(nesdev, cm_node->rem_addr, NULL, NES_ARP_RESOLVE);
++	arpindex = nes_addr_resolve_neigh(nesvnic, cm_info->rem_addr, oldarpindex);
+ 	if (arpindex < 0) {
+ 		kfree(cm_node);
+ 		return NULL;
+@@ -3160,11 +3156,7 @@ int nes_accept(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 	nesqp->nesqp_context->tcpPorts[1] =
+ 		cpu_to_le16(ntohs(cm_id->remote_addr.sin_port));
+ 
+-	if (ipv4_is_loopback(cm_id->remote_addr.sin_addr.s_addr))
+-		nesqp->nesqp_context->ip0 =
+-			cpu_to_le32(ntohl(nesvnic->local_ipaddr));
+-	else
+-		nesqp->nesqp_context->ip0 =
++	nesqp->nesqp_context->ip0 =
+ 			cpu_to_le32(ntohl(cm_id->remote_addr.sin_addr.s_addr));
+ 
+ 	nesqp->nesqp_context->misc2 |= cpu_to_le32(
+@@ -3189,10 +3181,7 @@ int nes_accept(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 	memset(&nes_quad, 0, sizeof(nes_quad));
+ 	nes_quad.DstIpAdrIndex =
+ 		cpu_to_le32((u32)PCI_FUNC(nesdev->pcidev->devfn) << 24);
+-	if (ipv4_is_loopback(cm_id->remote_addr.sin_addr.s_addr))
+-		nes_quad.SrcIpadr = nesvnic->local_ipaddr;
+-	else
+-		nes_quad.SrcIpadr = cm_id->remote_addr.sin_addr.s_addr;
++	nes_quad.SrcIpadr = cm_id->remote_addr.sin_addr.s_addr;
+ 	nes_quad.TcpPorts[0] = cm_id->remote_addr.sin_port;
+ 	nes_quad.TcpPorts[1] = cm_id->local_addr.sin_port;
+ 
+@@ -3545,11 +3534,7 @@ static void cm_event_connected(struct nes_cm_event *event)
+ 		cpu_to_le16(ntohs(cm_id->local_addr.sin_port));
+ 	nesqp->nesqp_context->tcpPorts[1] =
+ 		cpu_to_le16(ntohs(cm_id->remote_addr.sin_port));
+-	if (ipv4_is_loopback(cm_id->remote_addr.sin_addr.s_addr))
+-		nesqp->nesqp_context->ip0 =
+-			cpu_to_le32(ntohl(nesvnic->local_ipaddr));
+-	else
+-		nesqp->nesqp_context->ip0 =
++	nesqp->nesqp_context->ip0 =
+ 			cpu_to_le32(ntohl(cm_id->remote_addr.sin_addr.s_addr));
+ 
+ 	nesqp->nesqp_context->misc2 |= cpu_to_le32(
+@@ -3578,10 +3563,7 @@ static void cm_event_connected(struct nes_cm_event *event)
+ 
+ 	nes_quad.DstIpAdrIndex =
+ 		cpu_to_le32((u32)PCI_FUNC(nesdev->pcidev->devfn) << 24);
+-	if (ipv4_is_loopback(cm_id->remote_addr.sin_addr.s_addr))
+-		nes_quad.SrcIpadr = nesvnic->local_ipaddr;
+-	else
+-		nes_quad.SrcIpadr = cm_id->remote_addr.sin_addr.s_addr;
++	nes_quad.SrcIpadr = cm_id->remote_addr.sin_addr.s_addr;
+ 	nes_quad.TcpPorts[0] = cm_id->remote_addr.sin_port;
+ 	nes_quad.TcpPorts[1] = cm_id->local_addr.sin_port;
+ 
+-- 
+1.7.9.5
+

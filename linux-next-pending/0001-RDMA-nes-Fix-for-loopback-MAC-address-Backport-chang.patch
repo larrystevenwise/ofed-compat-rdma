@@ -1,0 +1,33 @@
+From 536c7cc5997776dc9e65d9ab8869d535505506a2 Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+Date: Fri, 7 Sep 2012 19:41:29 -0500
+Subject: [PATCH 1/4] RDMA/nes: Fix for loopback MAC address - Backport change
+
+RDMA/nes: Fix for resolving correctly the MAC address for loopback connection
+(the patch should be applied on top of previous backports)
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_cm.c |    5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
+index 0b5b1a9..d9fa245 100644
+--- a/drivers/infiniband/hw/nes/nes_cm.c
++++ b/drivers/infiniband/hw/nes/nes_cm.c
+@@ -1363,11 +1363,8 @@ static int nes_addr_resolve_neigh(struct nes_vnic *nesvnic, u32 dst_ip, int arpi
+ 	else
+ 		netdev = nesvnic->netdev;
+ 
+-#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0))
+ 	neigh = neigh_lookup(&arp_tbl, &rt->rt_gateway, netdev);
+-#else
+-	neigh = dst_neigh_lookup(&rt->dst, &dst_ip);
+-#endif
++
+ 	rcu_read_lock();
+ 	if (neigh) {
+ 		if (neigh->nud_state & NUD_VALID) {
+-- 
+1.7.9.5
+
