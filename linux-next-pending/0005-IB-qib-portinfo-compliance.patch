@@ -1,0 +1,32 @@
+IB/qib: fix compliance test failure C14-024#06_LocalPortNum
+
+From: Mike Marciniszyn <mike.marciniszyn@intel.com>
+
+Commit 3236b2d4 ("IB/qib: MADs with misset M_Keys should return failure")
+introduced a return code assignment that unfortunately introduced
+an unconditional exit for the routine due to the lack of braces.
+
+This patch adds the braces to correct the original patch.
+
+Reviewed-by: Dean Luick <dean.luick@intel.com>
+Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
+---
+ drivers/infiniband/hw/qib/qib_mad.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/qib/qib_mad.c b/drivers/infiniband/hw/qib/qib_mad.c
+index 4339021..3e55415 100644
+--- a/drivers/infiniband/hw/qib/qib_mad.c
++++ b/drivers/infiniband/hw/qib/qib_mad.c
+@@ -463,9 +463,10 @@ static int subn_get_portinfo(struct ib_smp *smp, struct ib_device *ibdev,
+ 		if (port_num != port) {
+ 			ibp = to_iport(ibdev, port_num);
+ 			ret = check_mkey(ibp, smp, 0);
+-			if (ret)
++			if (ret) {
+ 				ret = IB_MAD_RESULT_FAILURE;
+ 				goto bail;
++			}
+ 		}
+ 	}
+ 
