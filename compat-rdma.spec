@@ -359,9 +359,9 @@ if [ -f /etc/SuSE-release ]; then
 ### BEGIN INIT INFO
 # Provides:       openibd
 # Required-Start: $local_fs
-# Required-Stop: opensmd $openiscsi
+# Required-Stop: $local_fs
 # Default-Start:  2 3 5
-# Default-Stop: 0 1 2 6
+# Default-Stop: 0 1 4 6
 # Description:    Activates/Deactivates InfiniBand Driver to \
 #                 start at boot time.
 ### END INIT INFO
@@ -386,9 +386,9 @@ if [ -f /etc/debian_version ]; then
 ### BEGIN INIT INFO
 # Provides:       openibd
 # Required-Start: $local_fs
-# Required-Stop: opensmd $openiscsi
-# Default-Start:  2 3 5
-# Default-Stop: 0 1 2 6
+# Required-Stop: $local_fs
+# Default-Start:  2 3 4 5
+# Default-Stop: 0 1 6
 # Description:    Activates/Deactivates InfiniBand Driver to \
 #                 start at boot time.
 ### END INIT INFO
