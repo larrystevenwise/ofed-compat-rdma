@@ -1,0 +1,36 @@
+From 6086904c02bba993fc4c8da95e2c6ca115469fac Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Fri, 21 Sep 2012 04:53:36 -0700
+Subject: [PATCH] iw_cxgb4: Fix bug 2369 in OFED bugzilla
+
+Bug 2369 - [OFED-3.5] Trace observed in dmesg while running IMB-MPI1 using
+openmpi-1.6
+
+dst_neigh_lookup and neigh_release function has been introduced
+in kernel >= 3.4.0. neigh_release function was introduced to
+decrement the reference acquired by dst_neigh_lookup function.
+neigh_release was getting called unnecessary for the kernel < 3.4.0
+which was resulting in the trace.
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c |    2 ++
+ 1 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index c1805bd..d6fea23 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -1672,7 +1672,9 @@ static int import_ep(struct c4iw_ep *ep, __be32 peer_ip, struct dst_entry *dst,
+ out:
+ 	rcu_read_unlock();
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
+ 	neigh_release(n);
++#endif
+ 
+ 	return err;
+ }
+-- 
+1.7.0.4
+
