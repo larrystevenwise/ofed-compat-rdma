@@ -1,13 +1,13 @@
-From 7498293c8d344b70376649277926d72b4250c674 Mon Sep 17 00:00:00 2001
+From 67fc061694dfa829043570007ccec9ff1d655ee3 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
 Date: Mon, 30 Jul 2012 12:06:12 +0530
-Subject: [PATCH 13/21] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
+Subject: [PATCH 13/25] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |   13 ++
  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  190 ++++++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |   72 +++++++++-
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |   72 ++++++++-
  3 files changed, 273 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
@@ -594,5 +594,5 @@ index e111d97..b97bea7 100644
  				restore_rx_bufs(&si, &rxq->fl, frags);
  		} else if (likely(rsp_type == RSP_TYPE_CPL)) {
 -- 
-1.7.0.4
+1.7.9.5
 

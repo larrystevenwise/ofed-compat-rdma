@@ -1,7 +1,7 @@
-From 5061a057e8d166edd67d28d9531c0b1b4b8a8724 Mon Sep 17 00:00:00 2001
+From b52ebe158b3bb1b21b488f18683a17259d4b5b74 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Fri, 7 Sep 2012 19:34:28 -0500
-Subject: [PATCH 3/4] RDMA/nes: Loopback clean up - linux-next-pending
+Subject: [PATCH 2/5] RDMA/nes: Loopback clean up - linux-next-pending
 
 Necessary clean up for the loopback code
 

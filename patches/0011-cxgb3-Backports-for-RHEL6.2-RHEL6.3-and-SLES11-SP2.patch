@@ -1,7 +1,7 @@
-From 434d4d19533137c6936b9733743a934fd4946b63 Mon Sep 17 00:00:00 2001
+From d505c64dcda186c1cf7248bf261567284284ffd9 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <root@silicon.(none)>
 Date: Mon, 30 Jul 2012 19:08:37 +0530
-Subject: [PATCH 11/21] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH 11/25] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
@@ -11,7 +11,7 @@ Signed-off-by: Vipul Pandya <vipul@chelsio.com>
  drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |   25 +++
  drivers/net/ethernet/chelsio/cxgb3/l2t.c           |    4 +
  drivers/net/ethernet/chelsio/cxgb3/sge.c           |   49 ++++++
- drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 ++-
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 +-
  7 files changed, 280 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
@@ -632,5 +632,5 @@ index 3af19a5..b3c99fd 100644
  					hash_lo |= (1 << hash);
  				else
 -- 
-1.7.0.4
+1.7.9.5
 

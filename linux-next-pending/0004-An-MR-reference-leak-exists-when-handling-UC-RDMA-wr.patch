@@ -1,10 +1,9 @@
-IB/qib: Fix UC MR refs for immediate operations
-
+From 984a66a622f5a0c4aaceaa48ddb265de5a454392 Mon Sep 17 00:00:00 2001
 From: Mike Marciniszyn <mike.marciniszyn@intel.com>
-
-An MR reference leak exists when handling UC RDMA writes with
-immediate data because we manipulate the reference counts as if the
-operation had been a send.
+Date: Tue, 2 Oct 2012 15:53:02 +0200
+Subject: [PATCH 4/5] An MR reference leak exists when handling UC RDMA writes
+ with immediate data because we manipulate the reference
+ counts as if the operation had been a send.
 
 This patch moves the last_imm label so that the RDMA write operations
 with immediate data converge at the cq building code.  The copy/mr
@@ -15,7 +14,7 @@ Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 Signed-off-by: Roland Dreier <roland@purestorage.com>
 ---
  drivers/infiniband/hw/qib/qib_uc.c |    8 +++++++-
- 1 files changed, 7 insertions(+), 1 deletions(-)
+ 1 file changed, 7 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_uc.c b/drivers/infiniband/hw/qib/qib_uc.c
 index ce7387f..70b4cb7 100644
@@ -50,3 +49,6 @@ index ce7387f..70b4cb7 100644
  		goto last_imm;
  
  	case OP(RDMA_WRITE_LAST):
+-- 
+1.7.9.5
+

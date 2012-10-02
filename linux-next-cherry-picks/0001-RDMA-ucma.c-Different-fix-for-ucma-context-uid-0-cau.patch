@@ -1,7 +1,8 @@
-From 63e0d2fdb051ee6beb0990cb4722c9cf6816d80b Mon Sep 17 00:00:00 2001
+From 35d307dfdb251ebfd997fe8d9cdd0a4c64b90595 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Tue, 7 Aug 2012 17:46:42 -0500
-Subject: [PATCH] RDMA/ucma.c: Different fix for ucma context uid=0, causing iWarp RDMA applications to fail in connection establishment
+Subject: [PATCH] RDMA/ucma.c: Different fix for ucma context uid=0, causing
+ iWarp RDMA applications to fail in connection establishment
 
 Fix for ucma context uid=0, causing iWarp RDMA applications to fail in connection establishment.
 
@@ -12,7 +13,7 @@ Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Signed-off-by: Sean Hefty <Sean.Hefty@intel.com>
 ---
  drivers/infiniband/core/ucma.c |    2 +-
- 1 files changed, 1 insertions(+), 1 deletions(-)
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/core/ucma.c b/drivers/infiniband/core/ucma.c
 index 5861cdb..28bf514 100644
@@ -35,5 +36,5 @@ index 5861cdb..28bf514 100644
  		if (!ctx->backlog) {
  			ret = -ENOMEM;
 -- 
-1.7.0.4
+1.7.9.5
 

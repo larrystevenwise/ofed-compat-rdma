@@ -1,7 +1,7 @@
-From 4c1b99148b5eeb1cdb2e251919a083b03aca35a4 Mon Sep 17 00:00:00 2001
+From 1625ace4f5f1fa23ac03766ad4a201684fc998a6 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
 Date: Sun, 5 Aug 2012 22:00:42 +0300
-Subject: [PATCH 19/21] mlx4_en: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH 19/25] mlx4_en: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
@@ -9,7 +9,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |   29 ++++++++++++
  drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   56 +++++++++++++++++++++++
  drivers/net/ethernet/mellanox/mlx4/en_tx.c      |    4 ++
- 4 files changed, 93 insertions(+), 0 deletions(-)
+ 4 files changed, 93 insertions(+)
 
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c b/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
 index 72901ce..332e851 100644
@@ -325,5 +325,5 @@ index 019d856..5a2bddd 100644
  
  	if (vlan_tx_tag_present(skb))
 -- 
-1.7.0.4
+1.7.9.5
 

@@ -1,8 +1,8 @@
-From 927a677bdc854f1a8cbd766560486c5ffdea0ab7 Mon Sep 17 00:00:00 2001
+From 7bbcd56628309225e630e511e612cd3b82762294 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Fri, 7 Sep 2012 19:45:21 -0500
-Subject: [PATCH 4/4] RDMA/nes: TSO is enabled again for linux-3.5 - Backport
- change
+Subject: [PATCH 24/25] RDMA/nes: TSO is enabled again for linux-3.5 -
+ Backport change
 
 RDMA/nes: TSO is enabled again for linux-3.5
 (the patch should be applied on top of previous backports)
@@ -13,10 +13,10 @@ Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
  1 file changed, 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes_nic.c b/drivers/infiniband/hw/nes/nes_nic.c
-index 5242294..4f73965 100644
+index 696b80e..7674358 100644
 --- a/drivers/infiniband/hw/nes/nes_nic.c
 +++ b/drivers/infiniband/hw/nes/nes_nic.c
-@@ -1758,12 +1758,10 @@ struct net_device *nes_netdev_init(struct nes_device *nesdev,
+@@ -1760,12 +1760,10 @@ struct net_device *nes_netdev_init(struct nes_device *nesdev,
  	netdev->features |= NETIF_F_HIGHDMA | NETIF_F_HW_VLAN_TX;
  
  	if ((nesvnic->logical_port < 2) || (nesdev->nesadapter->hw_rev != NE020_REV)) {

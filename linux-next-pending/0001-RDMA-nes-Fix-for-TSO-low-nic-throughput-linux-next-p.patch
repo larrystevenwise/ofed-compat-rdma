@@ -1,7 +1,7 @@
-From a2eb1d38ce10c7ce8070194b21fabe36fdd40ffd Mon Sep 17 00:00:00 2001
+From 669b99baeb7c8d2a887241aa761fe5ee1d144f4f Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Fri, 7 Sep 2012 19:37:55 -0500
-Subject: [PATCH 2/4] RDMA/nes: Fix for TSO low nic throughput -
+Subject: [PATCH 1/5] RDMA/nes: Fix for TSO low nic throughput -
  linux-next-pending
 
 Fix for TSO low nic throughput with linux-3.5
@@ -16,7 +16,7 @@ Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
  1 file changed, 13 insertions(+), 15 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes_nic.c b/drivers/infiniband/hw/nes/nes_nic.c
-index 696b80e..5242294 100644
+index 7674358..4f73965 100644
 --- a/drivers/infiniband/hw/nes/nes_nic.c
 +++ b/drivers/infiniband/hw/nes/nes_nic.c
 @@ -388,18 +388,16 @@ static int nes_nic_send(struct sk_buff *skb, struct net_device *netdev)

@@ -1,0 +1,186 @@
+From a9832b255f02b99997a13e2d25698f1228292cf4 Mon Sep 17 00:00:00 2001
+From: Bart Van Assche <bvanassche@acm.org>
+Date: Wed, 12 Sep 2012 14:31:04 +0200
+Subject: [PATCH 25/25] ib_srp: Backport to older kernels
+
+This patch has been tested on RHEL 6.0, RHEL 6.1, RHEL 6.2, RHEL 6.3
+and Ubuntu 10.04.
+
+Signed-off-by: Bart Van Assche <bvanassche@acm.org>
+---
+ drivers/infiniband/ulp/srp/ib_srp.c |  111 ++++++++++++++++++++++++++++++++++-
+ 1 file changed, 108 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
+index bcbf22e..fab74e0 100644
+--- a/drivers/infiniband/ulp/srp/ib_srp.c
++++ b/drivers/infiniband/ulp/srp/ib_srp.c
+@@ -32,6 +32,10 @@
+ 
+ #define pr_fmt(fmt) PFX fmt
+ 
++#define DRV_NAME	"ib_srp"
++#define PFX		DRV_NAME ": "
++
++#include <linux/version.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/slab.h>
+@@ -41,7 +45,11 @@
+ #include <linux/random.h>
+ #include <linux/jiffies.h>
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
+ #include <linux/atomic.h>
++#else
++#include <asm/atomic.h>
++#endif
+ 
+ #include <scsi/scsi.h>
+ #include <scsi/scsi_device.h>
+@@ -51,11 +59,54 @@
+ 
+ #include "ib_srp.h"
+ 
+-#define DRV_NAME	"ib_srp"
+-#define PFX		DRV_NAME ": "
+ #define DRV_VERSION	"0.2"
+ #define DRV_RELDATE	"November 1, 2005"
+ 
++#ifndef pr_warn
++#define pr_warn pr_warning
++#endif
++
++#if !defined(RHEL_MAJOR) && LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37) || \
++	RHEL_MAJOR -0 < 6 || RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 == 0
++struct srp_cred_req {
++	u8	opcode;
++	u8	sol_not;
++	u8	reserved[2];
++	__be32	req_lim_delta;
++	u64	tag;
++};
++
++struct srp_cred_rsp {
++	u8	opcode;
++	u8	reserved[7];
++	u64	tag;
++};
++
++/*
++ * The SRP spec defines the fixed portion of the AER_REQ structure to be
++ * 36 bytes, so it needs to be packed to avoid having it padded to 40 bytes
++ * on 64-bit architectures.
++ */
++struct srp_aer_req {
++	u8	opcode;
++	u8	sol_not;
++	u8	reserved[2];
++	__be32	req_lim_delta;
++	u64	tag;
++	u32	reserved2;
++	__be64	lun;
++	__be32	sense_data_len;
++	u32	reserved3;
++	u8	sense_data[0];
++} __attribute__((packed));
++
++struct srp_aer_rsp {
++	u8	opcode;
++	u8	reserved[7];
++	u64	tag;
++};
++#endif
++
+ MODULE_AUTHOR("Roland Dreier");
+ MODULE_DESCRIPTION("InfiniBand SCSI RDMA Protocol initiator "
+ 		   "v" DRV_VERSION " (" DRV_RELDATE ")");
+@@ -675,7 +726,11 @@ err:
+ 	if (target->state == SRP_TARGET_CONNECTING) {
+ 		target->state = SRP_TARGET_DEAD;
+ 		INIT_WORK(&target->work, srp_remove_work);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 		queue_work(ib_wq, &target->work);
++#else
++		schedule_work(&target->work);
++#endif
+ 	}
+ 	spin_unlock_irq(&target->lock);
+ 
+@@ -1254,7 +1309,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
+ 	}
+ }
+ 
+-static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
++/*
++ * Kernel with host lock push-down patch. See also upstream commit
++ * f281233d3eba15fb225d21ae2e228fd4553d824a.
++ */
++#define SRP_QUEUECOMMAND srp_queuecommand
++#elif defined(RHEL_MAJOR) && RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 >= 2
++/*
++ * Kernel with lockless SCSI command dispatching enabled.
++ * See also the RHEL 6.2 release notes (http://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html-single/6.2_Release_Notes/index.html).
++ */
++static int srp_queuecommand_wrk(struct Scsi_Host *shost,
++				struct scsi_cmnd *scmnd);
++static int srp_queuecommand(struct scsi_cmnd *scmnd,
++			    void (*done)(struct scsi_cmnd *))
++{
++	scmnd->scsi_done = done;
++	return srp_queuecommand_wrk(scmnd->device->host, scmnd);
++}
++#define SRP_QUEUECOMMAND srp_queuecommand_wrk
++#else
++/*
++ * Kernel that invokes srp_queuecommand with the SCSI host lock held.
++ */
++static int srp_queuecommand_wrk(struct Scsi_Host *shost,
++				struct scsi_cmnd *scmnd);
++static int srp_queuecommand(struct scsi_cmnd *scmnd,
++			    void (*done)(struct scsi_cmnd *))
++{
++	struct Scsi_Host *shost = scmnd->device->host;
++	int res;
++
++	spin_unlock_irq(shost->host_lock);
++
++	scmnd->scsi_done = done;
++	res = srp_queuecommand_wrk(shost, scmnd);
++
++	spin_lock_irq(shost->host_lock);
++	return res;
++}
++#define SRP_QUEUECOMMAND srp_queuecommand_wrk
++#endif
++
++static int SRP_QUEUECOMMAND(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ {
+ 	struct srp_target_port *target = host_to_target(shost);
+ 	struct srp_request *req;
+@@ -1822,6 +1920,9 @@ static struct scsi_host_template srp_template = {
+ 	.name				= "InfiniBand SRP initiator",
+ 	.proc_name			= DRV_NAME,
+ 	.info				= srp_target_info,
++#if defined(RHEL_MAJOR) && RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 >= 2
++	.lockless			= true,
++#endif
+ 	.queuecommand			= srp_queuecommand,
+ 	.eh_abort_handler		= srp_abort,
+ 	.eh_device_reset_handler	= srp_reset_device,
+@@ -2412,7 +2513,11 @@ static void srp_remove_one(struct ib_device *device)
+ 		 * started before we marked our target ports as
+ 		 * removed, and any target port removal tasks.
+ 		 */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
+ 		flush_workqueue(ib_wq);
++#else
++		flush_scheduled_work();
++#endif
+ 
+ 		list_for_each_entry_safe(target, tmp_target,
+ 					 &host->target_list, list) {
+-- 
+1.7.9.5
+

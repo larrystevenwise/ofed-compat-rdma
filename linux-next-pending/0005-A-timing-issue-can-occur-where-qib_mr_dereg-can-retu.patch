@@ -1,9 +1,8 @@
-IB/qib: Avoid returning EBUSY from MR deregister
-
+From f96007a6bc75a3644489b159050fce06d1f19655 Mon Sep 17 00:00:00 2001
 From: Mike Marciniszyn <mike.marciniszyn@intel.com>
-
-A timing issue can occur where qib_mr_dereg can return -EBUSY if the
-MR use count is not zero.
+Date: Tue, 2 Oct 2012 15:53:02 +0200
+Subject: [PATCH 5/5] A timing issue can occur where qib_mr_dereg can return
+ -EBUSY if the MR use count is not zero.
 
 This can occur if the MR is de-registered while RDMA read response
 packets are being progressed from the SDMA ring.  The suspicion is
@@ -34,15 +33,15 @@ Reviewed-by: Ramkrishna Vepa <ramkrishna.vepa@intel.com>
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 Signed-off-by: Roland Dreier <roland@purestorage.com>
 ---
- drivers/infiniband/hw/qib/qib_keys.c  |   84 +++++++----
+ drivers/infiniband/hw/qib/qib_keys.c  |   84 +++++++-----
  drivers/infiniband/hw/qib/qib_mr.c    |  242 ++++++++++++++++++---------------
  drivers/infiniband/hw/qib/qib_qp.c    |   21 +--
- drivers/infiniband/hw/qib/qib_rc.c    |   24 +--
+ drivers/infiniband/hw/qib/qib_rc.c    |   24 ++--
  drivers/infiniband/hw/qib/qib_ruc.c   |   14 +-
  drivers/infiniband/hw/qib/qib_uc.c    |   33 +----
- drivers/infiniband/hw/qib/qib_ud.c    |   12 --
- drivers/infiniband/hw/qib/qib_verbs.c |   10 +
- drivers/infiniband/hw/qib/qib_verbs.h |   28 ++++
+ drivers/infiniband/hw/qib/qib_ud.c    |   12 +-
+ drivers/infiniband/hw/qib/qib_verbs.c |   10 +-
+ drivers/infiniband/hw/qib/qib_verbs.h |   28 +++-
  9 files changed, 244 insertions(+), 224 deletions(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_keys.c b/drivers/infiniband/hw/qib/qib_keys.c
@@ -1033,3 +1032,6 @@ index 4876060..4a2277b 100644
  void qib_release_mmap_info(struct kref *ref);
  
  struct qib_mmap_info *qib_create_mmap_info(struct qib_ibdev *dev, u32 size,
+-- 
+1.7.9.5
+

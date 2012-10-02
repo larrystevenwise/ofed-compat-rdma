@@ -1,7 +1,8 @@
-From 536c7cc5997776dc9e65d9ab8869d535505506a2 Mon Sep 17 00:00:00 2001
+From 5ebf4547e291d3f94ae4e13956a7c3635896520a Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Fri, 7 Sep 2012 19:41:29 -0500
-Subject: [PATCH 1/4] RDMA/nes: Fix for loopback MAC address - Backport change
+Subject: [PATCH 23/25] RDMA/nes: Fix for loopback MAC address - Backport
+ change
 
 RDMA/nes: Fix for resolving correctly the MAC address for loopback connection
 (the patch should be applied on top of previous backports)

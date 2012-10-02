@@ -1,15 +1,15 @@
-From abd0f3494cc9ac2653dc3b451429cddd7c25def9 Mon Sep 17 00:00:00 2001
+From 40378c271c9fbbb445c7c1233444c795004d6232 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 Date: Sat, 25 Aug 2012 20:39:12 -0500
-Subject: [PATCH 21/21] RDMA/nes: Updated backports
+Subject: [PATCH 21/25] RDMA/nes: Updated backports
 
 OFED-3.5/NES: Updated backports to be applied on top of the previously submitted backport patch.
 
 Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 ---
  drivers/infiniband/hw/nes/nes_hw.c  |   11 ++++++++
- drivers/infiniband/hw/nes/nes_hw.h  |    3 ++
- drivers/infiniband/hw/nes/nes_nic.c |   49 ++++++++++++++++++++++++++++------
+ drivers/infiniband/hw/nes/nes_hw.h  |    3 +++
+ drivers/infiniband/hw/nes/nes_nic.c |   49 ++++++++++++++++++++++++++++-------
  3 files changed, 54 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes_hw.c b/drivers/infiniband/hw/nes/nes_hw.c
@@ -157,5 +157,5 @@ index d54776f..696b80e 100644
  }
  
 -- 
-1.7.0.4
+1.7.9.5
 
