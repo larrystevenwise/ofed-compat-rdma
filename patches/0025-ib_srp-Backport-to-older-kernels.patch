@@ -15,8 +15,11 @@ diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib
 index bcbf22e..fab74e0 100644
 --- a/drivers/infiniband/ulp/srp/ib_srp.c
 +++ b/drivers/infiniband/ulp/srp/ib_srp.c
-@@ -32,6 +32,10 @@
+@@ -30,8 +30,13 @@
+  * SOFTWARE.
+  */
  
++#undef  pr_fmt
  #define pr_fmt(fmt) PFX fmt
  
 +#define DRV_NAME	"ib_srp"
@@ -26,7 +29,7 @@ index bcbf22e..fab74e0 100644
  #include <linux/module.h>
  #include <linux/init.h>
  #include <linux/slab.h>
-@@ -41,7 +45,11 @@
+@@ -41,21 +46,27 @@
  #include <linux/random.h>
  #include <linux/jiffies.h>
  
@@ -38,7 +41,10 @@ index bcbf22e..fab74e0 100644
  
  #include <scsi/scsi.h>
  #include <scsi/scsi_device.h>
-@@ -51,11 +59,54 @@
+ #include <scsi/scsi_dbg.h>
+-#include <scsi/srp.h>
++#include "../../../../include/scsi/srp.h"
+ #include <scsi/scsi_transport_srp.h>
  
  #include "ib_srp.h"
  
@@ -51,51 +57,10 @@ index bcbf22e..fab74e0 100644
 +#define pr_warn pr_warning
 +#endif
 +
-+#if !defined(RHEL_MAJOR) && LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 37) || \
-+	RHEL_MAJOR -0 < 6 || RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 == 0
-+struct srp_cred_req {
-+	u8	opcode;
-+	u8	sol_not;
-+	u8	reserved[2];
-+	__be32	req_lim_delta;
-+	u64	tag;
-+};
-+
-+struct srp_cred_rsp {
-+	u8	opcode;
-+	u8	reserved[7];
-+	u64	tag;
-+};
-+
-+/*
-+ * The SRP spec defines the fixed portion of the AER_REQ structure to be
-+ * 36 bytes, so it needs to be packed to avoid having it padded to 40 bytes
-+ * on 64-bit architectures.
-+ */
-+struct srp_aer_req {
-+	u8	opcode;
-+	u8	sol_not;
-+	u8	reserved[2];
-+	__be32	req_lim_delta;
-+	u64	tag;
-+	u32	reserved2;
-+	__be64	lun;
-+	__be32	sense_data_len;
-+	u32	reserved3;
-+	u8	sense_data[0];
-+} __attribute__((packed));
-+
-+struct srp_aer_rsp {
-+	u8	opcode;
-+	u8	reserved[7];
-+	u64	tag;
-+};
-+#endif
-+
  MODULE_AUTHOR("Roland Dreier");
  MODULE_DESCRIPTION("InfiniBand SCSI RDMA Protocol initiator "
  		   "v" DRV_VERSION " (" DRV_RELDATE ")");
-@@ -675,7 +726,11 @@ err:
+@@ -675,7 +686,11 @@ err:
  	if (target->state == SRP_TARGET_CONNECTING) {
  		target->state = SRP_TARGET_DEAD;
  		INIT_WORK(&target->work, srp_remove_work);
@@ -107,7 +72,7 @@ index bcbf22e..fab74e0 100644
  	}
  	spin_unlock_irq(&target->lock);
  
-@@ -1254,7 +1309,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
+@@ -1254,7 +1269,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
  	}
  }
  
@@ -159,7 +124,7 @@ index bcbf22e..fab74e0 100644
  {
  	struct srp_target_port *target = host_to_target(shost);
  	struct srp_request *req;
-@@ -1822,6 +1920,9 @@ static struct scsi_host_template srp_template = {
+@@ -1822,6 +1880,9 @@ static struct scsi_host_template srp_template = {
  	.name				= "InfiniBand SRP initiator",
  	.proc_name			= DRV_NAME,
  	.info				= srp_target_info,
@@ -169,7 +134,7 @@ index bcbf22e..fab74e0 100644
  	.queuecommand			= srp_queuecommand,
  	.eh_abort_handler		= srp_abort,
  	.eh_device_reset_handler	= srp_reset_device,
-@@ -2412,7 +2513,11 @@ static void srp_remove_one(struct ib_device *device)
+@@ -2412,7 +2473,11 @@ static void srp_remove_one(struct ib_device *device)
  		 * started before we marked our target ports as
  		 * removed, and any target port removal tasks.
  		 */
