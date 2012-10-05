@@ -1,0 +1,323 @@
+From 26f7cbc0a5a42d8cc0c7725d10317089a8215f97 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Wed, 26 Sep 2012 02:39:42 +0000
+Subject: [PATCH 6/6] cxgb4: Don't attempt to upgrade T4 firmware when cxgb4 will end up as a slave
+
+This patch adds a new common code routine to upgrade an adapter's
+firmware.  This routine handles all of the complexities of working with the
+the existing adapter firmware in order to quiesce the adapter and uP, etc.
+For an automatic upgrade it will send a HELLO command to check if cxgb4
+want/can upgrade firmware, i.e. if cxgb4 is MASTER and has newer firmware
+that it wants to load and call the new common code routine t4_fw_upgrade.
+Note that it should not issue a RESET command after a successful firmware
+upgrade.
+
+Signed-off-by: Jay Hernandez <jay@chelsio.com>
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |    4 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   14 ++-
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |  171 +++++++++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/t4_regs.h    |    3 +
+ drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h   |   19 +++-
+ 5 files changed, 206 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 6827ce3..745a1f5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -726,6 +726,10 @@ int t4_fw_hello(struct adapter *adap, unsigned int mbox, unsigned int evt_mbox,
+ int t4_fw_bye(struct adapter *adap, unsigned int mbox);
+ int t4_early_init(struct adapter *adap, unsigned int mbox);
+ int t4_fw_reset(struct adapter *adap, unsigned int mbox, int reset);
++int t4_fw_halt(struct adapter *adap, unsigned int mbox, int force);
++int t4_fw_restart(struct adapter *adap, unsigned int mbox, int reset);
++int t4_fw_upgrade(struct adapter *adap, unsigned int mbox,
++		  const u8 *fw_data, unsigned int size, int force);
+ int t4_fw_config_file(struct adapter *adap, unsigned int mbox,
+ 		      unsigned int mtype, unsigned int maddr,
+ 		      u32 *finiver, u32 *finicsum, u32 *cfcsum);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index a3f866d..94b7846 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -929,10 +929,18 @@ static int upgrade_fw(struct adapter *adap)
+ 	 */
+ 	if (FW_HDR_FW_VER_MAJOR_GET(adap->params.fw_vers) != FW_VERSION_MAJOR ||
+ 	    vers > adap->params.fw_vers) {
+-		ret = -t4_load_fw(adap, fw->data, fw->size);
++		dev_info(dev, "upgrading firmware ...\n");
++		ret = t4_fw_upgrade(adap, adap->mbox, fw->data, fw->size,
++				    /*force=*/false);
+ 		if (!ret)
+-			dev_info(dev, "firmware upgraded to version %pI4 from "
+-				 FW_FNAME "\n", &hdr->fw_ver);
++			dev_info(dev, "firmware successfully upgraded to "
++				 FW_FNAME " (%d.%d.%d.%d)\n",
++				 FW_HDR_FW_VER_MAJOR_GET(vers),
++				 FW_HDR_FW_VER_MINOR_GET(vers),
++				 FW_HDR_FW_VER_MICRO_GET(vers),
++				 FW_HDR_FW_VER_BUILD_GET(vers));
++		else
++			dev_err(dev, "firmware upgrade failed! err=%d\n", -ret);
+ 	} else {
+ 		/*
+ 		 * Tell our caller that we didn't upgrade the firmware.
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 61f002d..ab732b3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -2537,6 +2537,177 @@ int t4_fw_reset(struct adapter *adap, unsigned int mbox, int reset)
+ }
+ 
+ /**
++ *	t4_fw_halt - issue a reset/halt to FW and put uP into RESET
++ *	@adap: the adapter
++ *	@mbox: mailbox to use for the FW RESET command (if desired)
++ *	@force: force uP into RESET even if FW RESET command fails
++ *
++ *	Issues a RESET command to firmware (if desired) with a HALT indication
++ *	and then puts the microprocessor into RESET state.  The RESET command
++ *	will only be issued if a legitimate mailbox is provided (mbox <=
++ *	FW_PCIE_FW_MASTER_MASK).
++ *
++ *	This is generally used in order for the host to safely manipulate the
++ *	adapter without fear of conflicting with whatever the firmware might
++ *	be doing.  The only way out of this state is to RESTART the firmware
++ *	...
++ */
++int t4_fw_halt(struct adapter *adap, unsigned int mbox, int force)
++{
++	int ret = 0;
++
++	/*
++	 * If a legitimate mailbox is provided, issue a RESET command
++	 * with a HALT indication.
++	 */
++	if (mbox <= FW_PCIE_FW_MASTER_MASK) {
++		struct fw_reset_cmd c;
++
++		memset(&c, 0, sizeof(c));
++		INIT_CMD(c, RESET, WRITE);
++		c.val = htonl(PIORST | PIORSTMODE);
++		c.halt_pkd = htonl(FW_RESET_CMD_HALT(1U));
++		ret = t4_wr_mbox(adap, mbox, &c, sizeof(c), NULL);
++	}
++
++	/*
++	 * Normally we won't complete the operation if the firmware RESET
++	 * command fails but if our caller insists we'll go ahead and put the
++	 * uP into RESET.  This can be useful if the firmware is hung or even
++	 * missing ...  We'll have to take the risk of putting the uP into
++	 * RESET without the cooperation of firmware in that case.
++	 *
++	 * We also force the firmware's HALT flag to be on in case we bypassed
++	 * the firmware RESET command above or we're dealing with old firmware
++	 * which doesn't have the HALT capability.  This will serve as a flag
++	 * for the incoming firmware to know that it's coming out of a HALT
++	 * rather than a RESET ... if it's new enough to understand that ...
++	 */
++	if (ret == 0 || force) {
++		t4_set_reg_field(adap, CIM_BOOT_CFG, UPCRST, UPCRST);
++		t4_set_reg_field(adap, PCIE_FW, FW_PCIE_FW_HALT,
++				 FW_PCIE_FW_HALT);
++	}
++
++	/*
++	 * And we always return the result of the firmware RESET command
++	 * even when we force the uP into RESET ...
++	 */
++	return ret;
++}
++
++/**
++ *	t4_fw_restart - restart the firmware by taking the uP out of RESET
++ *	@adap: the adapter
++ *	@reset: if we want to do a RESET to restart things
++ *
++ *	Restart firmware previously halted by t4_fw_halt().  On successful
++ *	return the previous PF Master remains as the new PF Master and there
++ *	is no need to issue a new HELLO command, etc.
++ *
++ *	We do this in two ways:
++ *
++ *	 1. If we're dealing with newer firmware we'll simply want to take
++ *	    the chip's microprocessor out of RESET.  This will cause the
++ *	    firmware to start up from its start vector.  And then we'll loop
++ *	    until the firmware indicates it's started again (PCIE_FW.HALT
++ *	    reset to 0) or we timeout.
++ *
++ *	 2. If we're dealing with older firmware then we'll need to RESET
++ *	    the chip since older firmware won't recognize the PCIE_FW.HALT
++ *	    flag and automatically RESET itself on startup.
++ */
++int t4_fw_restart(struct adapter *adap, unsigned int mbox, int reset)
++{
++	if (reset) {
++		/*
++		 * Since we're directing the RESET instead of the firmware
++		 * doing it automatically, we need to clear the PCIE_FW.HALT
++		 * bit.
++		 */
++		t4_set_reg_field(adap, PCIE_FW, FW_PCIE_FW_HALT, 0);
++
++		/*
++		 * If we've been given a valid mailbox, first try to get the
++		 * firmware to do the RESET.  If that works, great and we can
++		 * return success.  Otherwise, if we haven't been given a
++		 * valid mailbox or the RESET command failed, fall back to
++		 * hitting the chip with a hammer.
++		 */
++		if (mbox <= FW_PCIE_FW_MASTER_MASK) {
++			t4_set_reg_field(adap, CIM_BOOT_CFG, UPCRST, 0);
++			msleep(100);
++			if (t4_fw_reset(adap, mbox,
++					PIORST | PIORSTMODE) == 0)
++				return 0;
++		}
++
++		t4_write_reg(adap, PL_RST, PIORST | PIORSTMODE);
++		msleep(2000);
++	} else {
++		int ms;
++
++		t4_set_reg_field(adap, CIM_BOOT_CFG, UPCRST, 0);
++		for (ms = 0; ms < FW_CMD_MAX_TIMEOUT; ) {
++			if (!(t4_read_reg(adap, PCIE_FW) & FW_PCIE_FW_HALT))
++				return 0;
++			msleep(100);
++			ms += 100;
++		}
++		return -ETIMEDOUT;
++	}
++	return 0;
++}
++
++/**
++ *	t4_fw_upgrade - perform all of the steps necessary to upgrade FW
++ *	@adap: the adapter
++ *	@mbox: mailbox to use for the FW RESET command (if desired)
++ *	@fw_data: the firmware image to write
++ *	@size: image size
++ *	@force: force upgrade even if firmware doesn't cooperate
++ *
++ *	Perform all of the steps necessary for upgrading an adapter's
++ *	firmware image.  Normally this requires the cooperation of the
++ *	existing firmware in order to halt all existing activities
++ *	but if an invalid mailbox token is passed in we skip that step
++ *	(though we'll still put the adapter microprocessor into RESET in
++ *	that case).
++ *
++ *	On successful return the new firmware will have been loaded and
++ *	the adapter will have been fully RESET losing all previous setup
++ *	state.  On unsuccessful return the adapter may be completely hosed ...
++ *	positive errno indicates that the adapter is ~probably~ intact, a
++ *	negative errno indicates that things are looking bad ...
++ */
++int t4_fw_upgrade(struct adapter *adap, unsigned int mbox,
++		  const u8 *fw_data, unsigned int size, int force)
++{
++	const struct fw_hdr *fw_hdr = (const struct fw_hdr *)fw_data;
++	int reset, ret;
++
++	ret = t4_fw_halt(adap, mbox, force);
++	if (ret < 0 && !force)
++		return ret;
++
++	ret = t4_load_fw(adap, fw_data, size);
++	if (ret < 0)
++		return ret;
++
++	/*
++	 * Older versions of the firmware don't understand the new
++	 * PCIE_FW.HALT flag and so won't know to perform a RESET when they
++	 * restart.  So for newly loaded older firmware we'll have to do the
++	 * RESET for it so it starts up on a clean slate.  We can tell if
++	 * the newly loaded firmware will handle this right by checking
++	 * its header flags to see if it advertises the capability.
++	 */
++	reset = ((ntohl(fw_hdr->flags) & FW_HDR_FLAGS_RESET_HALT) == 0);
++	return t4_fw_restart(adap, mbox, reset);
++}
++
++
++/**
+  *	t4_fw_config_file - setup an adapter via a Configuration File
+  *	@adap: the adapter
+  *	@mbox: mailbox to use for the FW command
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+index 732c6da..a1a8b57 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+@@ -321,6 +321,8 @@
+ #define  WINDOW(x)       ((x) << WINDOW_SHIFT)
+ #define PCIE_MEM_ACCESS_OFFSET 0x306c
+ 
++#define PCIE_FW 0x30b8
++
+ #define PCIE_CORE_UTL_SYSTEM_BUS_AGENT_STATUS 0x5908
+ #define  RNPP 0x80000000U
+ #define  RPCP 0x20000000U
+@@ -419,6 +421,7 @@
+ 
+ #define CIM_BOOT_CFG 0x7b00
+ #define  BOOTADDR_MASK 0xffffff00U
++#define  UPCRST        0x1U
+ 
+ #define CIM_PF_MAILBOX_DATA 0x240
+ #define CIM_PF_MAILBOX_CTRL 0x280
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+index b1d5561..a636463 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+@@ -317,9 +317,15 @@ struct fw_reset_cmd {
+ 	__be32 op_to_write;
+ 	__be32 retval_len16;
+ 	__be32 val;
+-	__be32 r3;
++	__be32 halt_pkd;
+ };
+ 
++#define FW_RESET_CMD_HALT_SHIFT    31
++#define FW_RESET_CMD_HALT_MASK     0x1
++#define FW_RESET_CMD_HALT(x)       ((x) << FW_RESET_CMD_HALT_SHIFT)
++#define FW_RESET_CMD_HALT_GET(x)  \
++	(((x) >> FW_RESET_CMD_HALT_SHIFT) & FW_RESET_CMD_HALT_MASK)
++
+ enum fw_hellow_cmd {
+ 	fw_hello_cmd_stage_os		= 0x0
+ };
+@@ -1648,6 +1654,7 @@ struct fw_debug_cmd {
+ 
+ #define FW_PCIE_FW_ERR           (1U << 31)
+ #define FW_PCIE_FW_INIT          (1U << 30)
++#define FW_PCIE_FW_HALT          (1U << 29)
+ #define FW_PCIE_FW_MASTER_VLD    (1U << 15)
+ #define FW_PCIE_FW_MASTER_MASK   0x7
+ #define FW_PCIE_FW_MASTER_SHIFT  12
+@@ -1669,7 +1676,11 @@ struct fw_hdr {
+ 	u8 intfver_iscsi;
+ 	u8 intfver_fcoe;
+ 	u8 reserved2;
+-	__be32  reserved3[27];
++	__u32   reserved3;
++	__u32   reserved4;
++	__u32   reserved5;
++	__be32  flags;
++	__be32  reserved6[23];
+ };
+ 
+ #define FW_HDR_FW_VER_MAJOR_GET(x) (((x) >> 24) & 0xff)
+@@ -1677,4 +1688,8 @@ struct fw_hdr {
+ #define FW_HDR_FW_VER_MICRO_GET(x) (((x) >> 8) & 0xff)
+ #define FW_HDR_FW_VER_BUILD_GET(x) (((x) >> 0) & 0xff)
+ 
++enum fw_hdr_flags {
++	FW_HDR_FLAGS_RESET_HALT = 0x00000001,
++};
++
+ #endif /* _T4FW_INTERFACE_H_ */
+-- 
+1.7.1
+

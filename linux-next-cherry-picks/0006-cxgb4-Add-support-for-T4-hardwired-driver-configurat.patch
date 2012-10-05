@@ -1,0 +1,651 @@
+From 13ee15d396da78079918c5be7510ea1847393d4c Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Wed, 26 Sep 2012 02:39:40 +0000
+Subject: [PATCH 4/6] cxgb4: Add support for T4 hardwired driver configuration settings
+
+In case if user defined configuration file at /lib/firmware/cxgb4/t4-config.txt
+location and also factory default configuration file written to FLASH are not
+present then driver will use hardwired configuration settings.
+
+Signed-off-by: Jay Hernandez <jay@chelsio.com>
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |    4 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  390 +++++++++++++++++++++--
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |   22 ++
+ drivers/net/ethernet/chelsio/cxgb4/t4_regs.h    |   56 ++++
+ drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h   |    2 +
+ 5 files changed, 442 insertions(+), 32 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 777cbb4..6827ce3 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -318,6 +318,7 @@ enum {                                 /* adapter flags */
+ 	USING_MSI          = (1 << 1),
+ 	USING_MSIX         = (1 << 2),
+ 	FW_OK              = (1 << 4),
++	RSS_TNLALLLOOKUP   = (1 << 5),
+ 	USING_SOFT_PARAMS  = (1 << 6),
+ 	MASTER_PF          = (1 << 7),
+ 	FW_OFLD_CONN       = (1 << 9),
+@@ -677,6 +678,9 @@ static inline int t4_wr_mbox_ns(struct adapter *adap, int mbox, const void *cmd,
+ 	return t4_wr_mbox_meat(adap, mbox, cmd, size, rpl, false);
+ }
+ 
++void t4_write_indirect(struct adapter *adap, unsigned int addr_reg,
++		       unsigned int data_reg, const u32 *vals,
++		       unsigned int nregs, unsigned int start_idx);
+ void t4_intr_enable(struct adapter *adapter);
+ void t4_intr_disable(struct adapter *adapter);
+ int t4_slow_intr_handler(struct adapter *adapter);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index cb3e663..b9cd08d 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -78,28 +78,45 @@
+  */
+ #define MAX_SGE_TIMERVAL 200U
+ 
+-#ifdef CONFIG_PCI_IOV
+-/*
+- * Virtual Function provisioning constants.  We need two extra Ingress Queues
+- * with Interrupt capability to serve as the VF's Firmware Event Queue and
+- * Forwarded Interrupt Queue (when using MSI mode) -- neither will have Free
+- * Lists associated with them).  For each Ethernet/Control Egress Queue and
+- * for each Free List, we need an Egress Context.
+- */
+ enum {
++	/*
++	 * Physical Function provisioning constants.
++	 */
++	PFRES_NVI = 4,			/* # of Virtual Interfaces */
++	PFRES_NETHCTRL = 128,		/* # of EQs used for ETH or CTRL Qs */
++	PFRES_NIQFLINT = 128,		/* # of ingress Qs/w Free List(s)/intr
++					 */
++	PFRES_NEQ = 256,		/* # of egress queues */
++	PFRES_NIQ = 0,			/* # of ingress queues */
++	PFRES_TC = 0,			/* PCI-E traffic class */
++	PFRES_NEXACTF = 128,		/* # of exact MPS filters */
++
++	PFRES_R_CAPS = FW_CMD_CAP_PF,
++	PFRES_WX_CAPS = FW_CMD_CAP_PF,
++
++#ifdef CONFIG_PCI_IOV
++	/*
++	 * Virtual Function provisioning constants.  We need two extra Ingress
++	 * Queues with Interrupt capability to serve as the VF's Firmware
++	 * Event Queue and Forwarded Interrupt Queue (when using MSI mode) --
++	 * neither will have Free Lists associated with them).  For each
++	 * Ethernet/Control Egress Queue and for each Free List, we need an
++	 * Egress Context.
++	 */
+ 	VFRES_NPORTS = 1,		/* # of "ports" per VF */
+ 	VFRES_NQSETS = 2,		/* # of "Queue Sets" per VF */
+ 
+ 	VFRES_NVI = VFRES_NPORTS,	/* # of Virtual Interfaces */
+ 	VFRES_NETHCTRL = VFRES_NQSETS,	/* # of EQs used for ETH or CTRL Qs */
+ 	VFRES_NIQFLINT = VFRES_NQSETS+2,/* # of ingress Qs/w Free List(s)/intr */
+-	VFRES_NIQ = 0,			/* # of non-fl/int ingress queues */
+ 	VFRES_NEQ = VFRES_NQSETS*2,	/* # of egress queues */
++	VFRES_NIQ = 0,			/* # of non-fl/int ingress queues */
+ 	VFRES_TC = 0,			/* PCI-E traffic class */
+ 	VFRES_NEXACTF = 16,		/* # of exact MPS filters */
+ 
+ 	VFRES_R_CAPS = FW_CMD_CAP_DMAQ|FW_CMD_CAP_VF|FW_CMD_CAP_PORT,
+ 	VFRES_WX_CAPS = FW_CMD_CAP_DMAQ|FW_CMD_CAP_VF,
++#endif
+ };
+ 
+ /*
+@@ -146,7 +163,6 @@ static unsigned int pfvfres_pmask(struct adapter *adapter,
+ 	}
+ 	/*NOTREACHED*/
+ }
+-#endif
+ 
+ enum {
+ 	MAX_TXQ_ENTRIES      = 16384,
+@@ -213,6 +229,17 @@ static uint force_init;
+ module_param(force_init, uint, 0644);
+ MODULE_PARM_DESC(force_init, "Forcibly become Master PF and initialize adapter");
+ 
++/*
++ * Normally if the firmware we connect to has Configuration File support, we
++ * use that and only fall back to the old Driver-based initialization if the
++ * Configuration File fails for some reason.  If force_old_init is set, then
++ * we'll always use the old Driver-based initialization sequence.
++ */
++static uint force_old_init;
++
++module_param(force_old_init, uint, 0644);
++MODULE_PARM_DESC(force_old_init, "Force old initialization sequence");
++
+ static int dflt_msg_enable = DFLT_MSG_ENABLE;
+ 
+ module_param(dflt_msg_enable, int, 0644);
+@@ -274,6 +301,30 @@ module_param_array(num_vf, uint, NULL, 0644);
+ MODULE_PARM_DESC(num_vf, "number of VFs for each of PFs 0-3");
+ #endif
+ 
++/*
++ * The filter TCAM has a fixed portion and a variable portion.  The fixed
++ * portion can match on source/destination IP IPv4/IPv6 addresses and TCP/UDP
++ * ports.  The variable portion is 36 bits which can include things like Exact
++ * Match MAC Index (9 bits), Ether Type (16 bits), IP Protocol (8 bits),
++ * [Inner] VLAN Tag (17 bits), etc. which, if all were somehow selected, would
++ * far exceed the 36-bit budget for this "compressed" header portion of the
++ * filter.  Thus, we have a scarce resource which must be carefully managed.
++ *
++ * By default we set this up to mostly match the set of filter matching
++ * capabilities of T3 but with accommodations for some of T4's more
++ * interesting features:
++ *
++ *   { IP Fragment (1), MPS Match Type (3), IP Protocol (8),
++ *     [Inner] VLAN (17), Port (3), FCoE (1) }
++ */
++enum {
++	TP_VLAN_PRI_MAP_DEFAULT = HW_TPL_FR_MT_PR_IV_P_FC,
++	TP_VLAN_PRI_MAP_FIRST = FCOE_SHIFT,
++	TP_VLAN_PRI_MAP_LAST = FRAGMENTATION_SHIFT,
++};
++
++static unsigned int tp_vlan_pri_map = TP_VLAN_PRI_MAP_DEFAULT;
++
+ static struct dentry *cxgb4_debugfs_root;
+ 
+ static LIST_HEAD(adapter_list);
+@@ -3410,6 +3461,262 @@ bye:
+ }
+ 
+ /*
++ * Attempt to initialize the adapter via hard-coded, driver supplied
++ * parameters ...
++ */
++static int adap_init0_no_config(struct adapter *adapter, int reset)
++{
++	struct sge *s = &adapter->sge;
++	struct fw_caps_config_cmd caps_cmd;
++	u32 v;
++	int i, ret;
++
++	/*
++	 * Reset device if necessary
++	 */
++	if (reset) {
++		ret = t4_fw_reset(adapter, adapter->mbox,
++				  PIORSTMODE | PIORST);
++		if (ret < 0)
++			goto bye;
++	}
++
++	/*
++	 * Get device capabilities and select which we'll be using.
++	 */
++	memset(&caps_cmd, 0, sizeof(caps_cmd));
++	caps_cmd.op_to_write = htonl(FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
++				     FW_CMD_REQUEST | FW_CMD_READ);
++	caps_cmd.retval_len16 = htonl(FW_LEN16(caps_cmd));
++	ret = t4_wr_mbox(adapter, adapter->mbox, &caps_cmd, sizeof(caps_cmd),
++			 &caps_cmd);
++	if (ret < 0)
++		goto bye;
++
++#ifndef CONFIG_CHELSIO_T4_OFFLOAD
++	/*
++	 * If we're a pure NIC driver then disable all offloading facilities.
++	 * This will allow the firmware to optimize aspects of the hardware
++	 * configuration which will result in improved performance.
++	 */
++	caps_cmd.ofldcaps = 0;
++	caps_cmd.iscsicaps = 0;
++	caps_cmd.rdmacaps = 0;
++	caps_cmd.fcoecaps = 0;
++#endif
++
++	if (caps_cmd.niccaps & htons(FW_CAPS_CONFIG_NIC_VM)) {
++		if (!vf_acls)
++			caps_cmd.niccaps ^= htons(FW_CAPS_CONFIG_NIC_VM);
++		else
++			caps_cmd.niccaps = htons(FW_CAPS_CONFIG_NIC_VM);
++	} else if (vf_acls) {
++		dev_err(adapter->pdev_dev, "virtualization ACLs not supported");
++		goto bye;
++	}
++	caps_cmd.op_to_write = htonl(FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
++			      FW_CMD_REQUEST | FW_CMD_WRITE);
++	ret = t4_wr_mbox(adapter, adapter->mbox, &caps_cmd, sizeof(caps_cmd),
++			 NULL);
++	if (ret < 0)
++		goto bye;
++
++	/*
++	 * Tweak configuration based on system architecture, module
++	 * parameters, etc.
++	 */
++	ret = adap_init0_tweaks(adapter);
++	if (ret < 0)
++		goto bye;
++
++	/*
++	 * Select RSS Global Mode we want to use.  We use "Basic Virtual"
++	 * mode which maps each Virtual Interface to its own section of
++	 * the RSS Table and we turn on all map and hash enables ...
++	 */
++	adapter->flags |= RSS_TNLALLLOOKUP;
++	ret = t4_config_glbl_rss(adapter, adapter->mbox,
++				 FW_RSS_GLB_CONFIG_CMD_MODE_BASICVIRTUAL,
++				 FW_RSS_GLB_CONFIG_CMD_TNLMAPEN |
++				 FW_RSS_GLB_CONFIG_CMD_HASHTOEPLITZ |
++				 ((adapter->flags & RSS_TNLALLLOOKUP) ?
++					FW_RSS_GLB_CONFIG_CMD_TNLALLLKP : 0));
++	if (ret < 0)
++		goto bye;
++
++	/*
++	 * Set up our own fundamental resource provisioning ...
++	 */
++	ret = t4_cfg_pfvf(adapter, adapter->mbox, adapter->fn, 0,
++			  PFRES_NEQ, PFRES_NETHCTRL,
++			  PFRES_NIQFLINT, PFRES_NIQ,
++			  PFRES_TC, PFRES_NVI,
++			  FW_PFVF_CMD_CMASK_MASK,
++			  pfvfres_pmask(adapter, adapter->fn, 0),
++			  PFRES_NEXACTF,
++			  PFRES_R_CAPS, PFRES_WX_CAPS);
++	if (ret < 0)
++		goto bye;
++
++	/*
++	 * Perform low level SGE initialization.  We need to do this before we
++	 * send the firmware the INITIALIZE command because that will cause
++	 * any other PF Drivers which are waiting for the Master
++	 * Initialization to proceed forward.
++	 */
++	for (i = 0; i < SGE_NTIMERS - 1; i++)
++		s->timer_val[i] = min(intr_holdoff[i], MAX_SGE_TIMERVAL);
++	s->timer_val[SGE_NTIMERS - 1] = MAX_SGE_TIMERVAL;
++	s->counter_val[0] = 1;
++	for (i = 1; i < SGE_NCOUNTERS; i++)
++		s->counter_val[i] = min(intr_cnt[i - 1],
++					THRESHOLD_0_GET(THRESHOLD_0_MASK));
++	t4_sge_init(adapter);
++
++#ifdef CONFIG_PCI_IOV
++	/*
++	 * Provision resource limits for Virtual Functions.  We currently
++	 * grant them all the same static resource limits except for the Port
++	 * Access Rights Mask which we're assigning based on the PF.  All of
++	 * the static provisioning stuff for both the PF and VF really needs
++	 * to be managed in a persistent manner for each device which the
++	 * firmware controls.
++	 */
++	{
++		int pf, vf;
++
++		for (pf = 0; pf < ARRAY_SIZE(num_vf); pf++) {
++			if (num_vf[pf] <= 0)
++				continue;
++
++			/* VF numbering starts at 1! */
++			for (vf = 1; vf <= num_vf[pf]; vf++) {
++				ret = t4_cfg_pfvf(adapter, adapter->mbox,
++						  pf, vf,
++						  VFRES_NEQ, VFRES_NETHCTRL,
++						  VFRES_NIQFLINT, VFRES_NIQ,
++						  VFRES_TC, VFRES_NVI,
++						  FW_PFVF_CMD_CMASK_GET(
++						  FW_PFVF_CMD_CMASK_MASK),
++						  pfvfres_pmask(
++						  adapter, pf, vf),
++						  VFRES_NEXACTF,
++						  VFRES_R_CAPS, VFRES_WX_CAPS);
++				if (ret < 0)
++					dev_warn(adapter->pdev_dev,
++						 "failed to "\
++						 "provision pf/vf=%d/%d; "
++						 "err=%d\n", pf, vf, ret);
++			}
++		}
++	}
++#endif
++
++	/*
++	 * Set up the default filter mode.  Later we'll want to implement this
++	 * via a firmware command, etc. ...  This needs to be done before the
++	 * firmare initialization command ...  If the selected set of fields
++	 * isn't equal to the default value, we'll need to make sure that the
++	 * field selections will fit in the 36-bit budget.
++	 */
++	if (tp_vlan_pri_map != TP_VLAN_PRI_MAP_DEFAULT) {
++		int i, bits = 0;
++
++		for (i = TP_VLAN_PRI_MAP_FIRST; i <= TP_VLAN_PRI_MAP_LAST; i++)
++			switch (tp_vlan_pri_map & (1 << i)) {
++			case 0:
++				/* compressed filter field not enabled */
++				break;
++			case FCOE_MASK:
++				bits +=  1;
++				break;
++			case PORT_MASK:
++				bits +=  3;
++				break;
++			case VNIC_ID_MASK:
++				bits += 17;
++				break;
++			case VLAN_MASK:
++				bits += 17;
++				break;
++			case TOS_MASK:
++				bits +=  8;
++				break;
++			case PROTOCOL_MASK:
++				bits +=  8;
++				break;
++			case ETHERTYPE_MASK:
++				bits += 16;
++				break;
++			case MACMATCH_MASK:
++				bits +=  9;
++				break;
++			case MPSHITTYPE_MASK:
++				bits +=  3;
++				break;
++			case FRAGMENTATION_MASK:
++				bits +=  1;
++				break;
++			}
++
++		if (bits > 36) {
++			dev_err(adapter->pdev_dev,
++				"tp_vlan_pri_map=%#x needs %d bits > 36;"\
++				" using %#x\n", tp_vlan_pri_map, bits,
++				TP_VLAN_PRI_MAP_DEFAULT);
++			tp_vlan_pri_map = TP_VLAN_PRI_MAP_DEFAULT;
++		}
++	}
++	v = tp_vlan_pri_map;
++	t4_write_indirect(adapter, TP_PIO_ADDR, TP_PIO_DATA,
++			  &v, 1, TP_VLAN_PRI_MAP);
++
++	/*
++	 * We need Five Tuple Lookup mode to be set in TP_GLOBAL_CONFIG order
++	 * to support any of the compressed filter fields above.  Newer
++	 * versions of the firmware do this automatically but it doesn't hurt
++	 * to set it here.  Meanwhile, we do _not_ need to set Lookup Every
++	 * Packet in TP_INGRESS_CONFIG to support matching non-TCP packets
++	 * since the firmware automatically turns this on and off when we have
++	 * a non-zero number of filters active (since it does have a
++	 * performance impact).
++	 */
++	if (tp_vlan_pri_map)
++		t4_set_reg_field(adapter, TP_GLOBAL_CONFIG,
++				 FIVETUPLELOOKUP_MASK,
++				 FIVETUPLELOOKUP_MASK);
++
++	/*
++	 * Tweak some settings.
++	 */
++	t4_write_reg(adapter, TP_SHIFT_CNT, SYNSHIFTMAX(6) |
++		     RXTSHIFTMAXR1(4) | RXTSHIFTMAXR2(15) |
++		     PERSHIFTBACKOFFMAX(8) | PERSHIFTMAX(8) |
++		     KEEPALIVEMAXR1(4) | KEEPALIVEMAXR2(9));
++
++	/*
++	 * Get basic stuff going by issuing the Firmware Initialize command.
++	 * Note that this _must_ be after all PFVF commands ...
++	 */
++	ret = t4_fw_initialize(adapter, adapter->mbox);
++	if (ret < 0)
++		goto bye;
++
++	/*
++	 * Return successfully!
++	 */
++	dev_info(adapter->pdev_dev, "Successfully configured using built-in "\
++		 "driver parameters\n");
++	return 0;
++
++	/*
++	 * Something bad happened.  Return the error ...
++	 */
++bye:
++	return ret;
++}
++
++/*
+  * Phase 0 of initialization: contact FW, obtain config, perform basic init.
+  */
+ static int adap_init0(struct adapter *adap)
+@@ -3474,7 +3781,9 @@ static int adap_init0(struct adapter *adap)
+ 		goto bye;
+ 
+ 	/*
+-	 * Find out what ports are available to us.
++	 * Find out what ports are available to us.  Note that we need to do
++	 * this before calling adap_init0_no_config() since it needs nports
++	 * and portvec ...
+ 	 */
+ 	v =
+ 	    FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
+@@ -3500,35 +3809,52 @@ static int adap_init0(struct adapter *adap)
+ 	} else {
+ 		dev_info(adap->pdev_dev, "Coming up as MASTER: "\
+ 			 "Initializing adapter\n");
+-		/*
+-		 * Find out whether we're dealing with a version of
+-		 * the firmware which has configuration file support.
+-		 */
+-		params[0] = (FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
+-			     FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_CF));
+-		ret = t4_query_params(adap, adap->mbox, adap->fn, 0, 1,
+-				      params, val);
+ 
+ 		/*
+ 		 * If the firmware doesn't support Configuration
+ 		 * Files warn user and exit,
+ 		 */
+ 		if (ret < 0)
+-			dev_warn(adap->pdev_dev, "Firmware doesn't support "\
++			dev_warn(adap->pdev_dev, "Firmware doesn't support "
+ 				 "configuration file.\n");
++		if (force_old_init)
++			ret = adap_init0_no_config(adap, reset);
+ 		else {
+ 			/*
+-			 * The firmware provides us with a memory
+-			 * buffer where we can load a Configuration
+-			 * File from the host if we want to override
+-			 * the Configuration File in flash.
++			 * Find out whether we're dealing with a version of
++			 * the firmware which has configuration file support.
+ 			 */
++			params[0] = (FW_PARAMS_MNEM(FW_PARAMS_MNEM_DEV) |
++				     FW_PARAMS_PARAM_X(FW_PARAMS_PARAM_DEV_CF));
++			ret = t4_query_params(adap, adap->mbox, adap->fn, 0, 1,
++					      params, val);
+ 
+-			ret = adap_init0_config(adap, reset);
+-			if (ret == -ENOENT) {
+-				dev_info(adap->pdev_dev,
+-				    "No Configuration File present "
+-				    "on adapter.\n");
++			/*
++			 * If the firmware doesn't support Configuration
++			 * Files, use the old Driver-based, hard-wired
++			 * initialization.  Otherwise, try using the
++			 * Configuration File support and fall back to the
++			 * Driver-based initialization if there's no
++			 * Configuration File found.
++			 */
++			if (ret < 0)
++				ret = adap_init0_no_config(adap, reset);
++			else {
++				/*
++				 * The firmware provides us with a memory
++				 * buffer where we can load a Configuration
++				 * File from the host if we want to override
++				 * the Configuration File in flash.
++				 */
++
++				ret = adap_init0_config(adap, reset);
++				if (ret == -ENOENT) {
++					dev_info(adap->pdev_dev,
++					    "No Configuration File present "
++					    "on adapter.  Using hard-wired "
++					    "configuration parameters.\n");
++					ret = adap_init0_no_config(adap, reset);
++				}
+ 			}
+ 		}
+ 		if (ret < 0) {
+@@ -3601,14 +3927,14 @@ static int adap_init0(struct adapter *adap)
+ 	 */
+ 	memset(&caps_cmd, 0, sizeof(caps_cmd));
+ 	caps_cmd.op_to_write = htonl(V_FW_CMD_OP(FW_CAPS_CONFIG_CMD) |
+-				     F_FW_CMD_REQUEST | F_FW_CMD_READ);
+-	caps_cmd.cfvalid_to_len16 = htonl(FW_LEN16(caps_cmd));
++				     FW_CMD_REQUEST | FW_CMD_READ);
++	caps_cmd.retval_len16 = htonl(FW_LEN16(caps_cmd));
+ 	ret = t4_wr_mbox(adap, adap->mbox, &caps_cmd, sizeof(caps_cmd),
+ 			 &caps_cmd);
+ 	if (ret < 0)
+ 		goto bye;
+ 
+-	if (caps_cmd.toecaps) {
++	if (caps_cmd.ofldcaps) {
+ 		/* query offload-related parameters */
+ 		params[0] = FW_PARAM_DEV(NTID);
+ 		params[1] = FW_PARAM_PFVF(SERVER_START);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 419432d..61f002d 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -120,6 +120,28 @@ static void t4_read_indirect(struct adapter *adap, unsigned int addr_reg,
+ 	}
+ }
+ 
++/**
++ *	t4_write_indirect - write indirectly addressed registers
++ *	@adap: the adapter
++ *	@addr_reg: register holding the indirect addresses
++ *	@data_reg: register holding the value for the indirect registers
++ *	@vals: values to write
++ *	@nregs: how many indirect registers to write
++ *	@start_idx: address of first indirect register to write
++ *
++ *	Writes a sequential block of registers that are accessed indirectly
++ *	through an address/data register pair.
++ */
++void t4_write_indirect(struct adapter *adap, unsigned int addr_reg,
++		       unsigned int data_reg, const u32 *vals,
++		       unsigned int nregs, unsigned int start_idx)
++{
++	while (nregs--) {
++		t4_write_reg(adap, addr_reg, start_idx++);
++		t4_write_reg(adap, data_reg, *vals++);
++	}
++}
++
+ /*
+  * Get the reply to a mailbox command and store it in @rpl in big-endian order.
+  */
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+index 779b23f..732c6da 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+@@ -491,6 +491,13 @@
+ #define  VLANEXTENABLE_MASK  0x0000f000U
+ #define  VLANEXTENABLE_SHIFT 12
+ 
++#define TP_GLOBAL_CONFIG 0x7d08
++#define  FIVETUPLELOOKUP_SHIFT  17
++#define  FIVETUPLELOOKUP_MASK   0x00060000U
++#define  FIVETUPLELOOKUP(x)     ((x) << FIVETUPLELOOKUP_SHIFT)
++#define  FIVETUPLELOOKUP_GET(x) (((x) & FIVETUPLELOOKUP_MASK) >> \
++				FIVETUPLELOOKUP_SHIFT)
++
+ #define TP_PARA_REG2 0x7d68
+ #define  MAXRXDATA_MASK    0xffff0000U
+ #define  MAXRXDATA_SHIFT   16
+@@ -506,6 +513,41 @@
+ 	(((x) & DELAYEDACKRESOLUTION_MASK) >> DELAYEDACKRESOLUTION_SHIFT)
+ 
+ #define TP_SHIFT_CNT 0x7dc0
++#define  SYNSHIFTMAX_SHIFT         24
++#define  SYNSHIFTMAX_MASK          0xff000000U
++#define  SYNSHIFTMAX(x)            ((x) << SYNSHIFTMAX_SHIFT)
++#define  SYNSHIFTMAX_GET(x)        (((x) & SYNSHIFTMAX_MASK) >> \
++				   SYNSHIFTMAX_SHIFT)
++#define  RXTSHIFTMAXR1_SHIFT       20
++#define  RXTSHIFTMAXR1_MASK        0x00f00000U
++#define  RXTSHIFTMAXR1(x)          ((x) << RXTSHIFTMAXR1_SHIFT)
++#define  RXTSHIFTMAXR1_GET(x)      (((x) & RXTSHIFTMAXR1_MASK) >> \
++				   RXTSHIFTMAXR1_SHIFT)
++#define  RXTSHIFTMAXR2_SHIFT       16
++#define  RXTSHIFTMAXR2_MASK        0x000f0000U
++#define  RXTSHIFTMAXR2(x)          ((x) << RXTSHIFTMAXR2_SHIFT)
++#define  RXTSHIFTMAXR2_GET(x)      (((x) & RXTSHIFTMAXR2_MASK) >> \
++				   RXTSHIFTMAXR2_SHIFT)
++#define  PERSHIFTBACKOFFMAX_SHIFT  12
++#define  PERSHIFTBACKOFFMAX_MASK   0x0000f000U
++#define  PERSHIFTBACKOFFMAX(x)     ((x) << PERSHIFTBACKOFFMAX_SHIFT)
++#define  PERSHIFTBACKOFFMAX_GET(x) (((x) & PERSHIFTBACKOFFMAX_MASK) >> \
++				   PERSHIFTBACKOFFMAX_SHIFT)
++#define  PERSHIFTMAX_SHIFT         8
++#define  PERSHIFTMAX_MASK          0x00000f00U
++#define  PERSHIFTMAX(x)            ((x) << PERSHIFTMAX_SHIFT)
++#define  PERSHIFTMAX_GET(x)        (((x) & PERSHIFTMAX_MASK) >> \
++				   PERSHIFTMAX_SHIFT)
++#define  KEEPALIVEMAXR1_SHIFT      4
++#define  KEEPALIVEMAXR1_MASK       0x000000f0U
++#define  KEEPALIVEMAXR1(x)         ((x) << KEEPALIVEMAXR1_SHIFT)
++#define  KEEPALIVEMAXR1_GET(x)     (((x) & KEEPALIVEMAXR1_MASK) >> \
++				   KEEPALIVEMAXR1_SHIFT)
++#define KEEPALIVEMAXR2_SHIFT       0
++#define KEEPALIVEMAXR2_MASK        0x0000000fU
++#define KEEPALIVEMAXR2(x)          ((x) << KEEPALIVEMAXR2_SHIFT)
++#define KEEPALIVEMAXR2_GET(x)      (((x) & KEEPALIVEMAXR2_MASK) >> \
++				   KEEPALIVEMAXR2_SHIFT)
+ 
+ #define TP_CCTRL_TABLE 0x7ddc
+ #define TP_MTU_TABLE 0x7de4
+@@ -539,6 +581,20 @@
+ #define TP_INT_CAUSE 0x7e74
+ #define  FLMTXFLSTEMPTY 0x40000000U
+ 
++#define TP_VLAN_PRI_MAP 0x140
++#define  FRAGMENTATION_SHIFT 9
++#define  FRAGMENTATION_MASK  0x00000200U
++#define  MPSHITTYPE_MASK     0x00000100U
++#define  MACMATCH_MASK       0x00000080U
++#define  ETHERTYPE_MASK      0x00000040U
++#define  PROTOCOL_MASK       0x00000020U
++#define  TOS_MASK            0x00000010U
++#define  VLAN_MASK           0x00000008U
++#define  VNIC_ID_MASK        0x00000004U
++#define  PORT_MASK           0x00000002U
++#define  FCOE_SHIFT          0
++#define  FCOE_MASK           0x00000001U
++
+ #define TP_INGRESS_CONFIG 0x141
+ #define  VNIC                0x00000800U
+ #define  CSUM_HAS_PSEUDO_HDR 0x00000400U
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+index 3f85019..b1d5561 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+@@ -79,6 +79,8 @@ struct fw_wr_hdr {
+ #define FW_WR_FLOWID(x)	((x) << 8)
+ #define FW_WR_LEN16(x)	((x) << 0)
+ 
++#define HW_TPL_FR_MT_PR_IV_P_FC         0X32B
++
+ struct fw_ulptx_wr {
+ 	__be32 op_to_compl;
+ 	__be32 flowid_len16;
+-- 
+1.7.1
+
