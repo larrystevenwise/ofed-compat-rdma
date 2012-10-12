@@ -12,7 +12,7 @@ Signed-off-by: Bart Van Assche <bvanassche@acm.org>
  1 file changed, 108 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
-index bcbf22e..fab74e0 100644
+index bcbf22e..d42e9c4 100644
 --- a/drivers/infiniband/ulp/srp/ib_srp.c
 +++ b/drivers/infiniband/ulp/srp/ib_srp.c
 @@ -30,8 +30,13 @@
@@ -29,7 +29,7 @@ index bcbf22e..fab74e0 100644
  #include <linux/module.h>
  #include <linux/init.h>
  #include <linux/slab.h>
-@@ -41,21 +46,27 @@
+@@ -41,21 +46,32 @@
  #include <linux/random.h>
  #include <linux/jiffies.h>
  
@@ -57,22 +57,15 @@ index bcbf22e..fab74e0 100644
 +#define pr_warn pr_warning
 +#endif
 +
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++static struct workqueue_struct *srp_wq;
++#define ib_wq srp_wq
++#endif
++
  MODULE_AUTHOR("Roland Dreier");
  MODULE_DESCRIPTION("InfiniBand SCSI RDMA Protocol initiator "
  		   "v" DRV_VERSION " (" DRV_RELDATE ")");
-@@ -675,7 +686,11 @@ err:
- 	if (target->state == SRP_TARGET_CONNECTING) {
- 		target->state = SRP_TARGET_DEAD;
- 		INIT_WORK(&target->work, srp_remove_work);
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
- 		queue_work(ib_wq, &target->work);
-+#else
-+		schedule_work(&target->work);
-+#endif
- 	}
- 	spin_unlock_irq(&target->lock);
- 
-@@ -1254,7 +1269,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
+@@ -1254,7 +1270,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
  	}
  }
  
@@ -124,7 +117,7 @@ index bcbf22e..fab74e0 100644
  {
  	struct srp_target_port *target = host_to_target(shost);
  	struct srp_request *req;
-@@ -1822,6 +1880,9 @@ static struct scsi_host_template srp_template = {
+@@ -1822,6 +1881,9 @@ static struct scsi_host_template srp_template = {
  	.name				= "InfiniBand SRP initiator",
  	.proc_name			= DRV_NAME,
  	.info				= srp_target_info,
@@ -134,18 +127,32 @@ index bcbf22e..fab74e0 100644
  	.queuecommand			= srp_queuecommand,
  	.eh_abort_handler		= srp_abort,
  	.eh_device_reset_handler	= srp_reset_device,
-@@ -2412,7 +2473,11 @@ static void srp_remove_one(struct ib_device *device)
- 		 * started before we marked our target ports as
- 		 * removed, and any target port removal tasks.
- 		 */
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
- 		flush_workqueue(ib_wq);
-+#else
-+		flush_scheduled_work();
-+#endif
+@@ -2491,11 +2553,25 @@ static int __init srp_init_module(void)
+ 		return ret;
+ 	}
  
- 		list_for_each_entry_safe(target, tmp_target,
- 					 &host->target_list, list) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++	srp_wq = create_workqueue("srp");
++	if (IS_ERR(srp_wq)) {
++		ib_unregister_client(&srp_client);
++		ib_sa_unregister_client(&srp_sa_client);
++		class_unregister(&srp_class);
++		srp_release_transport(ib_srp_transport_template);
++		return PTR_ERR(srp_wq);
++	}
++#endif
++
+ 	return 0;
+ }
+ 
+ static void __exit srp_cleanup_module(void)
+ {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++	destroy_workqueue(srp_wq);
++#endif
+ 	ib_unregister_client(&srp_client);
+ 	ib_sa_unregister_client(&srp_sa_client);
+ 	class_unregister(&srp_class);
 -- 
 1.7.9.5
 
