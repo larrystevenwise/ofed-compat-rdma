@@ -1,0 +1,29 @@
+From 594f88e96ebaf290e6509b37fff84b310ec1f155 Mon Sep 17 00:00:00 2001
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Mon, 8 Oct 2012 10:12:11 +0300
+Subject: [PATCH] cxgb4: allocate enough data in t4_memory_rw()
+
+MEMWIN0_APERTURE is the size in bytes.
+
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 137a244..e914c41 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -417,7 +417,7 @@ static int t4_memory_rw(struct adapter *adap, int mtype, u32 addr, u32 len,
+ 	if ((addr & 0x3) || (len & 0x3))
+ 		return -EINVAL;
+
+-	data = vmalloc(MEMWIN0_APERTURE/sizeof(__be32));
++	data = vmalloc(MEMWIN0_APERTURE);
+ 	if (!data)
+ 		return -ENOMEM;
+
+--
+1.7.1
+
