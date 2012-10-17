@@ -78,27 +78,31 @@ diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/che
 index 1fde57d..3ecc087 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -68,9 +68,6 @@
+@@ -68,9 +68,11 @@
   */
  #define RX_PKT_SKB_LEN   512
  
--/* Ethernet header padding prepended to RX_PKTs */
--#define RX_PKT_PAD 2
--
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
+ /* Ethernet header padding prepended to RX_PKTs */
+ #define RX_PKT_PAD 2
+
++#endif
  /*
   * Max number of Tx descriptors we clean up at a time.  Should be modest as
   * freeing skbs isn't cheap and it happens while holding locks.  We just need
-@@ -137,13 +134,6 @@
+@@ -137,13 +134,15 @@
   */
  #define MAX_CTRL_WR_LEN SGE_MAX_WR_LEN
  
--enum {
--	/* packet alignment in FL buffers */
--	FL_ALIGN = L1_CACHE_BYTES < 32 ? 32 : L1_CACHE_BYTES,
--	/* egress status entry size */
--	STAT_LEN = L1_CACHE_BYTES > 64 ? 128 : 64
--};
--
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 7, 0)
+ enum {
+ 	/* packet alignment in FL buffers */
+ 	FL_ALIGN = L1_CACHE_BYTES < 32 ? 32 : L1_CACHE_BYTES,
+ 	/* egress status entry size */
+ 	STAT_LEN = L1_CACHE_BYTES > 64 ? 128 : 64
+ };
+
++#endif
  struct tx_sw_desc {                /* SW state per Tx descriptor */
  	struct sk_buff *skb;
  	struct ulptx_sgl *sgl;
@@ -286,12 +290,15 @@ index 1fde57d..3ecc087 100644
  	int ret;
  	struct sk_buff *skb;
  
-@@ -1529,11 +1587,11 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
+@@ -1529,11 +1587,15 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
  	}
 
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
--	copy_frags(skb, gl, RX_PKT_PAD);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 +	copy_frags(skb, gl, s->pktshift);
++#else
+ 	copy_frags(skb, gl, RX_PKT_PAD);
++#endif
  #else
  	copy_frags(skb_shinfo(skb), gl, RX_PKT_PAD);
  #endif
@@ -317,12 +324,14 @@ index 1fde57d..3ecc087 100644
  	skb->protocol = eth_type_trans(skb, q->netdev);
  	skb_record_rx_queue(skb, q->idx);
  	if (skb->dev->features & NETIF_F_RXHASH)
-@@ -1696,6 +1755,8 @@ static int process_responses(struct sge_rspq *q, int budget)
+@@ -1696,6 +1755,10 @@ static int process_responses(struct sge_rspq *q, int budget)
  	int budget_left = budget;
  	const struct rsp_ctrl *rc;
  	struct sge_eth_rxq *rxq = container_of(q, struct sge_eth_rxq, rspq);
 +	struct adapter *adapter = q->adap;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 +	struct sge *s = &adapter->sge;
++#endif
  
  	while (likely(budget_left)) {
  		rc = (void *)q->cur_desc + (q->iqe_len - sizeof(*rc));
@@ -335,12 +344,15 @@ index 1fde57d..3ecc087 100644
  				fp->page = rsd->page;
  				fp->offset = q->offset;
  				fp->size = min(bufsz, len);
-@@ -1747,7 +1808,7 @@ static int process_responses(struct sge_rspq *q, int budget)
+@@ -1747,7 +1808,11 @@ static int process_responses(struct sge_rspq *q, int budget)
  			ret = q->handler(q, q->cur_desc, &si);
  			if (likely(ret == 0))
  #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
--				q->offset += ALIGN(fp->size, FL_ALIGN);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 7, 0)
 +				q->offset += ALIGN(fp->size, s->fl_align);
++#else
+ 				q->offset += ALIGN(fp->size, FL_ALIGN);
++#endif
  #else
  				q->offset += ALIGN(skb_frag_size(fp), FL_ALIGN);
  #endif
