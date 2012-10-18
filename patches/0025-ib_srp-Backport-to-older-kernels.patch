@@ -127,32 +127,56 @@ index bcbf22e..d42e9c4 100644
  	.queuecommand			= srp_queuecommand,
  	.eh_abort_handler		= srp_abort,
  	.eh_device_reset_handler	= srp_reset_device,
-@@ -2491,11 +2553,25 @@ static int __init srp_init_module(void)
- 		return ret;
+@@ -2468,15 +2530,28 @@ static int __init srp_init_module(void)
+ 		indirect_sg_entries = cmd_sg_entries;
  	}
  
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
 +	srp_wq = create_workqueue("srp");
-+	if (IS_ERR(srp_wq)) {
-+		ib_unregister_client(&srp_client);
-+		ib_sa_unregister_client(&srp_sa_client);
-+		class_unregister(&srp_class);
-+		srp_release_transport(ib_srp_transport_template);
++	if (IS_ERR(srp_wq))
 +		return PTR_ERR(srp_wq);
-+	}
 +#endif
 +
- 	return 0;
- }
+ 	ib_srp_transport_template =
+ 		srp_attach_transport(&ib_srp_transport_functions);
+-	if (!ib_srp_transport_template)
++	if (!ib_srp_transport_template) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return -ENOMEM;
++	}
  
- static void __exit srp_cleanup_module(void)
- {
+ 	ret = class_register(&srp_class);
+ 	if (ret) {
+ 		pr_err("couldn't register class infiniband_srp\n");
+ 		srp_release_transport(ib_srp_transport_template);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return ret;
+ 	}
+ 
+@@ -2488,6 +2563,9 @@ static int __init srp_init_module(void)
+ 		srp_release_transport(ib_srp_transport_template);
+ 		ib_sa_unregister_client(&srp_sa_client);
+ 		class_unregister(&srp_class);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return ret;
+ 	}
+ 
+@@ -2500,6 +2578,9 @@ static void __exit srp_cleanup_module(void)
+ 	ib_sa_unregister_client(&srp_sa_client);
+ 	class_unregister(&srp_class);
+ 	srp_release_transport(ib_srp_transport_template);
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
 +	destroy_workqueue(srp_wq);
 +#endif
- 	ib_unregister_client(&srp_client);
- 	ib_sa_unregister_client(&srp_sa_client);
- 	class_unregister(&srp_class);
+ }
+ 
+ module_init(srp_init_module);
 -- 
 1.7.9.5
 
