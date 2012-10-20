@@ -1,0 +1,23 @@
+Fix for incorrect hdr_pbase when forwarding fpdus to hardware 
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_mgt.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_mgt.c b/drivers/infiniband/hw/nes/nes_mgt.c
+index 3ba7be3..8cf74fd 100644
+--- a/drivers/infiniband/hw/nes/nes_mgt.c
++++ b/drivers/infiniband/hw/nes/nes_mgt.c
+@@ -447,7 +447,7 @@ static int forward_fpdus(struct nes_vnic *nesvnic, struct nes_qp *nesqp)
+ 		set_wqe_32bit_value(cqp_wqe->wqe_words, NES_NIC_SQ_WQE_FRAG0_LOW_IDX,
+ 				    lower_32_bits(u64tmp));
+ 		set_wqe_32bit_value(cqp_wqe->wqe_words, NES_NIC_SQ_WQE_FRAG0_HIGH_IDX,
+-				    upper_32_bits(u64tmp >> 32));
++				    upper_32_bits(u64tmp));
+ 
+ 		set_wqe_32bit_value(cqp_wqe->wqe_words, NES_NIC_SQ_WQE_FRAG1_LOW_IDX,
+ 				    lower_32_bits(fpdu_info->frags[0].physaddr));
+-- 
+1.7.4.2
+

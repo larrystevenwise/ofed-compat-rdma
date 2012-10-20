@@ -1,0 +1,62 @@
+Fix for unlinking NULL skb because of race condition
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_mgt.c |    8 ++++----
+ 1 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_mgt.c b/drivers/infiniband/hw/nes/nes_mgt.c
+index 2d710e1..9d0fd2b 100644
+--- a/drivers/infiniband/hw/nes/nes_mgt.c
++++ b/drivers/infiniband/hw/nes/nes_mgt.c
+@@ -322,11 +322,10 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
+ 		frag_cnt = 1;
+ 	}
+ 
+-	spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+-
+ 	/* Found one */
+ 	fpdu_info = kzalloc(sizeof(*fpdu_info), GFP_ATOMIC);
+ 	if (fpdu_info == NULL) {
++		spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+ 		nes_debug(NES_DBG_PAU, "Failed to alloc a fpdu_info.\n");
+ 		rc = -ENOMEM;
+ 		goto out;
+@@ -334,6 +333,7 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
+ 
+ 	fpdu_info->cqp_request = nes_get_cqp_request(nesdev);
+ 	if (fpdu_info->cqp_request == NULL) {
++		spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+ 		nes_debug(NES_DBG_PAU, "Failed to get a cqp_request.\n");
+ 		rc = -ENOMEM;
+ 		goto out;
+@@ -353,6 +353,7 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
+ 		fpdu_info->hdr_vbase = pci_alloc_consistent(nesdev->pcidev,
+ 							    fpdu_info->hdr_len, &fpdu_info->hdr_pbase);
+ 		if (!fpdu_info->hdr_vbase) {
++			spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+ 			nes_debug(NES_DBG_PAU, "Unable to allocate memory for pau first frag\n");
+ 			rc = -ENOMEM;
+ 			goto out;
+@@ -385,10 +386,8 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
+ 
+ 		if (frags[i].skb->len == 0) {
+ 			/* Pull skb off the list - it will be freed in the callback */
+-			spin_lock_irqsave(&nesqp->pau_lock, flags);
+ 			if (!skb_queue_empty(&nesqp->pau_list))
+ 				skb_unlink(frags[i].skb, &nesqp->pau_list);
+-			spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+ 		} else {
+ 			/* Last skb still has data so update the seq */
+ 			iph = (struct iphdr *)(cb->data_start + ETH_HLEN);
+@@ -396,6 +395,7 @@ static int get_fpdu_info(struct nes_device *nesdev, struct nes_qp *nesqp,
+ 			tcph->seq = cpu_to_be32(nesqp->pau_rcv_nxt);
+ 		}
+ 	}
++	spin_unlock_irqrestore(&nesqp->pau_lock, flags);
+ 
+ out:
+ 	if (rc) {
+-- 
+1.7.4.2
+
