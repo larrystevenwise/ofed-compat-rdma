@@ -1,0 +1,32 @@
+From f36a3730fdd4cc65780a0137ca20da0248aa8de7 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Wed, 7 Nov 2012 15:57:03 +0530
+Subject: [PATCH net] cxgb4: Fix initialization of SGE_CONTROL register
+
+INGPADBOUNDARY_MASK is already shifted. No need to shift it again. On reloading
+a driver it was resulting in a bad SGE FL MTU sizes [1536, 9088] error. This
+only causes an issue on systems that have L1 cache size of 32B, 128B, 512B,
+2048B or 4096B.
+
+Signed-off-by: Jay Hernandez <jay@chelsio.com>
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 01fa5b7..730ae2c 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -2831,7 +2831,7 @@ int t4_fixup_host_params(struct adapter *adap, unsigned int page_size,
+ 		     HOSTPAGESIZEPF7(sge_hps));
+ 
+ 	t4_set_reg_field(adap, SGE_CONTROL,
+-			 INGPADBOUNDARY(INGPADBOUNDARY_MASK) |
++			 INGPADBOUNDARY_MASK |
+ 			 EGRSTATUSPAGESIZE_MASK,
+ 			 INGPADBOUNDARY(fl_align_log - 5) |
+ 			 EGRSTATUSPAGESIZE(stat_len != 64));
+-- 
+1.7.1
+
