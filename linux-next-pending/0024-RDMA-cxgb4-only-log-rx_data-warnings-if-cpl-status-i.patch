@@ -1,0 +1,29 @@
+From 7064cb784a8515d6c65deec78eb6e839820434e8 Mon Sep 17 00:00:00 2001
+From: Vipul Pandya <vipul@chelsio.com>
+Date: Thu, 8 Nov 2012 14:39:46 +0530
+Subject: [PATCH] RDMA/cxgb4: only log rx_data warnings if cpl status is non zero.
+
+With newer firmware, we can get streaming data due to connection
+errors before the driver moves the QP out of RTS.
+
+Signed-off-by: Vipul Pandya <vipul@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 6164268..7a216ed 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -1418,7 +1418,7 @@ static int rx_data(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	case FPDU_MODE: {
+ 		struct c4iw_qp_attributes attrs;
+ 		BUG_ON(!ep->com.qp);
+-		if (ep->com.qp->attr.state == C4IW_QP_STATE_RTS)
++		if (status)
+ 			pr_err("%s Unexpected streaming data." \
+ 			       " qpid %u ep %p state %d tid %u status %d\n",
+ 			       __func__, ep->com.qp->wq.sq.qid, ep,
+-- 
+1.7.1
+
