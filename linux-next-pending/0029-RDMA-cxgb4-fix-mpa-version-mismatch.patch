@@ -1,0 +1,59 @@
+RDMA/cxgb4: Don't wakeup threads for MPAv2
+
+Don't wakeup threads blocked in rdma_init/rdma_fini if we are on
+MPAv2, and want to retry connection with MPAv1.
+
+Stop ep-timer on getting MPA version mismatch, before doing the
+abort_connection - in process_mpa_request.
+
+Take care to stop ep-timer in error paths for process_mpa_request.
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+--- a/drivers/infiniband/hw/cxgb4/cm.c	2012-11-19 15:09:38.780091885 +0530
++++ b/drivers/infiniband/hw/cxgb4/cm.c	2012-11-19 17:24:22.842503571 +0530
+@@ -1324,11 +1324,13 @@ static void process_mpa_request(struct c
+ 	if (mpa->revision > mpa_rev) {
+ 		printk(KERN_ERR MOD "%s MPA version mismatch. Local = %d,"
+ 		       " Received = %d\n", __func__, mpa_rev, mpa->revision);
++		stop_ep_timer(ep);
+ 		abort_connection(ep, skb, GFP_KERNEL);
+ 		return;
+ 	}
+ 
+ 	if (memcmp(mpa->key, MPA_KEY_REQ, sizeof(mpa->key))) {
++		stop_ep_timer(ep);
+ 		abort_connection(ep, skb, GFP_KERNEL);
+ 		return;
+ 	}
+@@ -1339,6 +1341,7 @@ static void process_mpa_request(struct c
+ 	 * Fail if there's too much private data.
+ 	 */
+ 	if (plen > MPA_MAX_PRIVATE_DATA) {
++		stop_ep_timer(ep);
+ 		abort_connection(ep, skb, GFP_KERNEL);
+ 		return;
+ 	}
+@@ -1347,6 +1350,7 @@ static void process_mpa_request(struct c
+ 	 * If plen does not account for pkt size
+ 	 */
+ 	if (ep->mpa_pkt_len > (sizeof(*mpa) + plen)) {
++		stop_ep_timer(ep);
+ 		abort_connection(ep, skb, GFP_KERNEL);
+ 		return;
+ 	}
+@@ -3352,8 +3356,14 @@ static int peer_abort_intr(struct c4iw_d
+ 
+ 	/*
+ 	 * Wake up any threads in rdma_init() or rdma_fini().
++	 * However, if we are on MPAv2 and want to retry with MPAv1
++	 * then, don't wake up yet.
+ 	 */
+-	c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++	if (mpa_rev == 2 && !ep->tried_with_mpa_v1) {
++		if (ep->com.state != MPA_REQ_SENT)
++			c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
++	} else
++		c4iw_wake_up(&ep->com.wr_wait, -ECONNRESET);
+ 	sched(dev, skb);
+ 	return 0;
+ }
