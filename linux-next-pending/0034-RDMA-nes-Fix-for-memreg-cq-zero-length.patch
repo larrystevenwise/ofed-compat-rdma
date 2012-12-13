@@ -1,0 +1,26 @@
+Fix for crash when registering zero length MR for CQ.
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_verbs.c |    5 +++++
+ 1 files changed, 5 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_verbs.c b/drivers/infiniband/hw/nes/nes_verbs.c
+index c47ec25..07e4fba 100644
+--- a/drivers/infiniband/hw/nes/nes_verbs.c
++++ b/drivers/infiniband/hw/nes/nes_verbs.c
+@@ -2561,6 +2561,11 @@ static struct ib_mr *nes_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 			return ibmr;
+ 		case IWNES_MEMREG_TYPE_QP:
+ 		case IWNES_MEMREG_TYPE_CQ:
++			if (!region->length) {
++				nes_debug(NES_DBG_MR, "Unable to register zero length region for CQ\n");
++				ib_umem_release(region);
++				return ERR_PTR(-EINVAL);
++			}
+ 			nespbl = kzalloc(sizeof(*nespbl), GFP_KERNEL);
+ 			if (!nespbl) {
+ 				nes_debug(NES_DBG_MR, "Unable to allocate PBL\n");
+-- 
+1.7.4.2
+

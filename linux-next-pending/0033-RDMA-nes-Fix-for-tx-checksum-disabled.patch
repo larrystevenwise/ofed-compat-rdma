@@ -1,0 +1,39 @@
+Fix for sending mini cm packets with tx checksum offload disabled.
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_cm.c  |    2 ++
+ drivers/infiniband/hw/nes/nes_nic.c |    4 +++-
+ 2 files changed, 5 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
+index 43d91b0..4084dd3 100644
+--- a/drivers/infiniband/hw/nes/nes_cm.c
++++ b/drivers/infiniband/hw/nes/nes_cm.c
+@@ -430,6 +430,8 @@ static void form_cm_frame(struct sk_buff *skb,
+ 	buf += sizeof(*tcph);
+ 
+ 	skb->ip_summed = CHECKSUM_PARTIAL;
++	if (!(cm_node->netdev->features & NETIF_F_IP_CSUM))
++		skb->ip_summed = CHECKSUM_UNNECESSARY;		
+ 	skb->protocol = htons(0x800);
+ 	skb->data_len = 0;
+ 	skb->mac_len = ETH_HLEN;
+diff --git a/drivers/infiniband/hw/nes/nes_nic.c b/drivers/infiniband/hw/nes/nes_nic.c
+index d113dac..300192f 100644
+--- a/drivers/infiniband/hw/nes/nes_nic.c
++++ b/drivers/infiniband/hw/nes/nes_nic.c
+@@ -400,7 +400,9 @@ static int nes_nic_send(struct sk_buff *skb, struct net_device *netdev)
+ 			wqe_misc |= NES_NIC_SQ_WQE_COMPLETION;
+ 		}
+ 	} else {	/* CHECKSUM_HW */
+-		wqe_misc |= NES_NIC_SQ_WQE_DISABLE_CHKSUM | NES_NIC_SQ_WQE_COMPLETION;
++		wqe_misc |= NES_NIC_SQ_WQE_COMPLETION;
++		if (skb->ip_summed != CHECKSUM_UNNECESSARY)
++			 wqe_misc |= NES_NIC_SQ_WQE_DISABLE_CHKSUM;
+ 	}
+ 
+ 	set_wqe_32bit_value(nic_sqe->wqe_words, NES_NIC_SQ_WQE_TOTAL_LENGTH_IDX,
+-- 
+1.7.4.2
+
