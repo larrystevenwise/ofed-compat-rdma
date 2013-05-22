@@ -1,0 +1,58 @@
+diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
+--- a/drivers/infiniband/core/netlink.c	2013-02-14 08:47:02.000000000 -0800
++++ b/drivers/infiniband/core/netlink.c	2013-03-05 16:13:24.026999790 -0800
+@@ -30,7 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifndef pr_fmt
+ #define pr_fmt(fmt) "%s:%s: " fmt, KBUILD_MODNAME, __func__
++#endif
+ 
+ #include <linux/export.h>
+ #include <net/netlink.h>
+@@ -149,7 +151,7 @@ static int ibnl_rcv_msg(struct sk_buff *
+ 			    !client->cb_table[RDMA_NL_GET_OP(op)].dump)
+ 				return -EINVAL;
+ 
+-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0))
++#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || CONFIG_COMPAT_RHEL_6_4)
+ 			{
+ 				struct netlink_dump_control c = {
+ 					.dump = client->cb_table[op].dump,
+@@ -160,7 +162,7 @@ static int ibnl_rcv_msg(struct sk_buff *
+ 			return netlink_dump_start(nls, skb, nlh,
+ 						  client->cb_table[op].dump,
+ 						  NULL, 0);
+-#endif /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,4,0)) */
++#endif /* ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || CONFIG_COMPAT_RHEL_6_4) */
+ 		}
+ 	}
+ 
+diff -Nrup a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+--- a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-02-14 08:47:01.000000000 -0800
++++ b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-03-05 16:13:24.026999790 -0800
+@@ -200,6 +200,7 @@ static u8 mlx4_en_dcbnl_setdcbx(struct n
+ 	return 0;
+ }
+ 
++#ifndef CONFIG_COMPAT_RHEL_6_4
+ #define MLX4_RATELIMIT_UNITS_IN_KB 100000 /* rate-limit HW unit in Kbps */
+ static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
+ 				   struct ieee_maxrate *maxrate)
+@@ -241,12 +242,15 @@ static int mlx4_en_dcbnl_ieee_setmaxrate
+ 
+ 	return 0;
+ }
++#endif /* CONFIG_COMPAT_RHEL_6_4 */
+ 
+ const struct dcbnl_rtnl_ops mlx4_en_dcbnl_ops = {
+ 	.ieee_getets	= mlx4_en_dcbnl_ieee_getets,
+ 	.ieee_setets	= mlx4_en_dcbnl_ieee_setets,
++#ifndef CONFIG_COMPAT_RHEL_6_4
+ 	.ieee_getmaxrate = mlx4_en_dcbnl_ieee_getmaxrate,
+ 	.ieee_setmaxrate = mlx4_en_dcbnl_ieee_setmaxrate,
++#endif /* CONFIG_COMPAT_RHEL_6_4 */
+ 	.ieee_getpfc	= mlx4_en_dcbnl_ieee_getpfc,
+ 	.ieee_setpfc	= mlx4_en_dcbnl_ieee_setpfc,
+ 
