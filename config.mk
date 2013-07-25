@@ -37,8 +37,14 @@ NAME := $(shell grep ^NAME $(KLIB_SOURCE)/Makefile | sed -n 's/.*= *\(.*\)/\1/p'
 ifneq ($(NAME),)
 ifeq ("$(strip $(NAME))","Sneaky Weasel")
 SLES_MAJOR := "11"
+KERNEL_SUBLEVEL := $(shell grep ^SUBLEVEL $(KLIB_SOURCE)/Makefile | sed -n 's/.*= *\(.*\)/\1/p')
+ifeq ($(KERNEL_SUBLEVEL),13)
 SLES_MINOR := "2"
 CONFIG_COMPAT_SLES_11_2 := y
+else
+SLES_MINOR := "3"
+CONFIG_COMPAT_SLES_11_3 := y
+endif
 endif
 endif
 
@@ -63,6 +69,10 @@ endif #CONFIG_COMPAT_RHEL_6_3
 endif #CONFIG_COMPAT_KERNEL_2_6_38
 
 ifdef CONFIG_COMPAT_SLES_11_2
+ NEED_MIN_DUMP_ALLOC_ARG=y
+endif
+
+ifdef CONFIG_COMPAT_SLES_11_3
  NEED_MIN_DUMP_ALLOC_ARG=y
 endif
 

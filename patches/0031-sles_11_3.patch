@@ -1,0 +1,79 @@
+diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
+--- a/drivers/infiniband/core/netlink.c	2013-06-24 11:26:54.000000000 -0700
++++ b/drivers/infiniband/core/netlink.c	2013-06-27 14:53:58.000000000 -0700
+@@ -151,7 +151,12 @@ static int ibnl_rcv_msg(struct sk_buff *
+ 			    !client->cb_table[RDMA_NL_GET_OP(op)].dump)
+ 				return -EINVAL;
+ 
+-#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || CONFIG_COMPAT_RHEL_6_4)
++#ifdef CONFIG_COMPAT_SLES_11_3
++			return netlink_dump_start(nls, skb, nlh,
++						  client->cb_table[op].dump,
++						  NULL, 0);
++#else
++#if ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || defined(CONFIG_COMPAT_RHEL_6_4))
+ 			{
+ 				struct netlink_dump_control c = {
+ 					.dump = client->cb_table[op].dump,
+@@ -162,7 +167,8 @@ static int ibnl_rcv_msg(struct sk_buff *
+ 			return netlink_dump_start(nls, skb, nlh,
+ 						  client->cb_table[op].dump,
+ 						  NULL, 0);
+-#endif /* ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || CONFIG_COMPAT_RHEL_6_4) */
++#endif /* ((LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) || defined(CONFIG_COMPAT_RHEL_6_4)) */
++#endif /* CONFIG_COMPAT_SLES_11_3 */
+ 		}
+ 	}
+ 
+diff -Nrup a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+--- a/drivers/infiniband/hw/cxgb4/cm.c	2013-06-24 11:26:54.000000000 -0700
++++ b/drivers/infiniband/hw/cxgb4/cm.c	2013-06-27 14:43:42.000000000 -0700
+@@ -1601,6 +1601,8 @@ static int c4iw_reconnect(struct c4iw_ep
+ #if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh = dst_neigh_lookup(ep->dst,
+ 			&ep->com.cm_id->remote_addr.sin_addr.s_addr);
++#elif defined(CONFIG_COMPAT_SLES_11_3)
++	neigh = ep->dst->_neighbour;
+ #else
+ 	neigh = ep->dst->neighbour;
+ #endif
+@@ -3107,6 +3109,8 @@ static int rx_pkt(struct c4iw_dev *dev, 
+ 	neigh = dst_neigh_lookup_skb(dst, skb);
+ #elif LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh = dst->_neighbour;
++#elif defined(CONFIG_COMPAT_SLES_11_3)
++	neigh = dst->_neighbour;
+ #else
+ 	neigh = dst->neighbour;
+ #endif
+diff -Nrup a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+--- a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-06-24 11:26:54.000000000 -0700
++++ b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-06-27 14:43:42.000000000 -0700
+@@ -200,7 +200,7 @@ static u8 mlx4_en_dcbnl_setdcbx(struct n
+ 	return 0;
+ }
+ 
+-#ifndef CONFIG_COMPAT_RHEL_6_4
++#if (!defined(CONFIG_COMPAT_RHEL_6_4) && !defined(CONFIG_COMPAT_SLES_11_3))
+ #define MLX4_RATELIMIT_UNITS_IN_KB 100000 /* rate-limit HW unit in Kbps */
+ static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
+ 				   struct ieee_maxrate *maxrate)
+@@ -242,15 +242,15 @@ static int mlx4_en_dcbnl_ieee_setmaxrate
+ 
+ 	return 0;
+ }
+-#endif /* CONFIG_COMPAT_RHEL_6_4 */
++#endif /* (!defined(CONFIG_COMPAT_RHEL_6_4) && !defined(CONFIG_COMPAT_SLES_11_3)) */
+ 
+ const struct dcbnl_rtnl_ops mlx4_en_dcbnl_ops = {
+ 	.ieee_getets	= mlx4_en_dcbnl_ieee_getets,
+ 	.ieee_setets	= mlx4_en_dcbnl_ieee_setets,
+-#ifndef CONFIG_COMPAT_RHEL_6_4
++#if (!defined(CONFIG_COMPAT_RHEL_6_4) && !defined(CONFIG_COMPAT_SLES_11_3))
+ 	.ieee_getmaxrate = mlx4_en_dcbnl_ieee_getmaxrate,
+ 	.ieee_setmaxrate = mlx4_en_dcbnl_ieee_setmaxrate,
+-#endif /* CONFIG_COMPAT_RHEL_6_4 */
++#endif /* (!defined(CONFIG_COMPAT_RHEL_6_4) && !defined(CONFIG_COMPAT_SLES_11_3)) */
+ 	.ieee_getpfc	= mlx4_en_dcbnl_ieee_getpfc,
+ 	.ieee_setpfc	= mlx4_en_dcbnl_ieee_setpfc,
+ 
