@@ -1,15 +1,13 @@
-From 0fd581905c953e5c0b3543d70fdd64dc6b7c681a Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
-Date: Tue, 10 Jul 2012 17:41:31 +0300
-Subject: [PATCH 04/25] ib/core: Backport pinned_vm for kernels <= 3.2
+Subject: [PATCH] ib/core: Backport pinned_vm for kernels <= 3.2
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
  drivers/infiniband/core/umem.c |   16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ 1 files changed, 16 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/umem.c b/drivers/infiniband/core/umem.c
-index a841123..3b6cb84 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/umem.c
 +++ b/drivers/infiniband/core/umem.c
 @@ -137,7 +137,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
@@ -60,6 +58,3 @@ index a841123..3b6cb84 100644
  	up_write(&mm->mmap_sem);
  	mmput(mm);
  	kfree(umem);
--- 
-1.7.9.5
-

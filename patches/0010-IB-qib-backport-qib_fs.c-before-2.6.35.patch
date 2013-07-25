@@ -1,15 +1,13 @@
-From a7e9289daf473d3bcddfea383e9d8f8aef90cf58 Mon Sep 17 00:00:00 2001
 From: Mike Marciniszyn <mike.marciniszyn@intel.com>
-Date: Thu, 2 Aug 2012 18:11:27 +0300
-Subject: [PATCH 10/25] IB/qib: backport qib_fs.c before 2.6.35
+Subject: [PATCH] IB/qib: backport qib_fs.c before 2.6.35
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 ---
  drivers/infiniband/hw/qib/qib_fs.c |   29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ 1 files changed, 29 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_fs.c b/drivers/infiniband/hw/qib/qib_fs.c
-index 05e0f17..4ea3926 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/qib/qib_fs.c
 +++ b/drivers/infiniband/hw/qib/qib_fs.c
 @@ -58,7 +58,9 @@ static int qibfs_mknod(struct inode *dir, struct dentry *dentry,
@@ -86,6 +84,3 @@ index 05e0f17..4ea3926 100644
  	.kill_sb =      qibfs_kill_super,
  };
  
--- 
-1.7.9.5
-

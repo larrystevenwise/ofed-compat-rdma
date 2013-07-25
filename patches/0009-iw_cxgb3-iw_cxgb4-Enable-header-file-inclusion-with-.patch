@@ -1,8 +1,5 @@
-From 049c8ba147e556fc1f1ad66a1e070aced80386e9 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
-Date: Mon, 7 May 2012 12:43:41 +0530
-Subject: [PATCH 09/25] iw_cxgb3/iw_cxgb4: Enable header file inclusion with
- absolute path
+Subject: [PATCH] iw_cxgb3/iw_cxgb4: Enable header file inclusion with absolute path
 
 iw_cxgb3/iw_cxgb4 driver includes header files of cxgb3/cxgb4 drivers
 respectively. OFED build environment is not able to find the header files
@@ -15,7 +12,7 @@ Signed-off-by: Vipul Pandya <vipul@chelsio.com>
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb3/Makefile b/drivers/infiniband/hw/cxgb3/Makefile
-index 2761364..c780a7a 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb3/Makefile
 +++ b/drivers/infiniband/hw/cxgb3/Makefile
 @@ -1,4 +1,4 @@
@@ -25,7 +22,7 @@ index 2761364..c780a7a 100644
  obj-$(CONFIG_INFINIBAND_CXGB3) += iw_cxgb3.o
  
 diff --git a/drivers/infiniband/hw/cxgb4/Makefile b/drivers/infiniband/hw/cxgb4/Makefile
-index e11cf72..2f9fbf3 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/Makefile
 +++ b/drivers/infiniband/hw/cxgb4/Makefile
 @@ -1,4 +1,4 @@
@@ -34,6 +31,3 @@ index e11cf72..2f9fbf3 100644
  
  obj-$(CONFIG_INFINIBAND_CXGB4) += iw_cxgb4.o
  
--- 
-1.7.9.5
-

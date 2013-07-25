@@ -1,20 +1,18 @@
-From e5eec669a7c0b85a2a4eae05684b61ade26b077a Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <root@silicon.(none)>
-Date: Mon, 30 Jul 2012 16:59:42 +0530
-Subject: [PATCH 17/25] iw_cxgb4: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH] iw_cxgb4: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <root@silicon.(none)>
 ---
  drivers/infiniband/hw/cxgb4/cm.c       |   45 ++++++++++++++++++++++++++++++++
- drivers/infiniband/hw/cxgb4/cq.c       |   12 +++++++++
+ drivers/infiniband/hw/cxgb4/cq.c       |   12 ++++++++
  drivers/infiniband/hw/cxgb4/iw_cxgb4.h |    4 +++
- drivers/infiniband/hw/cxgb4/mem.c      |    8 ++++++
+ drivers/infiniband/hw/cxgb4/mem.c      |    8 +++++
  drivers/infiniband/hw/cxgb4/qp.c       |   17 +++++++++++-
- drivers/infiniband/hw/cxgb4/t4.h       |   12 +++++++++
- 6 files changed, 97 insertions(+), 1 deletion(-)
+ drivers/infiniband/hw/cxgb4/t4.h       |   12 ++++++++
+ 6 files changed, 97 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
-index b18870c..c1805bd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
 @@ -316,12 +316,33 @@ static struct rtable *find_route(struct c4iw_dev *dev, __be32 local_ip,
@@ -112,7 +110,7 @@ index b18870c..c1805bd 100644
  	err = import_ep(ep, cm_id->remote_addr.sin_addr.s_addr,
  			ep->dst, ep->com.dev, true);
 diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
-index 0f1607c..550eb82 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cq.c
 +++ b/drivers/infiniband/hw/cxgb4/cq.c
 @@ -70,7 +70,11 @@ static int destroy_cq(struct c4iw_rdev *rdev, struct t4_cq *cq,
@@ -152,7 +150,7 @@ index 0f1607c..550eb82 100644
  	kfree(cq->sw_queue);
  err2:
 diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
-index 9beb3a9..9a9df48 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
 +++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
 @@ -359,7 +359,11 @@ static inline struct c4iw_mw *to_c4iw_mw(struct ib_mw *ibmw)
@@ -168,7 +166,7 @@ index 9beb3a9..9a9df48 100644
  	struct c4iw_dev *dev;
  	int size;
 diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
-index 57e07c6..375da95 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/mem.c
 +++ b/drivers/infiniband/hw/cxgb4/mem.c
 @@ -764,7 +764,11 @@ struct ib_fast_reg_page_list *c4iw_alloc_fastreg_pbl(struct ib_device *device,
@@ -196,7 +194,7 @@ index 57e07c6..375da95 100644
  
  int c4iw_dereg_mr(struct ib_mr *ib_mr)
 diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
-index 45aedf1..e83249c 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/qp.c
 +++ b/drivers/infiniband/hw/cxgb4/qp.c
 @@ -109,7 +109,11 @@ static int destroy_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
@@ -249,7 +247,7 @@ index 45aedf1..e83249c 100644
  	dealloc_sq(rdev, &wq->sq);
  err5:
 diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
-index 16f26ab..cafdb7c 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/t4.h
 +++ b/drivers/infiniband/hw/cxgb4/t4.h
 @@ -296,7 +296,11 @@ enum {
@@ -288,6 +286,3 @@ index 16f26ab..cafdb7c 100644
  	struct t4_cqe *sw_queue;
  	void __iomem *gts;
  	struct c4iw_rdev *rdev;
--- 
-1.7.9.5
-

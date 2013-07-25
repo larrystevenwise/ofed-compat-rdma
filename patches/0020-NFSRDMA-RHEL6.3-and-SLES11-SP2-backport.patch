@@ -1,17 +1,15 @@
-From b824c830e756c1466a7a84109b9954d2772586b9 Mon Sep 17 00:00:00 2001
 From: Jeff Becker <jeffrey.c.becker@nasa.gov>
-Date: Fri, 24 Aug 2012 11:18:23 -0700
-Subject: [PATCH 20/25] NFSRDMA: RHEL6.3 and SLES11 SP2 backport
+Subject: [PATCH] NFSRDMA: RHEL6.3 and SLES11 SP2 backport
 
 Signed-off-by: Jeff Becker <Jeffrey.C.Becker@nasa.gov>
 ---
  net/sunrpc/xprtrdma/rpc_rdma.c           |   16 ++++++++++++++++
  net/sunrpc/xprtrdma/svc_rdma_transport.c |    4 ++++
  net/sunrpc/xprtrdma/transport.c          |   12 ++++++++++++
- 3 files changed, 32 insertions(+)
+ 3 files changed, 32 insertions(+), 0 deletions(-)
 
 diff --git a/net/sunrpc/xprtrdma/rpc_rdma.c b/net/sunrpc/xprtrdma/rpc_rdma.c
-index 558fbab..0a6c1db 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/rpc_rdma.c
 +++ b/net/sunrpc/xprtrdma/rpc_rdma.c
 @@ -338,9 +338,17 @@ rpcrdma_inline_pullup(struct rpc_rqst *rqst, int pad)
@@ -52,7 +50,7 @@ index 558fbab..0a6c1db 100644
  			copy_len -= curlen;
  			if (copy_len == 0)
 diff --git a/net/sunrpc/xprtrdma/svc_rdma_transport.c b/net/sunrpc/xprtrdma/svc_rdma_transport.c
-index 73b428b..325e9fd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/svc_rdma_transport.c
 +++ b/net/sunrpc/xprtrdma/svc_rdma_transport.c
 @@ -445,7 +445,11 @@ static struct svcxprt_rdma *rdma_create_xprt(struct svc_serv *serv,
@@ -68,7 +66,7 @@ index 73b428b..325e9fd 100644
  	INIT_LIST_HEAD(&cma_xprt->sc_dto_q);
  	INIT_LIST_HEAD(&cma_xprt->sc_rq_dto_q);
 diff --git a/net/sunrpc/xprtrdma/transport.c b/net/sunrpc/xprtrdma/transport.c
-index b446e10..9419f34 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/transport.c
 +++ b/net/sunrpc/xprtrdma/transport.c
 @@ -283,7 +283,9 @@ xprt_setup_rdma(struct xprt_create *args)
@@ -108,6 +106,3 @@ index b446e10..9419f34 100644
  }
  
  /*
--- 
-1.7.9.5
-

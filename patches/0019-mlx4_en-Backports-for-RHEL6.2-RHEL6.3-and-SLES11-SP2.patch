@@ -1,7 +1,5 @@
-From 1625ace4f5f1fa23ac03766ad4a201684fc998a6 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
-Date: Sun, 5 Aug 2012 22:00:42 +0300
-Subject: [PATCH 19/25] mlx4_en: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH] mlx4_en: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
@@ -9,10 +7,10 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |   29 ++++++++++++
  drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   56 +++++++++++++++++++++++
  drivers/net/ethernet/mellanox/mlx4/en_tx.c      |    4 ++
- 4 files changed, 93 insertions(+)
+ 4 files changed, 93 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c b/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
-index 72901ce..332e851 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
 +++ b/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
 @@ -528,6 +528,7 @@ static void mlx4_en_get_ringparam(struct net_device *dev,
@@ -44,7 +42,7 @@ index 72901ce..332e851 100644
  
  
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_netdev.c b/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
-index 073b85b..2a53952 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
 +++ b/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
 @@ -45,6 +45,7 @@
@@ -145,7 +143,7 @@ index 073b85b..2a53952 100644
  	mdev->pndev[port] = dev;
  
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_rx.c b/drivers/net/ethernet/mellanox/mlx4/en_rx.c
-index d49a7ac..ae1c6a9 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_rx.c
 +++ b/drivers/net/ethernet/mellanox/mlx4/en_rx.c
 @@ -44,7 +44,11 @@
@@ -309,7 +307,7 @@ index d49a7ac..ae1c6a9 100644
  
  		/* If source MAC is equal to our own MAC and not performing
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_tx.c b/drivers/net/ethernet/mellanox/mlx4/en_tx.c
-index 019d856..5a2bddd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_tx.c
 +++ b/drivers/net/ethernet/mellanox/mlx4/en_tx.c
 @@ -529,7 +529,11 @@ u16 mlx4_en_select_queue(struct net_device *dev, struct sk_buff *skb)
@@ -324,6 +322,3 @@ index 019d856..5a2bddd 100644
  		return skb_tx_hash(dev, skb);
  
  	if (vlan_tx_tag_present(skb))
--- 
-1.7.9.5
-

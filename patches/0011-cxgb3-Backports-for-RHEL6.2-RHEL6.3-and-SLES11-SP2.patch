@@ -1,7 +1,5 @@
-From d505c64dcda186c1cf7248bf261567284284ffd9 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <root@silicon.(none)>
-Date: Mon, 30 Jul 2012 19:08:37 +0530
-Subject: [PATCH 11/25] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH] cxgb3: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
@@ -11,11 +9,11 @@ Signed-off-by: Vipul Pandya <vipul@chelsio.com>
  drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |   25 +++
  drivers/net/ethernet/chelsio/cxgb3/l2t.c           |    4 +
  drivers/net/ethernet/chelsio/cxgb3/sge.c           |   49 ++++++
- drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 +-
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 ++-
  7 files changed, 280 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
-index 8b395b5..27bd384 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/adapter.h
 +++ b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
 @@ -45,10 +45,20 @@
@@ -65,7 +63,7 @@ index 8b395b5..27bd384 100644
  	struct net_device *netdev;
  	struct netdev_queue *tx_q;	/* associated netdev TX queue */
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/common.h b/drivers/net/ethernet/chelsio/cxgb3/common.h
-index df01b63..9ef8b57 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/common.h
 +++ b/drivers/net/ethernet/chelsio/cxgb3/common.h
 @@ -317,6 +317,9 @@ struct tp_params {
@@ -79,7 +77,7 @@ index df01b63..9ef8b57 100644
  	unsigned int rspq_size;	/* # of entries in response queue */
  	unsigned int fl_size;	/* # of entries in regular free list */
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-index abb6ce7..f800119 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 @@ -643,6 +643,28 @@ static void enable_all_napi(struct adapter *adap)
@@ -415,7 +413,7 @@ index abb6ce7..f800119 100644
  		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
  	}
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-index 65e4b28..0dd8f2f 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
 @@ -177,13 +177,26 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
@@ -479,7 +477,7 @@ index 65e4b28..0dd8f2f 100644
  		return;
  	newdev = n->dev;
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/l2t.c b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
-index 3fa3c88..4206b33 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/l2t.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
 @@ -311,7 +311,11 @@ struct l2t_entry *t3_l2t_get(struct t3cdev *cdev, struct dst_entry *dst,
@@ -495,7 +493,7 @@ index 3fa3c88..4206b33 100644
  		goto done_rcu;
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
-index cfb60e1..6be199f 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c
 @@ -2020,7 +2020,11 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
@@ -594,7 +592,7 @@ index cfb60e1..6be199f 100644
  		u32 len, flags;
  		__be32 rss_hi, rss_lo;
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
-index 3af19a5..b3c99fd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
 @@ -311,17 +311,32 @@ int t3_mac_set_rx_mode(struct cmac *mac, struct net_device *dev)
@@ -631,6 +629,3 @@ index 3af19a5..b3c99fd 100644
  				if (hash < 32)
  					hash_lo |= (1 << hash);
  				else
--- 
-1.7.9.5
-

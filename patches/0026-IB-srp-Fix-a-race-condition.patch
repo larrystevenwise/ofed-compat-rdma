@@ -1,6 +1,4 @@
-From 220329916c72ee3d54ae7262b215a050f04a18fc Mon Sep 17 00:00:00 2001
 From: Bart Van Assche <bvanassche@acm.org>
-Date: Tue, 14 Aug 2012 13:18:53 +0000
 Subject: [PATCH] IB/srp: Fix a race condition
 
 Avoid a crash caused by the scmnd->scsi_done(scmnd) call in
@@ -15,13 +13,13 @@ Signed-off-by: Bart Van Assche <bvanassche@acm.org>
 Signed-off-by: Roland Dreier <roland@purestorage.com>
 ---
  drivers/infiniband/ulp/srp/ib_srp.c |   87 +++++++++++++++++++++++++----------
- 1 file changed, 63 insertions(+), 24 deletions(-)
+ 1 files changed, 63 insertions(+), 24 deletions(-)
 
 diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
-index bcbf22e..1b5b0c7 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/srp/ib_srp.c
 +++ b/drivers/infiniband/ulp/srp/ib_srp.c
-@@ -586,24 +586,62 @@ static void srp_unmap_data(struct scsi_cmnd *scmnd,
+@@ -602,24 +602,62 @@ static void srp_unmap_data(struct scsi_cmnd *scmnd,
  			scmnd->sc_data_direction);
  }
  
@@ -91,7 +89,7 @@ index bcbf22e..1b5b0c7 100644
  }
  
  static int srp_reconnect_target(struct srp_target_port *target)
-@@ -1073,11 +1111,18 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
+@@ -1089,11 +1127,18 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
  		complete(&target->tsk_mgmt_done);
  	} else {
  		req = &target->req_ring[rsp->tag];
@@ -112,7 +110,7 @@ index bcbf22e..1b5b0c7 100644
  		scmnd->result = rsp->status;
  
  		if (rsp->flags & SRP_RSP_FLAG_SNSVALID) {
-@@ -1092,7 +1137,9 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
+@@ -1108,7 +1153,9 @@ static void srp_process_rsp(struct srp_target_port *target, struct srp_rsp *rsp)
  		else if (rsp->flags & (SRP_RSP_FLAG_DIOVER | SRP_RSP_FLAG_DIUNDER))
  			scsi_set_resid(scmnd, be32_to_cpu(rsp->data_in_res_cnt));
  
@@ -123,7 +121,7 @@ index bcbf22e..1b5b0c7 100644
  		scmnd->host_scribble = NULL;
  		scmnd->scsi_done(scmnd);
  	}
-@@ -1631,25 +1678,17 @@ static int srp_abort(struct scsi_cmnd *scmnd)
+@@ -1690,25 +1737,17 @@ static int srp_abort(struct scsi_cmnd *scmnd)
  {
  	struct srp_target_port *target = host_to_target(scmnd->device->host);
  	struct srp_request *req = (struct srp_request *) scmnd->host_scribble;
@@ -155,6 +153,3 @@ index bcbf22e..1b5b0c7 100644
  }
  
  static int srp_reset_device(struct scsi_cmnd *scmnd)
--- 
-1.7.10.4
-

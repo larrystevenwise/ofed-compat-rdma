@@ -1,6 +1,4 @@
-From 9b796d06d5d1b1e85ae2316a283ea11dd739ef96 Mon Sep 17 00:00:00 2001
 From: Bart Van Assche <bvanassche@acm.org>
-Date: Fri, 24 Aug 2012 10:27:54 +0000
 Subject: [PATCH] IB/srp: Fix use-after-free in srp_reset_req()
 
 srp_free_req() uses the scsi_cmnd structure contents to unmap
@@ -13,13 +11,13 @@ Cc: <stable@vger.kernel.org>
 Signed-off-by: Roland Dreier <roland@purestorage.com>
 ---
  drivers/infiniband/ulp/srp/ib_srp.c |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ 1 files changed, 1 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
-index 1b5b0c7..ac66e6b 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/srp/ib_srp.c
 +++ b/drivers/infiniband/ulp/srp/ib_srp.c
-@@ -638,9 +638,9 @@ static void srp_reset_req(struct srp_target_port *target, struct srp_request *re
+@@ -654,9 +654,9 @@ static void srp_reset_req(struct srp_target_port *target, struct srp_request *re
  	struct scsi_cmnd *scmnd = srp_claim_req(target, req, NULL);
  
  	if (scmnd) {
@@ -30,6 +28,3 @@ index 1b5b0c7..ac66e6b 100644
  	}
  }
  
--- 
-1.7.10.4
-

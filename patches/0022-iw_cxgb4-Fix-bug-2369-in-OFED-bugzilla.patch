@@ -1,7 +1,5 @@
-From 9a2a5815ae4484d558d115380256a092ee08554e Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
-Date: Fri, 21 Sep 2012 04:53:36 -0700
-Subject: [PATCH 22/25] iw_cxgb4: Fix bug 2369 in OFED bugzilla
+Subject: [PATCH] iw_cxgb4: Fix bug 2369 in OFED bugzilla
 
 Bug 2369 - [OFED-3.5] Trace observed in dmesg while running IMB-MPI1 using
 openmpi-1.6
@@ -15,10 +13,10 @@ which was resulting in the trace.
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
  drivers/infiniband/hw/cxgb4/cm.c |    2 ++
- 1 file changed, 2 insertions(+)
+ 1 files changed, 2 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
-index c1805bd..d6fea23 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
 @@ -1672,7 +1672,9 @@ static int import_ep(struct c4iw_ep *ep, __be32 peer_ip, struct dst_entry *dst,
@@ -31,6 +29,3 @@ index c1805bd..d6fea23 100644
  
  	return err;
  }
--- 
-1.7.9.5
-

@@ -1,17 +1,15 @@
-From 67fc061694dfa829043570007ccec9ff1d655ee3 Mon Sep 17 00:00:00 2001
 From: Vipul Pandya <vipul@chelsio.com>
-Date: Mon, 30 Jul 2012 12:06:12 +0530
-Subject: [PATCH 13/25] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
+Subject: [PATCH] cxgb4: Backports for RHEL6.2 RHEL 6.3 and SLES11 SP2
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
  drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |   13 ++
  drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  190 ++++++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |   72 ++++++++-
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |   72 +++++++++-
  3 files changed, 273 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index ec2dafe..84fa932 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 @@ -300,6 +300,9 @@ struct port_info {
@@ -50,7 +48,7 @@ index ec2dafe..84fa932 100644
  	unsigned int nfrags;              /* # of fragments */
  	unsigned int tot_len;             /* total length of fragments */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index e1f96fb..ec57e1c 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -31,7 +31,9 @@
@@ -414,7 +412,7 @@ index e1f96fb..ec57e1c 100644
  		netdev->netdev_ops = &cxgb4_netdev_ops;
  		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index e111d97..b97bea7 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
 @@ -216,8 +216,13 @@ static int map_skb(struct device *dev, const struct sk_buff *skb,
@@ -593,6 +591,3 @@ index e111d97..b97bea7 100644
  			else
  				restore_rx_bufs(&si, &rxq->fl, frags);
  		} else if (likely(rsp_type == RSP_TYPE_CPL)) {
--- 
-1.7.9.5
-

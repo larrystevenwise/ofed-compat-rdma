@@ -1,6 +1,16 @@
-diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
---- a/drivers/infiniband/core/netlink.c	2013-02-14 08:47:02.000000000 -0800
-+++ b/drivers/infiniband/core/netlink.c	2013-03-05 16:13:24.026999790 -0800
+From: Rupert Dance <rsdance@soft-forge.com>
+Subject: [PATCH] Add RHEL6.4 support
+
+Signed-off-by: Rupert Dance <rsdance@soft-forge.com>
+---
+ drivers/infiniband/core/netlink.c              |    6 ++++--
+ drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c |    4 ++++
+ 2 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/netlink.c
++++ b/drivers/infiniband/core/netlink.c
 @@ -30,7 +30,9 @@
   * SOFTWARE.
   */
@@ -11,7 +21,7 @@ diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink
  
  #include <linux/export.h>
  #include <net/netlink.h>
-@@ -149,7 +151,7 @@ static int ibnl_rcv_msg(struct sk_buff *
+@@ -149,7 +151,7 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
  			    !client->cb_table[RDMA_NL_GET_OP(op)].dump)
  				return -EINVAL;
  
@@ -20,7 +30,7 @@ diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink
  			{
  				struct netlink_dump_control c = {
  					.dump = client->cb_table[op].dump,
-@@ -160,7 +162,7 @@ static int ibnl_rcv_msg(struct sk_buff *
+@@ -160,7 +162,7 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
  			return netlink_dump_start(nls, skb, nlh,
  						  client->cb_table[op].dump,
  						  NULL, 0);
@@ -29,10 +39,11 @@ diff -Nrup a/drivers/infiniband/core/netlink.c b/drivers/infiniband/core/netlink
  		}
  	}
  
-diff -Nrup a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
---- a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-02-14 08:47:01.000000000 -0800
-+++ b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c	2013-03-05 16:13:24.026999790 -0800
-@@ -200,6 +200,7 @@ static u8 mlx4_en_dcbnl_setdcbx(struct n
+diff --git a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
++++ b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+@@ -200,6 +200,7 @@ static u8 mlx4_en_dcbnl_setdcbx(struct net_device *dev, u8 mode)
  	return 0;
  }
  
@@ -40,7 +51,7 @@ diff -Nrup a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethern
  #define MLX4_RATELIMIT_UNITS_IN_KB 100000 /* rate-limit HW unit in Kbps */
  static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
  				   struct ieee_maxrate *maxrate)
-@@ -241,12 +242,15 @@ static int mlx4_en_dcbnl_ieee_setmaxrate
+@@ -241,12 +242,15 @@ static int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
  
  	return 0;
  }

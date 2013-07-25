@@ -1,7 +1,5 @@
-From 62e36abf5a81320929ecdfd96ec15ae7762843f3 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
-Date: Mon, 16 Jul 2012 17:14:31 +0300
-Subject: [PATCH 08/25] RDMA/nes: Backports for RHEL 6.2 and 6.3
+Subject: [PATCH] RDMA/nes: Backports for RHEL 6.2 and 6.3
 
 Backports for linux-3.5 nes to RHEL-6.2 and RHEL-6.3
 
@@ -12,7 +10,7 @@ Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
  2 files changed, 34 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
-index 020e95c..0b5b1a9 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/nes/nes_cm.c
 +++ b/drivers/infiniband/hw/nes/nes_cm.c
 @@ -1343,9 +1343,16 @@ static int nes_addr_resolve_neigh(struct nes_vnic *nesvnic, u32 dst_ip, int arpi
@@ -46,7 +44,7 @@ index 020e95c..0b5b1a9 100644
  	if (neigh) {
  		if (neigh->nud_state & NUD_VALID) {
 diff --git a/drivers/infiniband/hw/nes/nes_nic.c b/drivers/infiniband/hw/nes/nes_nic.c
-index f3a3ecf..d54776f 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/nes/nes_nic.c
 +++ b/drivers/infiniband/hw/nes/nes_nic.c
 @@ -909,7 +909,11 @@ static void nes_netdev_set_multicast_list(struct net_device *netdev)
@@ -126,6 +124,3 @@ index f3a3ecf..d54776f 100644
  
  	nes_debug(NES_DBG_INIT, "nesvnic = %p, reported features = 0x%lX, QPid = %d,"
  			" nic_index = %d, logical_port = %d, mac_index = %d.\n",
--- 
-1.7.9.5
-

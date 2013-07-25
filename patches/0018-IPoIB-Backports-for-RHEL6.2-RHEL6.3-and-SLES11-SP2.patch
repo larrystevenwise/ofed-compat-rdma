@@ -1,7 +1,5 @@
-From 23506f2107b334607305e2d34b760f2af6515186 Mon Sep 17 00:00:00 2001
 From: Vladimir Sokolovsky <vlad@mellanox.com>
-Date: Thu, 2 Aug 2012 16:12:39 +0300
-Subject: [PATCH 18/25] IPoIB: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
+Subject: [PATCH] IPoIB: Backports for RHEL6.2 RHEL6.3 and SLES11 SP2
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
@@ -9,10 +7,10 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/ulp/ipoib/ipoib_cm.c        |   21 +++++++++++++++++++++
  drivers/infiniband/ulp/ipoib/ipoib_main.c      |   18 ++++++++++++++++++
  drivers/infiniband/ulp/ipoib/ipoib_multicast.c |   19 +++++++++++++++++++
- 4 files changed, 61 insertions(+)
+ 4 files changed, 61 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib.h b/drivers/infiniband/ulp/ipoib/ipoib.h
-index 86df632..a876f24 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/ipoib/ipoib.h
 +++ b/drivers/infiniband/ulp/ipoib/ipoib.h
 @@ -92,6 +92,9 @@ enum {
@@ -26,7 +24,7 @@ index 86df632..a876f24 100644
  	IPOIB_MAX_BACKOFF_SECONDS = 16,
  
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib_cm.c b/drivers/infiniband/ulp/ipoib/ipoib_cm.c
-index 014504d..b83efdf 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/ipoib/ipoib_cm.c
 +++ b/drivers/infiniband/ulp/ipoib/ipoib_cm.c
 @@ -1378,7 +1378,11 @@ static void ipoib_cm_skb_reap(struct work_struct *work)
@@ -75,7 +73,7 @@ index 014504d..b83efdf 100644
  		rtnl_unlock();
  		ipoib_flush_paths(dev);
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib_main.c b/drivers/infiniband/ulp/ipoib/ipoib_main.c
-index 3974c29..f35bd5c 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/ipoib/ipoib_main.c
 +++ b/drivers/infiniband/ulp/ipoib/ipoib_main.c
 @@ -171,6 +171,7 @@ static int ipoib_stop(struct net_device *dev)
@@ -149,7 +147,7 @@ index 3974c29..f35bd5c 100644
  	result = ib_query_pkey(hca, port, 0, &priv->pkey);
  	if (result) {
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib_multicast.c b/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
-index 20ebc6f..4a4c64a 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
 +++ b/drivers/infiniband/ulp/ipoib/ipoib_multicast.c
 @@ -720,7 +720,11 @@ out:
@@ -201,6 +199,3 @@ index 20ebc6f..4a4c64a 100644
  
  		mcast = __ipoib_mcast_find(dev, &mgid);
  		if (!mcast || test_bit(IPOIB_MCAST_FLAG_SENDONLY, &mcast->flags)) {
--- 
-1.7.9.5
-

@@ -1,19 +1,17 @@
-From 40378c271c9fbbb445c7c1233444c795004d6232 Mon Sep 17 00:00:00 2001
 From: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
-Date: Sat, 25 Aug 2012 20:39:12 -0500
-Subject: [PATCH 21/25] RDMA/nes: Updated backports
+Subject: [PATCH] RDMA/nes: Updated backports
 
 OFED-3.5/NES: Updated backports to be applied on top of the previously submitted backport patch.
 
 Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
 ---
  drivers/infiniband/hw/nes/nes_hw.c  |   11 ++++++++
- drivers/infiniband/hw/nes/nes_hw.h  |    3 +++
- drivers/infiniband/hw/nes/nes_nic.c |   49 ++++++++++++++++++++++++++++-------
+ drivers/infiniband/hw/nes/nes_hw.h  |    3 ++
+ drivers/infiniband/hw/nes/nes_nic.c |   49 ++++++++++++++++++++++++++++------
  3 files changed, 54 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes_hw.c b/drivers/infiniband/hw/nes/nes_hw.c
-index d42c9f4..259faab 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/nes/nes_hw.c
 +++ b/drivers/infiniband/hw/nes/nes_hw.c
 @@ -2951,7 +2951,18 @@ void nes_nic_ce_handler(struct nes_device *nesdev, struct nes_hw_nic_cq *cq)
@@ -36,7 +34,7 @@ index d42c9f4..259faab 100644
  				if (nes_use_lro)
  					lro_receive_skb(&nesvnic->lro_mgr, rx_skb, NULL);
 diff --git a/drivers/infiniband/hw/nes/nes_hw.h b/drivers/infiniband/hw/nes/nes_hw.h
-index d748e4b..b4a31de 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/nes/nes_hw.h
 +++ b/drivers/infiniband/hw/nes/nes_hw.h
 @@ -1236,6 +1236,9 @@ struct nes_vnic {
@@ -50,7 +48,7 @@ index d748e4b..b4a31de 100644
  	atomic_t          rx_skb_timer_running;
  	int               budget;
 diff --git a/drivers/infiniband/hw/nes/nes_nic.c b/drivers/infiniband/hw/nes/nes_nic.c
-index d54776f..696b80e 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/nes/nes_nic.c
 +++ b/drivers/infiniband/hw/nes/nes_nic.c
 @@ -1597,6 +1597,33 @@ static const struct ethtool_ops nes_ethtool_ops = {
@@ -156,6 +154,3 @@ index d54776f..696b80e 100644
  	return netdev;
  }
  
--- 
-1.7.9.5
-
