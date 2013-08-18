@@ -5,12 +5,15 @@ all:
 
 .DELETE_ON_ERROR:
 
-# These exported as they are used by the scripts
-# to check config and compat autoconf
-export CONFIG_CHECK=.$(COMPAT_CONFIG)_md5sum.txt
-
 include ./configure.mk.kernel
-include ./config.mk
+
+export COMPAT_CONFIG=$(CWD)/compat.config
+export COMPAT_AUTOCONF=$(CWD)/include/linux/compat_autoconf.h
+export KLIB_BUILD
+export KVERSION
+export MAKE
+
+-include $(COMPAT_CONFIG)
 
 export CREL=$(shell cat $(CWD)/compat_version)
 export CREL_PRE:=.compat_autoconf_
@@ -22,36 +25,6 @@ CFLAGS += \
 	-DCOMPAT_PROJECT="\"Compat-rdma\"" \
 	-DCOMPAT_VERSION="\"$(shell cat compat_version)\"" \
 
-ifneq ($(CONFIG_COMPAT_SLES_11_2),)
-CFLAGS += \
-	-DCONFIG_COMPAT_SLES_11_2
-endif
-
-ifneq ($(CONFIG_COMPAT_SLES_11_3),)
-CFLAGS += \
-	-DCONFIG_COMPAT_SLES_11_3
-endif
-
-ifneq ($(CONFIG_COMPAT_RHEL_6_4),)
-CFLAGS += \
-	-DCONFIG_COMPAT_RHEL_6_4
-endif
-
-ifneq ($(CONFIG_COMPAT_XPRTRDMA_NEEDED),)
-CFLAGS += \
-	-DCONFIG_COMPAT_XPRTRDMA_NEEDED
-endif
-
-ifneq ($(NEED_MIN_DUMP_ALLOC_ARG),)
-CFLAGS += \
-	-DNEED_MIN_DUMP_ALLOC_ARG
-endif
-
-ifneq ($(CONFIG_COMPAT_SKB_FRAG_NEEDED),)
-CFLAGS += \
-	-DCONFIG_COMPAT_SKB_FRAG_NEEDED
-endif
-
 DEPMOD  = /sbin/depmod
 INSTALL_MOD_DIR ?= $(shell test -f /etc/redhat-release && echo extra/ofa_kernel || echo updates)
 
@@ -62,6 +35,12 @@ else
 endif
 
 export OPEN_ISCSI_MODULES = iscsi_tcp.ko libiscsi.ko scsi_transport_iscsi.ko
+
+$(COMPAT_AUTOCONF): $(COMPAT_CONFIG)
+	+@$(CWD)/ofed_scripts/gen-compat-autoconf.sh $(COMPAT_CONFIG) > $(COMPAT_AUTOCONF)
+
+$(COMPAT_CONFIG):
+	+@$(CWD)/ofed_scripts/gen-compat-config.sh > $(COMPAT_CONFIG)
 
 configure.mk.kernel:
 	@echo Please run ./configure
@@ -79,7 +58,7 @@ ifneq ($(kconfig_h),)
 KCONFIG_H = -include $(kconfig_h)
 endif
 
-V ?= 1
+V ?= 0
 
 #########################
 #	make kernel	#
@@ -87,14 +66,14 @@ V ?= 1
 #NB: The LINUXINCLUDE value comes from main kernel Makefile
 #    with local directories prepended. This eventually affects
 #    CPPFLAGS in the kernel Makefile
-kernel:
+kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 	@echo "Building kernel modules"
 	@echo "Kernel version: $(KVERSION)"
 	@echo "Modules directory: $(INSTALL_MOD_PATH)/$(MODULES_DIR)"
 	@echo "Kernel sources: $(KSRC)"
 	env CWD=$(CWD) BACKPORT_INCLUDES=$(BACKPORT_INCLUDES) \
 		$(MAKE) -C $(KSRC) SUBDIRS="$(CWD)" \
-		V=$(V) $(WITH_MAKE_PARAMS) \
+		V=$(V) KBUILD_NOCMDDEP=1 $(WITH_MAKE_PARAMS) \
 		CONFIG_MEMTRACK=$(CONFIG_MEMTRACK) \
 		CONFIG_DEBUG_INFO=$(CONFIG_DEBUG_INFO) \
 		CONFIG_INFINIBAND=$(CONFIG_INFINIBAND) \
@@ -138,13 +117,18 @@ kernel:
 		CONFIG_INFINIBAND_NES=$(CONFIG_INFINIBAND_NES) \
 		CONFIG_INFINIBAND_NES_DEBUG=$(CONFIG_INFINIBAND_NES_DEBUG) \
 		CONFIG_MLX4_CORE=$(CONFIG_MLX4_CORE) \
+		CONFIG_MLX5_CORE=$(CONFIG_MLX5_CORE) \
 		CONFIG_MLX4_EN=$(CONFIG_MLX4_EN) \
 		CONFIG_MLX4_INFINIBAND=$(CONFIG_MLX4_INFINIBAND) \
+		CONFIG_MLX5_INFINIBAND=$(CONFIG_MLX5_INFINIBAND) \
 		CONFIG_MLX4_ETHERNET=$(CONFIG_MLX4_ETHERNET) \
 		CONFIG_MLX4_DEBUG=$(CONFIG_MLX4_DEBUG) \
+		CONFIG_MLX5_DEBUG=$(CONFIG_MLX5_DEBUG) \
 		CONFIG_INFINIBAND_AMSO1100=$(CONFIG_INFINIBAND_AMSO1100) \
 		CONFIG_SUNRPC_XPRT_RDMA=$(CONFIG_SUNRPC_XPRT_RDMA) \
 		CONFIG_NFSD_RDMA=$(CONFIG_NFSD_RDMA) \
+		CONFIG_INFINIBAND_OCRDMA=$(CONFIG_INFINIBAND_OCRDMA) \
+		CONFIG_INFINIBAND_ISERT=$(CONFIG_INFINIBAND_ISERT) \
 		LINUXINCLUDE=' \
 		-D__OFED_BUILD__ \
 		$(CFLAGS) \
@@ -157,15 +141,22 @@ kernel:
 		$(KERNEL_NFS_FS_CFLAGS) \
 		$(OPENIB_KERNEL_EXTRA_CFLAGS) \
 		-I$(CWD)/include \
+		-I$(CWD)/include/uapi \
 		-I$(CWD)/drivers/infiniband/debug \
 		-I/usr/local/include/scst \
 		-I$(CWD)/drivers/infiniband/ulp/srpt \
 		$$(if $$(CONFIG_XEN),-D__XEN_INTERFACE_VERSION__=$$(CONFIG_XEN_INTERFACE_VERSION)) \
 		$$(if $$(CONFIG_XEN),-I$$(srctree)/arch/x86/include/mach-xen) \
 		-I$$(srctree)/arch/$$(SRCARCH)/include \
-		-Iarch/$$(SRCARCH)/include/generated -Iinclude \
+		-Iarch/$$(SRCARCH)/include/generated \
+		-Iinclude \
+		-I$$(srctree)/arch/$$(SRCARCH)/include/uapi \
+		-Iarch/$$(SRCARCH)/include/generated/uapi \
+		-I$$(srctree)/include/uapi \
+		-Iinclude/generated/uapi \
 		$$(if $$(KBUILD_SRC),-Iinclude2 -I$$(srctree)/include) \
 		-I$$(srctree)/arch/$$(SRCARCH)/include \
+		-Iarch/$$(SRCARCH)/include/generated \
 		' \
 		modules
 
@@ -186,6 +177,10 @@ clean: clean_kernel
 
 clean_kernel:
 	$(MAKE) -C $(KSRC) SUBDIRS="$(CWD)" $(WITH_MAKE_PARAMS) clean
+	@/bin/rm -f $(clean-files)
+
+clean-files := Module.symvers modules.order Module.markers compat/modules.order
+clean-files += $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 
 help:
 	@echo

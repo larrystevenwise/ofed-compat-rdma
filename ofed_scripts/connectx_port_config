@@ -340,6 +340,18 @@ if [ -e ${Devices[$dev]}/mlx4_port2 ]; then
 fi
 echo
 
+write_mask="0x222"
+mlx4_port_file="${Devices[$dev]}/mlx4_port1"
+if [ ! -w $mlx4_port_file ] || [ $((0x$(stat -c "%a" $mlx4_port_file) & $write_mask)) == "0" ]; then
+	echo "Not allowed to change port configuration, quitting..."
+	exit 1;
+fi
+mlx4_port_file="${Devices[$dev]}/mlx4_port2"
+if [ -e $mlx4_port_file ] && ([ ! -w $mlx4_port_file ] || [ $((0x$(stat -c "%a" $mlx4_port_file) & $write_mask)) == "0" ]); then
+	echo "Not allowed to change port configuration, quitting..."
+	exit 1;
+fi
+
 ############################################################
 # Set port configuration for the selected device           #
 ############################################################
@@ -353,6 +365,19 @@ fi
 
 comm1=`echo ${comm} | cut -d ',' -f 1`
 comm2=`echo ${comm} | cut -d ',' -f 2`
+
+for uverbs_dir in ${Devices[$dev]}infiniband_verbs/uverbs*
+do
+	if [[ -f $uverbs_dir/ref_cnt  ]]; then
+		if [[ `cat "$uverbs_dir/ref_cnt"` > 1 ]]; then
+			echo "WARNING: Please close user level applications" \
+			     "before running connectx_port_config. "
+			echo "Operation aborted!"
+			exit 1
+		fi
+	fi
+done
+
 {
 echo "${comm1}" > ${Devices[$dev]}/mlx4_port1
 } > /dev/null 2>&1

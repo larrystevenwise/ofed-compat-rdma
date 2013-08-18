@@ -34,6 +34,8 @@ Usage:  `basename $0` [options]
 
     --with-backport=VERSION  apply these backports [$(get_backport_dir.sh `uname -r`)]
     --kernel-version=VERSION  apply backports for this kernel [$(uname -r)]
+    --with-git[=TMP_BRANCH]  use git, create a temporary branch [backport-$(get_backport_dir.sh `uname -r`)]
+    --without-git        don't use git
     --with-quilt[=FILE]  path to quilt [$(/usr/bin/which quilt  2> /dev/null)]
     --without-quilt  use patch and not quilt [no]
     --with-patchdir=DIR  path to the patches directory []
@@ -50,10 +52,7 @@ Usage:  `basename $0` [options]
 
     --help - print out options
 
-List of supported backports:
-
 EOF
-	get_backports
 }
 
 # Execute command w/ echo and exit if it fail
@@ -66,38 +65,6 @@ ex()
         fi
 }
 
-get_backports()
-{
-	echo 2.6.9_U2
-	echo 2.6.9_U3
-	echo 2.6.9_U4
-	echo 2.6.9_U5
-	echo 2.6.9_U6
-	echo 2.6.9_U7
-	echo 2.6.16_sles10
-	echo 2.6.16_sles10_sp1
-	echo 2.6.16_sles10_sp2
-	echo 2.6.16
-	echo 2.6.17
-	echo 2.6.18_FC6 "(good for RHEL5 as well)"
-	echo 2.6.18-EL5.1  "( RHEL5 U1)"
-	echo 2.6.18-EL5.2  "( RHEL5 U2)"
-	echo 2.6.18-EL5.3  "( RHEL5 U3)"
-	echo 2.6.18-EL5.4  "( RHEL5 U4)"
-	echo 2.6.18_suse10_2
-	echo 2.6.18
-	echo 2.6.19
-	echo 2.6.20
-	echo 2.6.21
-	echo 2.6.22
-	echo 2.6.22_suse10_3
-	echo 2.6.23
-	echo 2.6.24
-	echo 2.6.25
-	echo 2.6.26
-	echo 2.6.27_sles11
-}
-
 # Apply patch
 apply_patch()
 {
@@ -106,7 +73,9 @@ apply_patch()
 
         if [ -e  ${patch} ]; then
             printf "\t${patch}\n"
-            if [ "${WITH_QUILT}" == "yes" ]; then
+            if [ "${WITH_GIT}" == "yes" ]; then
+                ex $GIT am $REJECT < ${patch}
+            elif [ "${WITH_QUILT}" == "yes" ]; then
                 ex $QUILT import ${patch}
                 ex $QUILT push patches/${patch##*/}
             else
@@ -125,14 +94,21 @@ apply_patch()
 # Apply patches from the given directory
 apply_backport_patches()
 {
-        local pdir=${CWD}/backports/${BACKPORT_DIR}
+        local pdir=${CWD}/${BACKPORT_DIR}
         shift
         printf "\nApplying patches for ${BACKPORT_DIR} kernel:\n"
+        if [ "${WITH_GIT}" == "yes" ]; then
+            ex $GIT checkout -b backport-${BACKPORT_DIR}
+        fi
         if [ -d ${pdir} ]; then
+            if [ "${WITH_GIT}" == "yes" ]; then
+                ex $GIT am $REJECT ${pdir}/*.patch
+            else
                 for patch in ${pdir}/*
                 do
-                        apply_patch ${patch}
+                    apply_patch ${patch}
                 done
+            fi
         else
                 echo ${pdir} no such directory
         fi
@@ -150,43 +126,37 @@ QUILT_DIFF_OPTS='-x .svn -p --ignore-matching-lines=\$Id'
 QUILT_PATCH_OPTS='-l'
 EOF
 
-        QUILT="${QUILT} --quiltrc ${quiltrc}"
+    QUILT="${QUILT} --quiltrc ${quiltrc}"
 
-        if [ -n "${PATCH_DIR}" ]; then
-                # Apply user's patches
-                for patch in ${PATCH_DIR}/*
-                do
-                        apply_patch ${patch}
-                done
+    if [ -n "${PATCH_DIR}" ]; then
+            # Apply user's patches
+            for patch in ${PATCH_DIR}/*
+            do
+                    apply_patch ${patch}
+            done
 
-        else
-                # Apply backport patches
-                BACKPORT_DIR=${BACKPORT_DIR:-$(${CWD}/ofed_scripts/get_backport_dir.sh ${KVERSION})}
-                if [ -n "${BACKPORT_DIR}" ]; then
-                        if [ "X${WITH_BACKPORT_PATCHES}" == "Xyes" ]; then
-                                apply_backport_patches
-                        fi
-                        BACKPORT_INCLUDES='-I${CWD}/kernel_addons/backport/'${BACKPORT_DIR}/include/
-                fi
+    else
+            # Apply kernel fixes
+            if [ "X${WITH_KERNEL_FIXES}" == "Xyes" ]; then
+                apply_kernel_fixes
+            fi
 
+            # Apply backport patches
+            echo "getting backport dir for kernel version ${KVERSION}"
+            BACKPORT_DIR="backports"
+            echo "found backport dir ${BACKPORT_DIR}"
+            if [ -n "${BACKPORT_DIR}" ]; then
+                    if [ "X${WITH_BACKPORT_PATCHES}" == "Xyes" ]; then
+                            apply_backport_patches
+                    fi
+                    BACKPORT_INCLUDES='-I${CWD}/kernel_addons/backport/'${BACKPORT_DIR}/include/
+            fi
+    fi
 
-#FIXME: why are these applied here? Move them to before backports?
-                if [ "$WITH_PATCH" == "yes" ]; then
-                        # Apply huge pages patch
-                        if [ -d ${CWD}/kernel_patches/hpage_patches ]; then
-                            if [ "X${WITH_HPAGE_PATCH}" == "Xyes" ]; then
-                                # Apply hpages.patch
-                                patch=${CWD}/kernel_patches/hpage_patches/hpages.patch
-                                apply_patch ${patch}
-                            fi
-                        fi
-                fi
-        fi
-
-	# quilt leaves some files in .pc with no permissions
-	if [ -d ${CWD}/.pc ]; then
-		ex chmod -R u+rw ${CWD}/.pc
-	fi
+    # quilt leaves some files in .pc with no permissions
+    if [ -d ${CWD}/.pc ]; then
+        ex chmod -R u+rw ${CWD}/.pc
+    fi
 }
 
 main()
@@ -201,6 +171,20 @@ main()
                         ;;
                         -kernel-version=* | --kernel-version=* | --kern-ver=* | --ker-ver=*)
                                 KVERSION=`expr "x$1" : 'x[^=]*=\(.*\)'`
+                        ;;
+                        -with-git | --with-git)
+                                WITH_GIT="yes"
+                                if [ ! -z "$2" ] && [ "`echo -n $2 | cut -c 1`" != '-' ]; then
+                                        shift
+                                        GIT_BRANCH=$1
+                                fi
+                        ;;
+                        -with-git=* | --with-git=*)
+                                WITH_GIT="yes"
+                                GIT_BRANCH=`expr "x$1" : 'x[^=]*=\(.*\)'`
+                        ;;
+                        --without-git)
+                                WITH_GIT="no"
                         ;;
                         -with-quilt | --with-quilt)
                                 WITH_QUILT="yes"
@@ -276,6 +260,7 @@ main()
 
 #Set default values
 KVERSION=${KVERSION:-$(uname -r)}
+WITH_GIT=${WITH_GIT:-"yes"}
 WITH_QUILT=${WITH_QUILT:-"yes"}
 WITH_PATCH=${WITH_PATCH:-"yes"}
 BACKPORT_INCLUDES=""
@@ -284,6 +269,13 @@ WITH_BACKPORT_PATCHES=${WITH_BACKPORT_PATCHES:-"yes"}
 WITH_HPAGE_PATCH=${WITH_HPAGE_PATCH:-"no"}
 
 QUILT=${QUILT:-$(/usr/bin/which quilt  2> /dev/null)}
+GIT=${GIT:-$(/usr/bin/which git 2> /dev/null)}
+REJECT=`$GIT am --help 2> /dev/null | grep -qw '\-\-reject' && echo -n '--reject'`
+
+if [[ ! -x "$GIT" || ! -d ".git" ]]; then
+    WITH_GIT="no"
+fi
+
 CWD=$(pwd)
 PATCH_DIR=${PATCH_DIR:-""}
 
@@ -294,7 +286,8 @@ PATCH_DIR=${PATCH_DIR:-""}
         fi
 
         patches_handle
-	touch .backports_applied
+
+        touch .backports_applied
 }
 
 main $@

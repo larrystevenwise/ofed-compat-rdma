@@ -2,10 +2,11 @@ Documentation/infiniband/
 drivers/infiniband/
 drivers/net/ethernet/chelsio/cxgb3/
 drivers/net/ethernet/chelsio/cxgb4/
-drivers/net/ethernet/mellanox/mlx4/
+drivers/net/ethernet/mellanox/
 include/linux/mlx4/
+include/linux/mlx5/
 include/rdma/
+include/uapi/rdma/
 include/scsi/srp.h
 net/rds/
-include/linux/rds.h
 net/sunrpc/xprtrdma
