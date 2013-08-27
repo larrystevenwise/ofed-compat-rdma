@@ -115,7 +115,7 @@ Requires: kernel
 Requires: pciutils
 Requires: compat-rdma
 Version: %{_version}
-Release: %{krelver}
+Release: %{_release}
 Summary: Infiniband Driver and ULPs kernel modules sources
 Group: System Environment/Libraries
 %description -n compat-rdma-devel
