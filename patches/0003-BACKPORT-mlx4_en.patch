@@ -1,0 +1,109 @@
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Subject: [PATCH] BACKPORT: mlx4_en
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ drivers/net/ethernet/mellanox/mlx4/cmd.c       |    6 ++++++
+ drivers/net/ethernet/mellanox/mlx4/en_cq.c     |    4 ++++
+ drivers/net/ethernet/mellanox/mlx4/en_netdev.c |    4 ++++
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c     |    2 ++
+ 4 files changed, 16 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx4/cmd.c b/drivers/net/ethernet/mellanox/mlx4/cmd.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/cmd.c
++++ b/drivers/net/ethernet/mellanox/mlx4/cmd.c
+@@ -2306,6 +2306,7 @@ int mlx4_set_vf_spoofchk(struct mlx4_dev *dev, int port, int vf, bool setting)
+ }
+ EXPORT_SYMBOL_GPL(mlx4_set_vf_spoofchk);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,34)) || defined(CONFIG_COMPAT_NDO_VF_MAC_VLAN)
+ int mlx4_get_vf_config(struct mlx4_dev *dev, int port, int vf, struct ifla_vf_info *ivf)
+ {
+ 	struct mlx4_priv *priv = mlx4_priv(dev);
+@@ -2333,12 +2334,17 @@ int mlx4_get_vf_config(struct mlx4_dev *dev, int port, int vf, struct ifla_vf_in
+ 	ivf->vlan	= s_info->default_vlan;
+ 	ivf->qos	= s_info->default_qos;
+ 	ivf->tx_rate	= s_info->tx_rate;
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
+ 	ivf->spoofchk	= s_info->spoofchk;
++#endif
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0))
+ 	ivf->linkstate	= s_info->link_state;
++#endif
+ 
+ 	return 0;
+ }
+ EXPORT_SYMBOL_GPL(mlx4_get_vf_config);
++#endif
+ 
+ int mlx4_set_vf_link_state(struct mlx4_dev *dev, int port, int vf, int link_state)
+ {
+diff --git a/drivers/net/ethernet/mellanox/mlx4/en_cq.c b/drivers/net/ethernet/mellanox/mlx4/en_cq.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/en_cq.c
++++ b/drivers/net/ethernet/mellanox/mlx4/en_cq.c
+@@ -139,7 +139,9 @@ int mlx4_en_activate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq,
+ 
+ 	if (!cq->is_tx) {
+ 		netif_napi_add(cq->dev, &cq->napi, mlx4_en_poll_rx_cq, 64);
++#ifdef CONFIG_NET_RX_BUSY_POLL
+ 		napi_hash_add(&cq->napi);
++#endif
+ 		napi_enable(&cq->napi);
+ 	}
+ 
+@@ -163,7 +165,9 @@ void mlx4_en_deactivate_cq(struct mlx4_en_priv *priv, struct mlx4_en_cq *cq)
+ {
+ 	if (!cq->is_tx) {
+ 		napi_disable(&cq->napi);
++#ifdef CONFIG_NET_RX_BUSY_POLL
+ 		napi_hash_del(&cq->napi);
++#endif
+ 		synchronize_rcu();
+ 		netif_napi_del(&cq->napi);
+ 	}
+diff --git a/drivers/net/ethernet/mellanox/mlx4/en_netdev.c b/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
++++ b/drivers/net/ethernet/mellanox/mlx4/en_netdev.c
+@@ -2111,6 +2111,7 @@ static int mlx4_en_get_vf_config(struct net_device *dev, int vf, struct ifla_vf_
+ 	return mlx4_get_vf_config(mdev->dev, en_priv->port, vf, ivf);
+ }
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0))
+ static int mlx4_en_set_vf_link_state(struct net_device *dev, int vf, int link_state)
+ {
+ 	struct mlx4_en_priv *en_priv = netdev_priv(dev);
+@@ -2118,6 +2119,7 @@ static int mlx4_en_set_vf_link_state(struct net_device *dev, int vf, int link_st
+ 
+ 	return mlx4_set_vf_link_state(mdev->dev, en_priv->port, vf, link_state);
+ }
++#endif
+ static const struct net_device_ops mlx4_netdev_ops = {
+ 	.ndo_open		= mlx4_en_open,
+ 	.ndo_stop		= mlx4_en_close,
+@@ -2161,7 +2163,9 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
+ 	.ndo_set_vf_mac		= mlx4_en_set_vf_mac,
+ 	.ndo_set_vf_vlan	= mlx4_en_set_vf_vlan,
+ 	.ndo_set_vf_spoofchk	= mlx4_en_set_vf_spoofchk,
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0))
+ 	.ndo_set_vf_link_state	= mlx4_en_set_vf_link_state,
++#endif
+ 	.ndo_get_vf_config	= mlx4_en_get_vf_config,
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller	= mlx4_en_netpoll,
+diff --git a/drivers/net/ethernet/mellanox/mlx4/en_rx.c b/drivers/net/ethernet/mellanox/mlx4/en_rx.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/en_rx.c
++++ b/drivers/net/ethernet/mellanox/mlx4/en_rx.c
+@@ -767,7 +767,9 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+ 					       timestamp);
+ 		}
+ 
++#ifdef CONFIG_NET_RX_BUSY_POLL
+ 		skb_mark_napi_id(skb, &cq->napi);
++#endif
+ 
+ 		/* Push it up the stack */
+ 		netif_receive_skb(skb);

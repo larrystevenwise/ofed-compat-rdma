@@ -1,0 +1,38 @@
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Subject: [PATCH] BACKPORT: mlx4_ib
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ drivers/infiniband/hw/mlx4/cm.c |   10 ++++++++++
+ 1 files changed, 10 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/mlx4/cm.c
++++ b/drivers/infiniband/hw/mlx4/cm.c
+@@ -204,6 +204,9 @@ static struct id_map_entry *
+ id_map_alloc(struct ib_device *ibdev, int slave_id, u32 sl_cm_id)
+ {
+ 	int ret;
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
++	static int next_id;
++#endif
+ 	struct id_map_entry *ent;
+ 	struct mlx4_ib_sriov *sriov = &to_mdev(ibdev)->sriov;
+ 
+@@ -222,8 +225,15 @@ id_map_alloc(struct ib_device *ibdev, int slave_id, u32 sl_cm_id)
+ 	idr_preload(GFP_KERNEL);
+ 	spin_lock(&to_mdev(ibdev)->sriov.id_map_lock);
+ 
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
+ 	ret = idr_alloc_cyclic(&sriov->pv_id_table, ent, 0, 0, GFP_NOWAIT);
++#else
++	ret = idr_alloc(&sriov->pv_id_table, ent, next_id, 0, GFP_NOWAIT);
++#endif
+ 	if (ret >= 0) {
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0))
++		next_id = max(ret + 1, 0);
++#endif
+ 		ent->pv_cm_id = (u32)ret;
+ 		sl_id_map_add(ibdev, ent);
+ 		list_add_tail(&ent->list, &sriov->cm_list);
