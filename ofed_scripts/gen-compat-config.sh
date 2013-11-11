@@ -75,6 +75,13 @@ if [[ ${CONFIG_COMPAT_KERNEL_3_2} = "y" ]]; then
 	set_config CONFIG_COMPAT_USE_LRO y
 fi
 
+SLES_11_3_KERNEL=$(echo ${KVERSION} | sed -n 's/^\(3\.0\.76\+\)\-\(.*\)\-\(.*\)/\1-\2-\3/p')
+if [[ ! -z ${SLES_11_3_KERNEL} ]]; then
+	SLES_MAJOR="11"
+	SLES_MINOR="3"
+	set_config CONFIG_COMPAT_SLES_11_3 y
+fi
+
 SLES_11_2_KERNEL=$(echo ${KVERSION} | sed -n 's/^\(3\.0\.[0-9]\+\)\-\(.*\)\-\(.*\)/\1-\2-\3/p')
 if [[ ! -z ${SLES_11_2_KERNEL} ]]; then
 	SLES_MAJOR="11"
@@ -97,7 +104,6 @@ fi
 
 FC16_KERNEL=$(echo ${KVERSION} | grep fc16)
 if [[ ! -z ${FC16_KERNEL} ]]; then
-	set_config CONFIG_COMPAT_MAXRATE y
 	set_config CONFIG_COMPAT_EN_SYSFS y
 fi
 
@@ -143,6 +149,10 @@ if [[ ${CONFIG_COMPAT_SLES_11_2} = "y" ]]; then
 	set_config CONFIG_COMPAT_EN_SYSFS y
 fi
 
+if [[ ${CONFIG_COMPAT_SLES_11_3} = "y" ]]; then
+	set_config CONFIG_COMPAT_SCSI_TARGET_UNBLOCK y
+fi
+
 if (grep -q dst_set_neighbour ${KLIB_BUILD}/include/net/dst.h > /dev/null 2>&1 || grep -q dst_set_neighbour /lib/modules/${KVERSION}/source/include/net/dst.h > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_DST_NEIGHBOUR y
 fi
@@ -153,6 +163,26 @@ fi
 
 if (grep -q dev_hw_addr_random ${KLIB_BUILD}/include/linux/etherdevice.h > /dev/null 2>&1 || grep -q dev_hw_addr_random /lib/modules/${KVERSION}/source/include/linux/etherdevice.h > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_DEV_HW_ADDR_RANDOM y
+fi
+
+if (grep -q "typedef u64 netdev_features_t" ${KLIB_BUILD}/include/linux/netdevice.h > /dev/null 2>&1 || grep -q "typedef u64 netdev_features_t" /lib/modules/${KVERSION}/source/include/linux/netdevice.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_NETDEV_FEATURES y
+fi
+
+if (grep -qw "WORK_BUSY_PENDING" ${KLIB_BUILD}/include/linux/workqueue.h > /dev/null 2>&1 || grep -qw "WORK_BUSY_PENDING" /lib/modules/${KVERSION}/source/include/linux/workqueue.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_IS_WORK_BUSY y
+fi
+
+if (grep -qw ieee_getmaxrate ${KLIB_BUILD}/include/net/dcbnl.h > /dev/null 2>&1 || grep -qw ieee_getmaxrate /lib/modules/${KVERSION}/source/include/net/dcbnl.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_IS_MAXRATE y
+fi
+
+if (grep -qw "netdev_extended" ${KLIB_BUILD}/include/linux/netdevice.h > /dev/null 2>&1 || grep -qw "netdev_extended" /lib/modules/${KVERSION}/source/include/linux/netdevice.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_IS_NETDEV_EXTENDED y
+fi
+
+if [[ -f ${KLIB_BUILD}/include/linux/cpu_rmap.h || -f /lib/modules/${KVERSION}/source/include/linux/cpu_rmap.h ]]; then
+	set_config CONFIG_COMPAT_IS_LINUX_CPU_RMAP y
 fi
 
 if [[ ${CONFIG_COMPAT_RHEL_6_3} = "y" ]]; then
@@ -175,8 +205,6 @@ fi
 
 if [[ ${RHEL_MAJOR} -eq "6" ]]; then
 	set_config CONFIG_COMPAT_IS___SKB_TX_HASH y
-	set_config CONFIG_COMPAT_ISER_ATTR_IS_VISIBLE y
-	set_config CONFIG_COMPAT_ISCSI_ISER_GET_EP_PARAM y
 	set_config CONFIG_COMPAT_IS_BITMAP y
 	set_config CONFIG_COMPAT_DEFINE_NUM_LRO y
 	set_config CONFIG_COMPAT_NDO_VF_MAC_VLAN y
@@ -185,6 +213,8 @@ if [[ ${RHEL_MAJOR} -eq "6" ]]; then
 	set_config CONFIG_COMPAT_XPRTRDMA_NEEDED y
 
 	if [[ ${RHEL_MINOR} -ne "1" ]]; then
+		set_config CONFIG_COMPAT_ISER_ATTR_IS_VISIBLE y
+		set_config CONFIG_COMPAT_ISCSI_ISER_GET_EP_PARAM y
 		set_config CONFIG_COMPAT_IS_NUM_TX_QUEUES y
 		set_config CONFIG_COMPAT_IS_PRIO_TC_MAP y
 		set_config CONFIG_COMPAT_NEW_TX_RING_SCHEME y
