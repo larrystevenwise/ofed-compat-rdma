@@ -91,8 +91,14 @@ Usage:  `basename $0` [options]
     --with-mlx4-mod         make CONFIG_MLX4_CORE=y CONFIG_MLX4_INFINIBAND=y [no]
     --without-mlx4-mod      [yes]
 
+    --with-mlx5-mod         make CONFIG_MLX5_CORE=y CONFIG_MLX5_INFINIBAND=y [no]
+    --without-mlx5-mod      [yes]
+
     --with-mlx4_core-mod         make CONFIG_MLX4_CORE=y [no]
     --without-mlx4_core-mod      [yes]
+
+    --with-mlx5_core-mod         make CONFIG_MLX5_CORE=y [no]
+    --without-mlx5_core-mod      [yes]
 
     --with-mlx4_en-mod         make CONFIG_MLX4_EN=y [no]
     --without-mlx4_en-mod      [yes]
@@ -100,8 +106,14 @@ Usage:  `basename $0` [options]
     --with-mlx4_inf-mod         make CONFIG_MLX4_INFINIBAND=y [no]
     --without-mlx4_inf-mod      [yes]
 
+    --with-mlx5_inf-mod         make CONFIG_MLX5_INFINIBAND=y [no]
+    --without-mlx5_inf-mod      [yes]
+
     --with-mlx4_debug-mod         make CONFIG_MLX4_DEBUG=y [yes]
     --without-mlx4_debug-mod      [no]
+
+    --with-mlx5_debug-mod         make CONFIG_MLX5_DEBUG=y [yes]
+    --without-mlx5_debug-mod      [no]
 
     --with-ipath_inf-mod    make CONFIG_INFINIBAND_IPATH=m [no]
     --without-ipath_inf-mod    [yes]
@@ -133,14 +145,23 @@ Usage:  `basename $0` [options]
     --with-cxgb3-mod    make CONFIG_INFINIBAND_CXGB3=m [no]
     --without-cxgb3-mod    [yes]
 
+    --with-cxgb3i-mod    make CONFIG_SCSI_CXGB3_ISCSI=m [no]
+    --without-cxgb3i-mod    [yes]
+
     --with-cxgb3_debug-mod    make CONFIG_INFINIBAND_CXGB3_DEBUG=y [no]
     --without-cxgb3_debug-mod    [yes]
 
     --with-cxgb4-mod    make CONFIG_INFINIBAND_CXGB4=m [no]
     --without-cxgb4-mod    [yes]
 
+    --with-cxgb4i-mod    make CONFIG_SCSI_CXGB4_ISCSI=m [no]
+    --without-cxgb4i-mod    [yes]
+
     --with-nes-mod    make CONFIG_INFINIBAND_NES=m [no]
     --without-nes-mod    [yes]
+
+    --with-ocrdma-mod    make CONFIG_INFINIBAND_OCRDMA=m [no]
+    --without-ocrdma-mod    [yes]
 
     --with-nes_debug-mod    make CONFIG_INFINIBAND_NES_DEBUG=y [no]
     --without-nes_debug-mod    [yes]
@@ -401,16 +422,33 @@ main()
                             CONFIG_MLX4_INFINIBAND="m"
                             CONFIG_MLX4_DEBUG="y"
                         ;;
+                        --with-mlx5-mod)
+                            CONFIG_MLX5_CORE="m"
+                            CONFIG_MLX5_INFINIBAND="m"
+                            CONFIG_BACKPORT_LRO="m"
+                            CONFIG_MLX5_DEBUG="y"
+                        ;;
                         --with-mlx4_core-mod)
                             CONFIG_MLX4_CORE="m"
                         ;;
                         --without-mlx4_core-mod)
                             CONFIG_MLX4_CORE=
                         ;;
+                       --with-mlx5_core-mod)
+                            CONFIG_MLX5_CORE="m"
+                        ;;
+                        --without-mlx5_core-mod)
+                            CONFIG_MLX5_CORE=
+                        ;;
 			-without-mlx4-mod)
                             CONFIG_MLX4_CORE=
                             CONFIG_MLX4_INFINIBAND=
                             CONFIG_MLX4_DEBUG=
+                        ;;
+                        --without-mlx5-mod)
+                            CONFIG_MLX5_CORE=
+                            CONFIG_MLX5_INFINIBAND=
+                            CONFIG_MLX5_DEBUG=
                         ;;
                         --with-mlx4_en-mod)
   			    CONFIG_MLX4_CORE="m"
@@ -426,11 +464,24 @@ main()
                         --without-mlx4_inf-mod)
                             CONFIG_MLX4_INFINIBAND=
                         ;;
+                        --with-mlx5_inf-mod)
+                            CONFIG_MLX5_CORE="m"
+                            CONFIG_MLX5_INFINIBAND="m"
+                        ;;
+                        --without-mlx5_inf-mod)
+                            CONFIG_MLX5_INFINIBAND=
+                        ;;
                         --with-mlx4_debug-mod)
                             CONFIG_MLX4_DEBUG="y"
                         ;;
                         --without-mlx4_debug-mod)
                             CONFIG_MLX4_DEBUG=
+                        ;;
+                        --with-mlx5_debug-mod)
+                            CONFIG_MLX5_DEBUG="y"
+                        ;;
+                        --without-mlx5_debug-mod)
+                            CONFIG_MLX5_DEBUG=
                         ;;
                         --with-ipath_inf-mod)
                             CONFIG_INFINIBAND_IPATH="m"
@@ -520,6 +571,18 @@ main()
                             CONFIG_INFINIBAND_CXGB4=
                             CONFIG_CHELSIO_T4=
                         ;;
+                        --with-cxgb3i-mod)
+                            CONFIG_SCSI_CXGB3_ISCSI="m"
+                        ;;
+                        --without-cxgb3i-mod)
+                            CONFIG_SCSI_CXGB3_ISCSI=
+                        ;;
+                        --with-cxgb4i-mod)
+                            CONFIG_SCSI_CXGB4_ISCSI="m"
+                        ;;
+                        --without-cxgb4i-mod)
+                            CONFIG_SCSI_CXGB4_ISCSI=
+                        ;;
                         --with-nes-mod)
                             CONFIG_INFINIBAND_NES="m"
                         ;;
@@ -531,6 +594,12 @@ main()
                         ;;
                         --without-nes_debug-mod)
                             CONFIG_INFINIBAND_NES_DEBUG=
+                        ;;
+                        --with-ocrdma-mod)
+                            CONFIG_INFINIBAND_OCRDMA="m"
+                        ;;
+                        --without-ocrdma-mod)
+                            CONFIG_INFINIBAND_OCRDMA=
                         ;;
                         --with-nfsrdma-mod)
                             CONFIG_SUNRPC_XPRT_RDMA="m"
@@ -585,6 +654,12 @@ CONFIG="configure.mk.kernel"
 mkdir -p ${CWD}/include/linux
 AUTOCONF_H="${CWD}/include/linux/autoconf.h"
 
+# disable unsupported modules on 32bit
+if [ $ARCH != "x86_64" ]; then
+    CONFIG_INFINIBAND_IPATH=
+    CONFIG_INFINIBAND_QIB=
+fi
+
 CONFIG_MEMTRACK=${CONFIG_MEMTRACK:-''}
 CONFIG_DEBUG_INFO=${CONFIG_DEBUG_INFO:-'y'}
 CONFIG_INFINIBAND=${CONFIG_INFINIBAND:-''}
@@ -601,9 +676,13 @@ CONFIG_INFINIBAND_USER_MEM=${CONFIG_INFINIBAND_USER_MEM:-''}
 CONFIG_INFINIBAND_MTHCA=${CONFIG_INFINIBAND_MTHCA:-''}
 
 CONFIG_MLX4_CORE=${CONFIG_MLX4_CORE:-''}
+CONFIG_MLX5_CORE=${CONFIG_MLX5_CORE:-''}
 CONFIG_MLX4_EN=${CONFIG_MLX4_EN:-''}
+CONFIG_MLX4_VNIC=${CONFIG_MLX4_VNIC:-''}
 CONFIG_MLX4_INFINIBAND=${CONFIG_MLX4_INFINIBAND:-''}
+CONFIG_MLX5_INFINIBAND=${CONFIG_MLX5_INFINIBAND:-''}
 CONFIG_MLX4_DEBUG=${CONFIG_MLX4_DEBUG:-''}
+CONFIG_MLX5_DEBUG=${CONFIG_MLX4_DEBUG:-''}
 
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG:-''}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER:-''}
@@ -621,7 +700,10 @@ CONFIG_INFINIBAND_CXGB3=${CONFIG_INFINIBAND_CXGB3:-''}
 CONFIG_CHELSIO_T3=${CONFIG_CHELSIO_T3:-''}
 CONFIG_INFINIBAND_CXGB4=${CONFIG_INFINIBAND_CXGB4:-''}
 CONFIG_CHELSIO_T4=${CONFIG_CHELSIO_T4:-''}
+CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI:-''}
+CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI:-''}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES:-''}
+CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA:-''}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA:-''} 
 CONFIG_SUNRPC=${CONFIG_SUNRPC:-''} 
@@ -660,6 +742,12 @@ CONFIG_INFINIBAND_QLGC_VNIC_STATS=${CONFIG_INFINIBAND_QLGC_VNIC_STATS:-''}
 CONFIG_INFINIBAND_CXGB3_DEBUG=${CONFIG_INFINIBAND_CXGB3_DEBUG:-''}
 CONFIG_INFINIBAND_NES_DEBUG=${CONFIG_INFINIBAND_NES_DEBUG:-''}
 CONFIG_INFINIBAND_AMSO1100=${CONFIG_INFINIBAND_AMSO1100:-''}
+CONFIG_MLX4_EN_DCB=''
+if [ "X${CONFIG_MLX4_EN}" == "Xm" ]; then
+    if (grep -q "^CONFIG_DCB=y" $KSRC/.config > /dev/null 2>&1); then
+        CONFIG_MLX4_EN_DCB=y
+    fi
+fi
 
         # Check for minimal supported kernel version
         if ! check_kerver ${KVERSION} ${MIN_KVERSION}; then
@@ -705,10 +793,13 @@ CONFIG_INFINIBAND_USER_MEM=${CONFIG_INFINIBAND_USER_MEM}
 CONFIG_INFINIBAND_MTHCA=${CONFIG_INFINIBAND_MTHCA}
 
 CONFIG_MLX4_CORE=${CONFIG_MLX4_CORE}
+CONFIG_MLX5_CORE=${CONFIG_MLX5_CORE}
 CONFIG_MLX4_EN=${CONFIG_MLX4_EN}
+CONFIG_MLX4_EN_DCB=${CONFIG_MLX4_EN_DCB}
 CONFIG_MLX4_INFINIBAND=${CONFIG_MLX4_INFINIBAND}
+CONFIG_MLX5_INFINIBAND=${CONFIG_MLX5_INFINIBAND}
 CONFIG_MLX4_DEBUG=${CONFIG_MLX4_DEBUG}
-
+CONFIG_MLX5_DEBUG=${CONFIG_MLX5_DEBUG}
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER}
 CONFIG_SCSI_ISCSI_ATTRS=${CONFIG_SCSI_ISCSI_ATTRS}
@@ -725,7 +816,10 @@ CONFIG_INFINIBAND_CXGB3=${CONFIG_INFINIBAND_CXGB3}
 CONFIG_CHELSIO_T3=${CONFIG_CHELSIO_T3}
 CONFIG_INFINIBAND_CXGB4=${CONFIG_INFINIBAND_CXGB4}
 CONFIG_CHELSIO_T4=${CONFIG_CHELSIO_T4}
+CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI}
+CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES}
+CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA}
 CONFIG_SUNRPC=${CONFIG_SUNRPC}
@@ -749,6 +843,8 @@ CONFIG_NFSD_V3_ACL=${CONFIG_NFSD_V3_ACL}
 CONFIG_NFSD_V4=${CONFIG_NFSD_V4}
 CONFIG_NFSD_RDMA=${CONFIG_NFSD_RDMA}
 
+CONFIG_SCSI_SRP_ATTRS=${CONFIG_SCSI_SRP_ATTRS}
+
 CONFIG_INFINIBAND_IPOIB_DEBUG_DATA=${CONFIG_INFINIBAND_IPOIB_DEBUG_DATA}
 CONFIG_INFINIBAND_SDP_SEND_ZCOPY=${CONFIG_INFINIBAND_SDP_SEND_ZCOPY}
 CONFIG_INFINIBAND_SDP_RECV_ZCOPY=${CONFIG_INFINIBAND_SDP_RECV_ZCOPY}
@@ -761,6 +857,7 @@ CONFIG_INFINIBAND_QLGC_VNIC_STATS=${CONFIG_INFINIBAND_QLGC_VNIC_STATS}
 CONFIG_INFINIBAND_CXGB3_DEBUG=${CONFIG_INFINIBAND_CXGB3_DEBUG}
 CONFIG_INFINIBAND_NES_DEBUG=${CONFIG_INFINIBAND_NES_DEBUG}
 CONFIG_INFINIBAND_AMSO1100=${CONFIG_INFINIBAND_AMSO1100}
+CONFIG_MLX4_EN_DCB=${CONFIG_MLX4_EN_DCB}
 
 EOFCONFIG
         echo "Created ${CONFIG}:"
@@ -837,20 +934,40 @@ if [ "X${CONFIG_MLX4_CORE}" == "Xm" ]; then
 else
         DEFINE_MLX4_CORE="#undef CONFIG_MLX4_CORE"
 fi
+if [ "X${CONFIG_MLX5_CORE}" == "Xm" ]; then
+        DEFINE_MLX5_CORE="#undef CONFIG_MLX5_CORE\n#define CONFIG_MLX5_CORE 1"
+else
+        DEFINE_MLX4_CORE="#undef CONFIG_MLX5_CORE"
+fi
 if [ "X${CONFIG_MLX4_EN}" == "Xm" ]; then
         DEFINE_MLX4_EN="#undef CONFIG_MLX4_EN\n#define CONFIG_MLX4_EN 1"
 else
         DEFINE_MLX4_EN="#undef CONFIG_MLX4_EN"
+fi
+if [ "X${CONFIG_MLX4_EN_DCB}" == "Xy" ]; then
+        DEFINE_MLX4_EN="#undef CONFIG_MLX4_EN_DCB\n#define CONFIG_MLX4_EN_DCB 1"
+else
+        DEFINE_MLX4_EN="#undef CONFIG_MLX4_EN_DCB"
 fi
 if [ "X${CONFIG_MLX4_INFINIBAND}" == "Xm" ]; then
         DEFINE_MLX4_INFINIBAND="#undef CONFIG_MLX4_INFINIBAND\n#define CONFIG_MLX4_INFINIBAND 1"
 else
         DEFINE_MLX4_INFINIBAND="#undef CONFIG_MLX4_INFINIBAND"
 fi
+if [ "X${CONFIG_MLX5_INFINIBAND}" == "Xm" ]; then
+        DEFINE_MLX5_INFINIBAND="#undef CONFIG_MLX5_INFINIBAND\n#define CONFIG_MLX5_INFINIBAND 1"
+else
+        DEFINE_MLX5_INFINIBAND="#undef CONFIG_MLX5_INFINIBAND"
+fi
 if [ "X${CONFIG_MLX4_DEBUG}" == "Xy" ]; then
         DEFINE_MLX4_DEBUG="#undef CONFIG_MLX4_DEBUG\n#define CONFIG_MLX4_DEBUG 1"
 else
         DEFINE_MLX4_DEBUG="#undef CONFIG_MLX4_DEBUG"
+fi
+if [ "X${CONFIG_MLX5_DEBUG}" == "Xy" ]; then
+        DEFINE_MLX5_DEBUG="#undef CONFIG_MLX5_DEBUG\n#define CONFIG_MLX5_DEBUG 1"
+else
+        DEFINE_MLX5_DEBUG="#undef CONFIG_MLX5_DEBUG"
 fi
 if [ "X${CONFIG_INFINIBAND_IPOIB_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_IPOIB_DEBUG="#undef CONFIG_INFINIBAND_IPOIB_DEBUG\n#define CONFIG_INFINIBAND_IPOIB_DEBUG 1"
@@ -970,10 +1087,25 @@ if [ "X${CONFIG_CHELSIO_T4}" == "Xm" ]; then
 else
         DEFINE_CHELSIO_T4="#undef CONFIG_CHELSIO_T4"
 fi
+if [ "X${CONFIG_SCSI_CXGB3_ISCSI}" == "Xm" ]; then
+        DEFINE_SCSI_CXGB3_ISCSI="#undef CONFIG_SCSI_CXGB3_ISCSI\n#define CONFIG_SCSI_CXGB3_ISCSI 1"
+else
+        DEFINE_SCSI_CXGB3_ISCSI="#undef CONFIG_SCSI_CXGB3_ISCSI"
+fi
+if [ "X${CONFIG_SCSI_CXGB4_ISCSI}" == "Xm" ]; then
+        DEFINE_SCSI_CXGB4_ISCSI="#undef CONFIG_SCSI_CXGB4_ISCSI\n#define CONFIG_SCSI_CXGB4_ISCSI 1"
+else
+        DEFINE_SCSI_CXGB4_ISCSI="#undef CONFIG_SCSI_CXGB4_ISCSI"
+fi
 if [ "X${CONFIG_INFINIBAND_NES}" == "Xm" ]; then
         DEFINE_INFINIBAND_NES="#undef CONFIG_INFINIBAND_NES\n#define CONFIG_INFINIBAND_NES 1"
 else
         DEFINE_INFINIBAND_NES="#undef CONFIG_INFINIBAND_NES"
+fi
+if [ "X${CONFIG_INFINIBAND_OCRDMA}" == "Xm" ]; then
+        DEFINE_INFINIBAND_OCRDMA="#undef CONFIG_INFINIBAND_OCRDMA\n#define CONFIG_INFINIBAND_OCRDMA 1"
+else
+        DEFINE_INFINIBAND_OCRDMA="#undef CONFIG_INFINIBAND_OCRDMA"
 fi
 if [ "X${CONFIG_INFINIBAND_NES_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_NES_DEBUG="#undef CONFIG_INFINIBAND_NES_DEBUG\n#define CONFIG_INFINIBAND_NES_DEBUG 1"
@@ -984,6 +1116,11 @@ if [ "X${CONFIG_INFINIBAND_AMSO1100}" == "Xm" ]; then
         DEFINE_INFINIBAND_AMSO1100="#undef CONFIG_INFINIBAND_AMSO1100\n#define CONFIG_INFINIBAND_AMSO1100 1"
 else
         DEFINE_INFINIBAND_AMSO1100="#undef CONFIG_INFINIBAND_AMSO1100"
+fi
+if [ "X${CONFIG_MLX4_EN_DCB}" == "Xy" ]; then
+        DEFINE_MLX4_EN_DCB="#undef CONFIG_MLX4_EN_DCB\n#define CONFIG_MLX4_EN_DCB 1"
+else
+        DEFINE_MLX4_EN_DCB="#undef CONFIG_MLX4_EN_DCB"
 fi
 if [ "X${CONFIG_SUNRPC_XPRT_RDMA}" == "Xm" ]; then
         DEFINE_SUNRPC_XPRT_RDMA="#undef CONFIG_SUNRPC_XPRT_RDMA\n#define CONFIG_SUNRPC_XPRT_RDMA 1"
@@ -1028,6 +1165,11 @@ else
         DEFINE_NFSD_V4="/* CONFIG_NFSD_V4 is not set */"
         DEFINE_NFSD_RDMA="/* CONFIG_NFSD_RDMA is not set */"
 fi
+if [ "X${CONFIG_SCSI_SRP_ATTRS}" == "Xm" ]; then
+        DEFINE_SCSI_SRP_ATTRS="#undef CONFIG_SCSI_SRP_ATTRS\n#define CONFIG_SCSI_SRP_ATTRS 1"
+else
+        DEFINE_SCSI_SRP_ATTRS="/* CONFIG_SCSI_SRP_ATTRS is not set */"
+fi
 cat >> ${AUTOCONF_H} << EOFAUTOCONF
 #ifndef __OFED_BUILD__
 #include_next <linux/autoconf.h>
@@ -1049,6 +1191,7 @@ $(echo -e "${DEFINE_CHELSIO_T3}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_CXGB4}" | grep -v undef)
 $(echo -e "${DEFINE_CHELSIO_T4}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_OCRDMA}" | grep -v undef)
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}" | grep -v undef)
 $(echo -e "${DEFINE_SUNRPC}" | grep -v undef)
@@ -1085,10 +1228,13 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB3_DEBUG}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES_DEBUG}" | grep -v undef)
 
 $(echo -e "${DEFINE_MLX4_CORE}" | grep -v undef)
+$(echo -e "${DEFINE_MLX5_CORE}" | grep -v undef)
 $(echo -e "${DEFINE_MLX4_EN}" | grep -v undef)
 $(echo -e "${DEFINE_MLX4_INFINIBAND}" | grep -v undef)
+$(echo -e "${DEFINE_MLX5_INFINIBAND}" | grep -v undef)
 $(echo -e "${DEFINE_MLX4_ETHERNET}" | grep -v undef)
 $(echo -e "${DEFINE_MLX4_DEBUG}" | grep -v undef)
+$(echo -e "${DEFINE_MLX5_DEBUG}" | grep -v undef)
 
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG_DATA}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_SDP_SEND_ZCOPY}" | grep -v undef)
@@ -1117,9 +1263,13 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_INFINIBAND_MTHCA
 
 #undef CONFIG_MLX4_CORE
+#undef CONFIG_MLX5_CORE
 #undef CONFIG_MLX4_DEBUG
+#undef CONFIG_MLX5_DEBUG
 #undef CONFIG_MLX4_EN
+#undef CONFIG_MLX4_EN_DCB
 #undef CONFIG_MLX4_INFINIBAND
+#undef CONFIG_MLX5_INFINIBAND
 
 #undef CONFIG_INFINIBAND_IPOIB_DEBUG
 #undef CONFIG_INFINIBAND_ISER
@@ -1137,8 +1287,11 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_CHELSIO_T3
 #undef CONFIG_INFINIBAND_CXGB4
 #undef CONFIG_CHELSIO_T4
+#undef CONFIG_SCSI_CXGB3_ISCSI
+#undef CONFIG_SCSI_CXGB4_ISCSI
 #undef CONFIG_INFINIBAND_NES
 #undef CONFIG_INFINIBAND_NES_DEBUG
+#undef CONFIG_INFINIBAND_OCRDMA
 
 #undef CONFIG_SUNRPC_XPRT_RDMA
 #undef CONFIG_SUNRPC
@@ -1161,6 +1314,8 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_NFSD_V4
 #undef CONFIG_NFSD_RDMA
 
+#undef CONFIG_SCSI_SRP_ATTRS
+
 #undef CONFIG_INFINIBAND_IPOIB_DEBUG_DATA
 #undef CONFIG_INFINIBAND_SDP_SEND_ZCOPY
 #undef CONFIG_INFINIBAND_SDP_RECV_ZCOPY
@@ -1170,6 +1325,7 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_INFINIBAND_QIB
 #undef CONFIG_INFINIBAND_MTHCA_DEBUG
 #undef CONFIG_INFINIBAND_AMSO1100
+#undef CONFIG_MLX4_EN_DCB
 
 $(echo -e "${DEFINE_INFINIBAND}")
 $(echo -e "${DEFINE_INFINIBAND_IPOIB}")
@@ -1189,6 +1345,7 @@ $(echo -e "${DEFINE_CHELSIO_T3}")
 $(echo -e "${DEFINE_INFINIBAND_CXGB4}")
 $(echo -e "${DEFINE_CHELSIO_T4}")
 $(echo -e "${DEFINE_INFINIBAND_NES}")
+$(echo -e "${DEFINE_INFINIBAND_OCRDMA}")
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}")
 $(echo -e "${DEFINE_SUNRPC}")
@@ -1225,10 +1382,13 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB3_DEBUG}")
 $(echo -e "${DEFINE_INFINIBAND_NES_DEBUG}")
 
 $(echo -e "${DEFINE_MLX4_CORE}")
+$(echo -e "${DEFINE_MLX5_CORE}")
 $(echo -e "${DEFINE_MLX4_EN}")
 $(echo -e "${DEFINE_MLX4_INFINIBAND}")
+$(echo -e "${DEFINE_MLX5_INFINIBAND}")
 $(echo -e "${DEFINE_MLX4_ETHERNET}")
 $(echo -e "${DEFINE_MLX4_DEBUG}")
+$(echo -e "${DEFINE_MLX5_DEBUG}")
 
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG_DATA}")
 $(echo -e "${DEFINE_INFINIBAND_SDP_SEND_ZCOPY}")
@@ -1240,6 +1400,7 @@ $(echo -e "${DEFINE_INFINIBAND_QIB}")
 $(echo -e "${DEFINE_INFINIBAND_MTHCA_DEBUG}")
 $(echo -e "${DEFINE_INFINIBAND_MADEYE}")
 $(echo -e "${DEFINE_INFINIBAND_AMSO1100}")
+$(echo -e "${DEFINE_MLX4_EN_DCB}")
 #endif
 
 EOFAUTOCONF
