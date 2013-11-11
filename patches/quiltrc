@@ -1,0 +1,2 @@
+QUILT_DIFF_OPTS='-x .svn -p --ignore-matching-lines=$Id'
+QUILT_PATCH_OPTS='-l'
