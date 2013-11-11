@@ -13,9 +13,9 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   32 ++++
  drivers/net/ethernet/mellanox/mlx4/eq.c         |    8 +
  drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   57 ++++++++
- include/linux/mlx4/cmd.h                        |   11 ++
+ include/linux/mlx4/cmd.h                        |    2 +
  include/linux/mlx4/device.h                     |    6 +
- 12 files changed, 428 insertions(+), 1 deletions(-)
+ 12 files changed, 419 insertions(+), 1 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -1158,7 +1158,7 @@ diff --git a/include/linux/mlx4/cmd.h b/include/linux/mlx4/cmd.h
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/include/linux/mlx4/cmd.h
 +++ b/include/linux/mlx4/cmd.h
-@@ -238,9 +238,20 @@ u32 mlx4_comm_get_version(void);
+@@ -238,7 +238,9 @@ u32 mlx4_comm_get_version(void);
  int mlx4_set_vf_mac(struct mlx4_dev *dev, int port, int vf, u64 mac);
  int mlx4_set_vf_vlan(struct mlx4_dev *dev, int port, int vf, u16 vlan, u8 qos);
  int mlx4_set_vf_spoofchk(struct mlx4_dev *dev, int port, int vf, bool setting);
@@ -1167,18 +1167,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#endif
  int mlx4_set_vf_link_state(struct mlx4_dev *dev, int port, int vf, int link_state);
  
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 11, 0))
-+enum {
-+	IFLA_VF_LINK_STATE_AUTO,	/* link state of the uplink */
-+	IFLA_VF_LINK_STATE_ENABLE,	/* link always up */
-+	IFLA_VF_LINK_STATE_DISABLE,	/* link always down */
-+	__IFLA_VF_LINK_STATE_MAX,
-+};
-+#endif
-+
  #define MLX4_COMM_GET_IF_REV(cmd_chan_ver) (u8)((cmd_chan_ver) >> 8)
- 
- #endif /* MLX4_CMD_H */
 diff --git a/include/linux/mlx4/device.h b/include/linux/mlx4/device.h
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/include/linux/mlx4/device.h
