@@ -3,12 +3,12 @@ Subject: [PATCH] BACKPORT: ib_ipoib
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/ulp/ipoib/ipoib.h           |    3 ++
- drivers/infiniband/ulp/ipoib/ipoib_cm.c        |    8 ++++++
- drivers/infiniband/ulp/ipoib/ipoib_main.c      |   31 ++++++++++++++++++++++++
- drivers/infiniband/ulp/ipoib/ipoib_multicast.c |   15 +++++++++++
- drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |    8 ++++++
- 5 files changed, 65 insertions(+), 0 deletions(-)
+ drivers/infiniband/ulp/ipoib/ipoib.h           |  3 +++
+ drivers/infiniband/ulp/ipoib/ipoib_cm.c        |  8 ++++++
+ drivers/infiniband/ulp/ipoib/ipoib_main.c      | 35 ++++++++++++++++++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_multicast.c | 15 +++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |  8 ++++++
+ 5 files changed, 69 insertions(+)
 
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib.h b/drivers/infiniband/ulp/ipoib/ipoib.h
 index xxxxxxx..xxxxxxx xxxxxx
@@ -104,7 +104,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  		dev_set_mtu(dev, min(priv->mcast_mtu, dev->mtu));
  		rtnl_unlock();
  		ipoib_flush_paths(dev);
-@@ -1335,7 +1353,9 @@ static const struct net_device_ops ipoib_netdev_ops = {
+@@ -1313,7 +1331,11 @@ void ipoib_dev_cleanup(struct net_device *dev)
+ 		cancel_delayed_work(&cpriv->neigh_reap_task);
+ 		unregister_netdevice_queue(cpriv->dev, &head);
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,33)
+ 	unregister_netdevice_many(&head);
++#else
++	unregister_netdevice(cpriv->dev);
++#endif
+ 
+ 	ipoib_ib_dev_cleanup(dev);
+ 
+@@ -1335,7 +1357,9 @@ static const struct net_device_ops ipoib_netdev_ops = {
  	.ndo_open		 = ipoib_open,
  	.ndo_stop		 = ipoib_stop,
  	.ndo_change_mtu		 = ipoib_change_mtu,
@@ -114,7 +126,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.ndo_start_xmit	 	 = ipoib_start_xmit,
  	.ndo_tx_timeout		 = ipoib_timeout,
  	.ndo_set_rx_mode	 = ipoib_set_mcast_list,
-@@ -1522,6 +1542,7 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+@@ -1522,6 +1546,7 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
  	kfree(device_attr);
  
  	if (priv->hca_caps & IB_DEVICE_UD_IP_CSUM) {
@@ -122,7 +134,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		priv->dev->hw_features = NETIF_F_SG |
  			NETIF_F_IP_CSUM | NETIF_F_RXCSUM;
  
-@@ -1529,6 +1550,14 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+@@ -1529,6 +1554,14 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
  			priv->dev->hw_features |= NETIF_F_TSO;
  
  		priv->dev->features |= priv->dev->hw_features;
@@ -137,7 +149,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
  
  	return 0;
-@@ -1560,7 +1589,9 @@ static struct net_device *ipoib_add_port(const char *format,
+@@ -1560,7 +1593,9 @@ static struct net_device *ipoib_add_port(const char *format,
  	priv->dev->mtu  = IPOIB_UD_MTU(priv->max_ib_mtu);
  	priv->mcast_mtu  = priv->admin_mtu = priv->dev->mtu;
  

@@ -1,5 +1,6 @@
 From: Vipul Pandya <vipul@chelsio.com>
-Subject: [PATCH] iw_cxgb3/iw_cxgb4: Enable header file inclusion with absolute path
+Subject: [PATCH] iw_cxgb3/iw_cxgb4: Enable header file inclusion with
+ absolute path
 
 iw_cxgb3/iw_cxgb4 driver includes header files of cxgb3/cxgb4 drivers
 respectively. OFED build environment is not able to find the header files
@@ -7,8 +8,8 @@ if absolute path is not given.
 
 Signed-off-by: Vipul Pandya <vipul@chelsio.com>
 ---
- drivers/infiniband/hw/cxgb3/Makefile |    2 +-
- drivers/infiniband/hw/cxgb4/Makefile |    2 +-
+ drivers/infiniband/hw/cxgb3/Makefile | 2 +-
+ drivers/infiniband/hw/cxgb4/Makefile | 2 +-
  2 files changed, 2 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb3/Makefile b/drivers/infiniband/hw/cxgb3/Makefile

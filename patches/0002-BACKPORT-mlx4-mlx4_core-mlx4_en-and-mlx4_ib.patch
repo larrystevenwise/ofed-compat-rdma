@@ -3,19 +3,20 @@ Subject: [PATCH] BACKPORT: mlx4 (mlx4_core, mlx4_en and mlx4_ib)
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/hw/mlx4/cm.c                 |   31 ++++
- drivers/infiniband/hw/mlx4/main.c               |   16 ++
- drivers/net/ethernet/mellanox/mlx4/cmd.c        |    6 +
- drivers/net/ethernet/mellanox/mlx4/en_cq.c      |   10 ++
- drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |   47 ++++++
- drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |  176 ++++++++++++++++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   29 ++++
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   32 ++++
- drivers/net/ethernet/mellanox/mlx4/eq.c         |    8 +
- drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   57 ++++++++
- include/linux/mlx4/cmd.h                        |    2 +
- include/linux/mlx4/device.h                     |    6 +
- 12 files changed, 419 insertions(+), 1 deletions(-)
+ drivers/infiniband/hw/mlx4/cm.c                 |  31 +++++
+ drivers/infiniband/hw/mlx4/main.c               |  16 +++
+ drivers/net/ethernet/mellanox/mlx4/cmd.c        |   6 +
+ drivers/net/ethernet/mellanox/mlx4/en_cq.c      |  10 ++
+ drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |  12 ++
+ drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |  51 +++++++
+ drivers/net/ethernet/mellanox/mlx4/en_netdev.c  | 176 +++++++++++++++++++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  29 ++++
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  36 +++++
+ drivers/net/ethernet/mellanox/mlx4/eq.c         |   8 ++
+ drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |  57 ++++++++
+ include/linux/mlx4/cmd.h                        |   2 +
+ include/linux/mlx4/device.h                     |   6 +
+ 13 files changed, 439 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -213,6 +214,49 @@ index xxxxxxx..xxxxxxx xxxxxx
  		synchronize_rcu();
  		netif_napi_del(&cq->napi);
  	}
+diff --git a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
++++ b/drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c
+@@ -204,8 +204,13 @@ static u8 mlx4_en_dcbnl_setdcbx(struct net_device *dev, u8 mode)
+ }
+ 
+ #define MLX4_RATELIMIT_UNITS_IN_KB 100000 /* rate-limit HW unit in Kbps */
++#ifdef CONFIG_COMPAT_IS_MAXRATE
+ static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
+ 				   struct ieee_maxrate *maxrate)
++#else
++int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
++				  struct ieee_maxrate *maxrate)
++#endif
+ {
+ 	struct mlx4_en_priv *priv = netdev_priv(dev);
+ 	int i;
+@@ -217,8 +222,13 @@ static int mlx4_en_dcbnl_ieee_getmaxrate(struct net_device *dev,
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_COMPAT_IS_MAXRATE
+ static int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
+ 		struct ieee_maxrate *maxrate)
++#else
++int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
++				  struct ieee_maxrate *maxrate)
++#endif
+ {
+ 	struct mlx4_en_priv *priv = netdev_priv(dev);
+ 	u16 tmp[IEEE_8021QAZ_MAX_TCS];
+@@ -245,8 +255,10 @@ static int mlx4_en_dcbnl_ieee_setmaxrate(struct net_device *dev,
+ const struct dcbnl_rtnl_ops mlx4_en_dcbnl_ops = {
+ 	.ieee_getets	= mlx4_en_dcbnl_ieee_getets,
+ 	.ieee_setets	= mlx4_en_dcbnl_ieee_setets,
++#ifdef CONFIG_COMPAT_IS_MAXRATE
+ 	.ieee_getmaxrate = mlx4_en_dcbnl_ieee_getmaxrate,
+ 	.ieee_setmaxrate = mlx4_en_dcbnl_ieee_setmaxrate,
++#endif
+ 	.ieee_getpfc	= mlx4_en_dcbnl_ieee_getpfc,
+ 	.ieee_setpfc	= mlx4_en_dcbnl_ieee_setpfc,
+ 
 diff --git a/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c b/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_ethtool.c
@@ -254,7 +298,33 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
  	struct mlx4_en_dev *mdev = priv->mdev;
-@@ -1035,8 +1048,13 @@ static int mlx4_en_get_num_flows(struct mlx4_en_priv *priv)
+@@ -641,11 +654,13 @@ static int mlx4_en_validate_flow(struct net_device *dev,
+ 	if (cmd->fs.location >= MAX_NUM_OF_FS_RULES)
+ 		return -EINVAL;
+ 
++#ifdef CONFIG_COMPAT_ETHTOOL_FLOW_EXT_IS_H_DEST
+ 	if (cmd->fs.flow_type & FLOW_MAC_EXT) {
+ 		/* dest mac mask must be ff:ff:ff:ff:ff:ff */
+ 		if (!is_broadcast_ether_addr(cmd->fs.m_ext.h_dest))
+ 			return -EINVAL;
+ 	}
++#endif
+ 
+ 	switch (cmd->fs.flow_type & ~(FLOW_EXT | FLOW_MAC_EXT)) {
+ 	case TCP_V4_FLOW:
+@@ -737,9 +752,11 @@ static int mlx4_en_ethtool_add_mac_rule_by_ipv4(struct mlx4_en_priv *priv,
+ 	unsigned char mac[ETH_ALEN];
+ 
+ 	if (!ipv4_is_multicast(ipv4_dst)) {
++#ifdef CONFIG_COMPAT_ETHTOOL_FLOW_EXT_IS_H_DEST
+ 		if (cmd->fs.flow_type & FLOW_MAC_EXT)
+ 			memcpy(&mac, cmd->fs.h_ext.h_dest, ETH_ALEN);
+ 		else
++#endif
+ 			memcpy(&mac, priv->dev->dev_addr, ETH_ALEN);
+ 	} else {
+ 		ip_eth_mc_map(ipv4_dst, mac);
+@@ -1035,8 +1052,13 @@ static int mlx4_en_get_num_flows(struct mlx4_en_priv *priv)
  
  }
  
@@ -268,7 +338,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
  	struct mlx4_en_dev *mdev = priv->mdev;
-@@ -1064,7 +1082,11 @@ static int mlx4_en_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
+@@ -1064,7 +1086,11 @@ static int mlx4_en_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
  		while ((!err || err == -ENOENT) && priority < cmd->rule_cnt) {
  			err = mlx4_en_get_flow(dev, cmd, i);
  			if (!err)
@@ -280,7 +350,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			i++;
  		}
  		err = 0;
-@@ -1102,8 +1124,13 @@ static int mlx4_en_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
+@@ -1102,8 +1128,13 @@ static int mlx4_en_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
  	return err;
  }
  
@@ -294,7 +364,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
  
-@@ -1116,8 +1143,13 @@ static void mlx4_en_get_channels(struct net_device *dev,
+@@ -1116,8 +1147,13 @@ static void mlx4_en_get_channels(struct net_device *dev,
  	channel->tx_count = priv->tx_ring_num / MLX4_EN_NUM_UP;
  }
  
@@ -308,7 +378,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
  	struct mlx4_en_dev *mdev = priv->mdev;
-@@ -1148,10 +1180,15 @@ static int mlx4_en_set_channels(struct net_device *dev,
+@@ -1148,10 +1184,15 @@ static int mlx4_en_set_channels(struct net_device *dev,
  		goto out;
  	}
  
@@ -324,7 +394,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	en_warn(priv, "Using %d TX rings\n", priv->tx_ring_num);
  	en_warn(priv, "Using %d RX rings\n", priv->rx_ring_num);
-@@ -1219,11 +1256,21 @@ const struct ethtool_ops mlx4_en_ethtool_ops = {
+@@ -1219,11 +1260,21 @@ const struct ethtool_ops mlx4_en_ethtool_ops = {
  	.set_ringparam = mlx4_en_set_ringparam,
  	.get_rxnfc = mlx4_en_get_rxnfc,
  	.set_rxnfc = mlx4_en_set_rxnfc,
@@ -951,7 +1021,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (ring->bf_enabled)
  		ring->context.usr_page = cpu_to_be32(ring->bf.uar->index);
  
-@@ -567,16 +576,34 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc, struct sk_buff *sk
+@@ -567,16 +576,38 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc, struct sk_buff *sk
  u16 mlx4_en_select_queue(struct net_device *dev, struct sk_buff *skb)
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -969,7 +1039,11 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (vlan_tx_tag_present(skb))
  		up = vlan_tx_tag_get(skb) >> VLAN_PRIO_SHIFT;
  
++#ifdef CONFIG_COMPAT_IS_NETDEV_PICK_TX
  	return __netdev_pick_tx(dev, skb) % rings_p_up + up * rings_p_up;
++#else
++	return __skb_tx_hash(dev, skb, rings_p_up) + up * rings_p_up;
++#endif
 +#else /* (LINUX_VERSION_CODE >= KERNEL_VERSION(2,6,39)) || defined (CONFIG_COMPAT_NEW_TX_RING_SCHEME) */
 +	u16 vlan_tag = 0;
 +
@@ -986,7 +1060,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static void mlx4_bf_copy(void __iomem *dst, unsigned long *src, unsigned bytecnt)
-@@ -732,8 +759,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -732,8 +763,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  	 * set flag for further reference
  	 */
  	if (ring->hwtstamp_tx_type == HWTSTAMP_TX_ON &&

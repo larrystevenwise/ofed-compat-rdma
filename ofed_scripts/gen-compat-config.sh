@@ -185,6 +185,10 @@ if [[ -f ${KLIB_BUILD}/include/linux/cpu_rmap.h || -f /lib/modules/${KVERSION}/s
 	set_config CONFIG_COMPAT_IS_LINUX_CPU_RMAP y
 fi
 
+if (grep -w -A6 "struct ethtool_flow_ext" ${KLIB_BUILD}/include/{,uapi}/linux/ethtool.h 2> /dev/null | grep -wq "unsigned char   h_dest" > /dev/null 2>&1 || grep -q -A6 "struct ethtool_flow_ext" /lib/modules/${KVERSION}/source/include/{,uapi}/linux/ethtool.h 2> /dev/null | grep -wq "unsigned char   h_dest" > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_ETHTOOL_FLOW_EXT_IS_H_DEST y
+fi
+
 if [[ ${CONFIG_COMPAT_RHEL_6_3} = "y" ]]; then
 	set_config CONFIG_COMPAT_XPRT_ALLOC_4PARAMS y
 	set_config CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS y
