@@ -3,19 +3,19 @@ Subject: [PATCH] BACKPORT: ib_core
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/core/addr.c        | 105 ++++++++++++++++++++++++++++++++++
- drivers/infiniband/core/cm.c          |  23 ++++++++
- drivers/infiniband/core/cma.c         |  43 ++++++++++++++
- drivers/infiniband/core/fmr_pool.c    |   7 +++
- drivers/infiniband/core/netlink.c     |  20 +++++++
- drivers/infiniband/core/sa_query.c    |  15 +++++
- drivers/infiniband/core/ucm.c         |  38 ++++++++++++
- drivers/infiniband/core/ucma.c        |  76 ++++++++++++++++++++++++
- drivers/infiniband/core/umem.c        |  16 ++++++
- drivers/infiniband/core/user_mad.c    |  16 ++++++
- drivers/infiniband/core/uverbs_cmd.c  |  51 +++++++++++++++++
- drivers/infiniband/core/uverbs_main.c |  40 +++++++++++++
- 12 files changed, 450 insertions(+)
+ drivers/infiniband/core/addr.c        |  105 +++++++++++++++++++++++++++++++++
+ drivers/infiniband/core/cm.c          |   23 +++++++
+ drivers/infiniband/core/cma.c         |   43 +++++++++++++
+ drivers/infiniband/core/fmr_pool.c    |    7 ++
+ drivers/infiniband/core/netlink.c     |   20 ++++++
+ drivers/infiniband/core/sa_query.c    |   15 +++++
+ drivers/infiniband/core/ucm.c         |   38 ++++++++++++
+ drivers/infiniband/core/ucma.c        |   76 ++++++++++++++++++++++++
+ drivers/infiniband/core/umem.c        |   16 +++++
+ drivers/infiniband/core/user_mad.c    |   16 +++++
+ drivers/infiniband/core/uverbs_cmd.c  |   51 ++++++++++++++++
+ drivers/infiniband/core/uverbs_main.c |   40 +++++++++++++
+ 12 files changed, 450 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
 index xxxxxxx..xxxxxxx xxxxxx
