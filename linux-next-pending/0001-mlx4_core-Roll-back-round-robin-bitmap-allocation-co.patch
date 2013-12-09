@@ -1,0 +1,284 @@
+From: Jack Morgenstein <jackm@dev.mellanox.co.il>
+Subject: [PATCH] mlx4_core: Roll back round robin bitmap allocation commit for CQs, SRQs, and MPTs
+
+Commit f4ec9e9 "mlx4_core: Change bitmap allocator to work in round-robin fashion"
+introduced round-robin allocation (via bitmap) for all resources which allocate
+via a bitmap.
+
+Round robin allocation is desirable for mcgs, counters, pd's, UARs, and xrcds.
+These are simply numbers, with no involvement of ICM memory mapping.
+
+Round robin is required for QPs, since we had a problem with immediate
+reuse of a 24-bit QP number (commit f4ec9e9).
+
+However, for other resources which use the bitmap allocator and involve
+mapping ICM memory -- MPTs, CQs, SRQs -- round-robin is not desirable.
+
+What happens in these cases is the following:
+
+ICM memory is allocated and mapped in chunks of 256K.
+
+Since the resource allocation index goes up monotonically, the allocator
+will eventually require mapping a new chunk. Now, chunks are also unmapped
+when their reference count goes back to zero.  Thus, if a single app is
+running and starts/exits frequently we will have the following situation:
+
+When the app starts, a new chunk must be allocated and mapped.
+
+When the app exits, the chunk reference count goes back to zero, and the
+chunk is unmapped and freed. Therefore, the app must pay the cost of allocation
+and mapping of ICM memory each time it runs (although the price is paid only when
+allocating the initial entry in the new chunk).
+
+For apps which allocate MPTs/SRQs/CQs and which operate as described above,
+this presented a performance problem.
+
+We therefore roll back the round-robin allocator modification for MPTs, CQs, SRQs.
+
+Reported-by: Matthew Finlay <matt@mellanox.com>
+Signed-off-by: Jack Morgenstein <jackm@dev.mellanox.co.il>
+Signed-off-by: Or Gerlitz <ogerlitz@mellanox.com>
+---
+ drivers/net/ethernet/mellanox/mlx4/alloc.c |   12 +++++++++---
+ drivers/net/ethernet/mellanox/mlx4/cq.c    |    4 ++--
+ drivers/net/ethernet/mellanox/mlx4/eq.c    |    4 ++--
+ drivers/net/ethernet/mellanox/mlx4/main.c  |    2 +-
+ drivers/net/ethernet/mellanox/mlx4/mcg.c   |    6 +++---
+ drivers/net/ethernet/mellanox/mlx4/mlx4.h  |   10 ++++++++--
+ drivers/net/ethernet/mellanox/mlx4/mr.c    |    2 +-
+ drivers/net/ethernet/mellanox/mlx4/pd.c    |    6 +++---
+ drivers/net/ethernet/mellanox/mlx4/qp.c    |    2 +-
+ drivers/net/ethernet/mellanox/mlx4/srq.c   |    4 ++--
+ 10 files changed, 32 insertions(+), 20 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx4/alloc.c b/drivers/net/ethernet/mellanox/mlx4/alloc.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/alloc.c
++++ b/drivers/net/ethernet/mellanox/mlx4/alloc.c
+@@ -71,9 +71,9 @@ u32 mlx4_bitmap_alloc(struct mlx4_bitmap *bitmap)
+ 	return obj;
+ }
+ 
+-void mlx4_bitmap_free(struct mlx4_bitmap *bitmap, u32 obj)
++void mlx4_bitmap_free(struct mlx4_bitmap *bitmap, u32 obj, int use_rr)
+ {
+-	mlx4_bitmap_free_range(bitmap, obj, 1);
++	mlx4_bitmap_free_range(bitmap, obj, 1, use_rr);
+ }
+ 
+ u32 mlx4_bitmap_alloc_range(struct mlx4_bitmap *bitmap, int cnt, int align)
+@@ -118,11 +118,17 @@ u32 mlx4_bitmap_avail(struct mlx4_bitmap *bitmap)
+ 	return bitmap->avail;
+ }
+ 
+-void mlx4_bitmap_free_range(struct mlx4_bitmap *bitmap, u32 obj, int cnt)
++void mlx4_bitmap_free_range(struct mlx4_bitmap *bitmap, u32 obj, int cnt,
++			    int use_rr)
+ {
+ 	obj &= bitmap->max + bitmap->reserved_top - 1;
+ 
+ 	spin_lock(&bitmap->lock);
++	if (!use_rr) {
++		bitmap->last = min(bitmap->last, obj);
++		bitmap->top = (bitmap->top + bitmap->max + bitmap->reserved_top)
++				& bitmap->mask;
++	}
+ 	bitmap_clear(bitmap->table, obj, cnt);
+ 	bitmap->avail += cnt;
+ 	spin_unlock(&bitmap->lock);
+diff --git a/drivers/net/ethernet/mellanox/mlx4/cq.c b/drivers/net/ethernet/mellanox/mlx4/cq.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/cq.c
++++ b/drivers/net/ethernet/mellanox/mlx4/cq.c
+@@ -191,7 +191,7 @@ err_put:
+ 	mlx4_table_put(dev, &cq_table->table, *cqn);
+ 
+ err_out:
+-	mlx4_bitmap_free(&cq_table->bitmap, *cqn);
++	mlx4_bitmap_free(&cq_table->bitmap, *cqn, MLX4_NO_RR);
+ 	return err;
+ }
+ 
+@@ -221,7 +221,7 @@ void __mlx4_cq_free_icm(struct mlx4_dev *dev, int cqn)
+ 
+ 	mlx4_table_put(dev, &cq_table->cmpt_table, cqn);
+ 	mlx4_table_put(dev, &cq_table->table, cqn);
+-	mlx4_bitmap_free(&cq_table->bitmap, cqn);
++	mlx4_bitmap_free(&cq_table->bitmap, cqn, MLX4_NO_RR);
+ }
+ 
+ static void mlx4_cq_free_icm(struct mlx4_dev *dev, int cqn)
+diff --git a/drivers/net/ethernet/mellanox/mlx4/eq.c b/drivers/net/ethernet/mellanox/mlx4/eq.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/eq.c
++++ b/drivers/net/ethernet/mellanox/mlx4/eq.c
+@@ -966,7 +966,7 @@ err_out_free_mtt:
+ 	mlx4_mtt_cleanup(dev, &eq->mtt);
+ 
+ err_out_free_eq:
+-	mlx4_bitmap_free(&priv->eq_table.bitmap, eq->eqn);
++	mlx4_bitmap_free(&priv->eq_table.bitmap, eq->eqn, MLX4_USE_RR);
+ 
+ err_out_free_pages:
+ 	for (i = 0; i < npages; ++i)
+@@ -1021,7 +1021,7 @@ static void mlx4_free_eq(struct mlx4_dev *dev,
+ 				    eq->page_list[i].map);
+ 
+ 	kfree(eq->page_list);
+-	mlx4_bitmap_free(&priv->eq_table.bitmap, eq->eqn);
++	mlx4_bitmap_free(&priv->eq_table.bitmap, eq->eqn, MLX4_USE_RR);
+ 	mlx4_free_cmd_mailbox(dev, mailbox);
+ }
+ 
+diff --git a/drivers/net/ethernet/mellanox/mlx4/main.c b/drivers/net/ethernet/mellanox/mlx4/main.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/main.c
++++ b/drivers/net/ethernet/mellanox/mlx4/main.c
+@@ -1623,7 +1623,7 @@ EXPORT_SYMBOL_GPL(mlx4_counter_alloc);
+ 
+ void __mlx4_counter_free(struct mlx4_dev *dev, u32 idx)
+ {
+-	mlx4_bitmap_free(&mlx4_priv(dev)->counters_bitmap, idx);
++	mlx4_bitmap_free(&mlx4_priv(dev)->counters_bitmap, idx, MLX4_USE_RR);
+ 	return;
+ }
+ 
+diff --git a/drivers/net/ethernet/mellanox/mlx4/mcg.c b/drivers/net/ethernet/mellanox/mlx4/mcg.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/mcg.c
++++ b/drivers/net/ethernet/mellanox/mlx4/mcg.c
+@@ -998,7 +998,7 @@ out:
+ 				  index, dev->caps.num_mgms);
+ 		else
+ 			mlx4_bitmap_free(&priv->mcg_table.bitmap,
+-					 index - dev->caps.num_mgms);
++					 index - dev->caps.num_mgms, MLX4_USE_RR);
+ 	}
+ 	mutex_unlock(&priv->mcg_table.mutex);
+ 
+@@ -1089,7 +1089,7 @@ int mlx4_qp_detach_common(struct mlx4_dev *dev, struct mlx4_qp *qp, u8 gid[16],
+ 					  index, amgm_index, dev->caps.num_mgms);
+ 			else
+ 				mlx4_bitmap_free(&priv->mcg_table.bitmap,
+-						 amgm_index - dev->caps.num_mgms);
++						 amgm_index - dev->caps.num_mgms, MLX4_USE_RR);
+ 		}
+ 	} else {
+ 		/* Remove entry from AMGM */
+@@ -1109,7 +1109,7 @@ int mlx4_qp_detach_common(struct mlx4_dev *dev, struct mlx4_qp *qp, u8 gid[16],
+ 				  prev, index, dev->caps.num_mgms);
+ 		else
+ 			mlx4_bitmap_free(&priv->mcg_table.bitmap,
+-					 index - dev->caps.num_mgms);
++					 index - dev->caps.num_mgms, MLX4_USE_RR);
+ 	}
+ 
+ out:
+diff --git a/drivers/net/ethernet/mellanox/mlx4/mlx4.h b/drivers/net/ethernet/mellanox/mlx4/mlx4.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/mlx4.h
++++ b/drivers/net/ethernet/mellanox/mlx4/mlx4.h
+@@ -766,6 +766,11 @@ enum {
+ 	MLX4_PCI_DEV_FORCE_SENSE_PORT	= 1 << 1,
+ };
+ 
++enum {
++	MLX4_NO_RR	= 0,
++	MLX4_USE_RR	= 1,
++};
++
+ struct mlx4_priv {
+ 	struct mlx4_dev		dev;
+ 
+@@ -827,9 +832,10 @@ static inline struct mlx4_priv *mlx4_priv(struct mlx4_dev *dev)
+ extern struct workqueue_struct *mlx4_wq;
+ 
+ u32 mlx4_bitmap_alloc(struct mlx4_bitmap *bitmap);
+-void mlx4_bitmap_free(struct mlx4_bitmap *bitmap, u32 obj);
++void mlx4_bitmap_free(struct mlx4_bitmap *bitmap, u32 obj, int use_rr);
+ u32 mlx4_bitmap_alloc_range(struct mlx4_bitmap *bitmap, int cnt, int align);
+-void mlx4_bitmap_free_range(struct mlx4_bitmap *bitmap, u32 obj, int cnt);
++void mlx4_bitmap_free_range(struct mlx4_bitmap *bitmap, u32 obj, int cnt,
++			    int use_rr);
+ u32 mlx4_bitmap_avail(struct mlx4_bitmap *bitmap);
+ int mlx4_bitmap_init(struct mlx4_bitmap *bitmap, u32 num, u32 mask,
+ 		     u32 reserved_bot, u32 resetrved_top);
+diff --git a/drivers/net/ethernet/mellanox/mlx4/mr.c b/drivers/net/ethernet/mellanox/mlx4/mr.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/mr.c
++++ b/drivers/net/ethernet/mellanox/mlx4/mr.c
+@@ -346,7 +346,7 @@ void __mlx4_mpt_release(struct mlx4_dev *dev, u32 index)
+ {
+ 	struct mlx4_priv *priv = mlx4_priv(dev);
+ 
+-	mlx4_bitmap_free(&priv->mr_table.mpt_bitmap, index);
++	mlx4_bitmap_free(&priv->mr_table.mpt_bitmap, index, MLX4_NO_RR);
+ }
+ 
+ static void mlx4_mpt_release(struct mlx4_dev *dev, u32 index)
+diff --git a/drivers/net/ethernet/mellanox/mlx4/pd.c b/drivers/net/ethernet/mellanox/mlx4/pd.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/pd.c
++++ b/drivers/net/ethernet/mellanox/mlx4/pd.c
+@@ -59,7 +59,7 @@ EXPORT_SYMBOL_GPL(mlx4_pd_alloc);
+ 
+ void mlx4_pd_free(struct mlx4_dev *dev, u32 pdn)
+ {
+-	mlx4_bitmap_free(&mlx4_priv(dev)->pd_bitmap, pdn);
++	mlx4_bitmap_free(&mlx4_priv(dev)->pd_bitmap, pdn, MLX4_USE_RR);
+ }
+ EXPORT_SYMBOL_GPL(mlx4_pd_free);
+ 
+@@ -96,7 +96,7 @@ EXPORT_SYMBOL_GPL(mlx4_xrcd_alloc);
+ 
+ void __mlx4_xrcd_free(struct mlx4_dev *dev, u32 xrcdn)
+ {
+-	mlx4_bitmap_free(&mlx4_priv(dev)->xrcd_bitmap, xrcdn);
++	mlx4_bitmap_free(&mlx4_priv(dev)->xrcd_bitmap, xrcdn, MLX4_USE_RR);
+ }
+ 
+ void mlx4_xrcd_free(struct mlx4_dev *dev, u32 xrcdn)
+@@ -164,7 +164,7 @@ EXPORT_SYMBOL_GPL(mlx4_uar_alloc);
+ 
+ void mlx4_uar_free(struct mlx4_dev *dev, struct mlx4_uar *uar)
+ {
+-	mlx4_bitmap_free(&mlx4_priv(dev)->uar_table.bitmap, uar->index);
++	mlx4_bitmap_free(&mlx4_priv(dev)->uar_table.bitmap, uar->index, MLX4_USE_RR);
+ }
+ EXPORT_SYMBOL_GPL(mlx4_uar_free);
+ 
+diff --git a/drivers/net/ethernet/mellanox/mlx4/qp.c b/drivers/net/ethernet/mellanox/mlx4/qp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/qp.c
++++ b/drivers/net/ethernet/mellanox/mlx4/qp.c
+@@ -250,7 +250,7 @@ void __mlx4_qp_release_range(struct mlx4_dev *dev, int base_qpn, int cnt)
+ 
+ 	if (mlx4_is_qp_reserved(dev, (u32) base_qpn))
+ 		return;
+-	mlx4_bitmap_free_range(&qp_table->bitmap, base_qpn, cnt);
++	mlx4_bitmap_free_range(&qp_table->bitmap, base_qpn, cnt, MLX4_USE_RR);
+ }
+ 
+ void mlx4_qp_release_range(struct mlx4_dev *dev, int base_qpn, int cnt)
+diff --git a/drivers/net/ethernet/mellanox/mlx4/srq.c b/drivers/net/ethernet/mellanox/mlx4/srq.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx4/srq.c
++++ b/drivers/net/ethernet/mellanox/mlx4/srq.c
+@@ -116,7 +116,7 @@ err_put:
+ 	mlx4_table_put(dev, &srq_table->table, *srqn);
+ 
+ err_out:
+-	mlx4_bitmap_free(&srq_table->bitmap, *srqn);
++	mlx4_bitmap_free(&srq_table->bitmap, *srqn, MLX4_NO_RR);
+ 	return err;
+ }
+ 
+@@ -144,7 +144,7 @@ void __mlx4_srq_free_icm(struct mlx4_dev *dev, int srqn)
+ 
+ 	mlx4_table_put(dev, &srq_table->cmpt_table, srqn);
+ 	mlx4_table_put(dev, &srq_table->table, srqn);
+-	mlx4_bitmap_free(&srq_table->bitmap, srqn);
++	mlx4_bitmap_free(&srq_table->bitmap, srqn, MLX4_NO_RR);
+ }
+ 
+ static void mlx4_srq_free_icm(struct mlx4_dev *dev, int srqn)
