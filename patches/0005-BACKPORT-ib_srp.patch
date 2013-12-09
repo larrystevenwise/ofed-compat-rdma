@@ -1,0 +1,179 @@
+From: Bart Van Assche <bvanassche@acm.org>
+Subject: [PATCH] BACKPORT: ib_srp
+
+Signed-off-by: Bart Van Assche <bvanassche@acm.org>
+---
+ drivers/infiniband/ulp/srp/ib_srp.c |   91 ++++++++++++++++++++++++++++++++++-
+ 1 files changed, 89 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/srp/ib_srp.c
++++ b/drivers/infiniband/ulp/srp/ib_srp.c
+@@ -30,8 +30,13 @@
+  * SOFTWARE.
+  */
+ 
++#undef  pr_fmt
+ #define pr_fmt(fmt) PFX fmt
+ 
++#define DRV_NAME	"ib_srp"
++#define PFX		DRV_NAME ": "
++
++#include <linux/version.h>
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/slab.h>
+@@ -41,7 +46,11 @@
+ #include <linux/random.h>
+ #include <linux/jiffies.h>
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 37)
+ #include <linux/atomic.h>
++#else
++#include <asm/atomic.h>
++#endif
+ 
+ #include <scsi/scsi.h>
+ #include <scsi/scsi_device.h>
+@@ -56,6 +65,15 @@
+ #define DRV_VERSION	"1.0"
+ #define DRV_RELDATE	"July 1, 2013"
+ 
++#ifndef pr_warn
++#define pr_warn pr_warning
++#endif
++
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++static struct workqueue_struct *srp_wq;
++#define ib_wq srp_wq
++#endif
++
+ MODULE_AUTHOR("Roland Dreier");
+ MODULE_DESCRIPTION("InfiniBand SCSI RDMA Protocol initiator "
+ 		   "v" DRV_VERSION " (" DRV_RELDATE ")");
+@@ -734,8 +752,12 @@ static int srp_reconnect_target(struct srp_target_port *target)
+ 	if (ret == 0)
+ 		ret = srp_connect_target(target);
+ 
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 6, 0))
+ 	scsi_target_unblock(&shost->shost_gendev, ret == 0 ? SDEV_RUNNING :
+ 			    SDEV_TRANSPORT_OFFLINE);
++#else
++	scsi_target_unblock(&shost->shost_gendev);
++#endif
+ 	target->transport_offline = !!ret;
+ 
+ 	if (ret)
+@@ -1346,7 +1368,50 @@ static void srp_send_completion(struct ib_cq *cq, void *target_ptr)
+ 	}
+ }
+ 
+-static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 36)
++/*
++ * Kernel with host lock push-down patch. See also upstream commit
++ * f281233d3eba15fb225d21ae2e228fd4553d824a.
++ */
++#define SRP_QUEUECOMMAND srp_queuecommand
++#elif defined(RHEL_MAJOR) && RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 >= 2
++/*
++ * Kernel with lockless SCSI command dispatching enabled.
++ * See also the RHEL 6.2 release notes (http://access.redhat.com/knowledge/docs/en-US/Red_Hat_Enterprise_Linux/6/html-single/6.2_Release_Notes/index.html).
++ */
++static int srp_queuecommand_wrk(struct Scsi_Host *shost,
++				struct scsi_cmnd *scmnd);
++static int srp_queuecommand(struct scsi_cmnd *scmnd,
++			    void (*done)(struct scsi_cmnd *))
++{
++	scmnd->scsi_done = done;
++	return srp_queuecommand_wrk(scmnd->device->host, scmnd);
++}
++#define SRP_QUEUECOMMAND srp_queuecommand_wrk
++#else
++/*
++ * Kernel that invokes srp_queuecommand with the SCSI host lock held.
++ */
++static int srp_queuecommand_wrk(struct Scsi_Host *shost,
++				struct scsi_cmnd *scmnd);
++static int srp_queuecommand(struct scsi_cmnd *scmnd,
++			    void (*done)(struct scsi_cmnd *))
++{
++	struct Scsi_Host *shost = scmnd->device->host;
++	int res;
++
++	spin_unlock_irq(shost->host_lock);
++
++	scmnd->scsi_done = done;
++	res = srp_queuecommand_wrk(shost, scmnd);
++
++	spin_lock_irq(shost->host_lock);
++	return res;
++}
++#define SRP_QUEUECOMMAND srp_queuecommand_wrk
++#endif
++
++static int SRP_QUEUECOMMAND(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ {
+ 	struct srp_target_port *target = host_to_target(shost);
+ 	struct srp_request *req;
+@@ -1960,6 +2025,9 @@ static struct scsi_host_template srp_template = {
+ 	.proc_name			= DRV_NAME,
+ 	.slave_configure		= srp_slave_configure,
+ 	.info				= srp_target_info,
++#if defined(RHEL_MAJOR) && RHEL_MAJOR -0 == 6 && RHEL_MINOR -0 >= 2
++	.lockless			= true,
++#endif
+ 	.queuecommand			= srp_queuecommand,
+ 	.eh_abort_handler		= srp_abort,
+ 	.eh_device_reset_handler	= srp_reset_device,
+@@ -2643,15 +2711,28 @@ static int __init srp_init_module(void)
+ 		indirect_sg_entries = cmd_sg_entries;
+ 	}
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++	srp_wq = create_workqueue("srp");
++	if (IS_ERR(srp_wq))
++		return PTR_ERR(srp_wq);
++#endif
++
+ 	ib_srp_transport_template =
+ 		srp_attach_transport(&ib_srp_transport_functions);
+-	if (!ib_srp_transport_template)
++	if (!ib_srp_transport_template) {
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return -ENOMEM;
++	}
+ 
+ 	ret = class_register(&srp_class);
+ 	if (ret) {
+ 		pr_err("couldn't register class infiniband_srp\n");
+ 		srp_release_transport(ib_srp_transport_template);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return ret;
+ 	}
+ 
+@@ -2663,6 +2744,9 @@ static int __init srp_init_module(void)
+ 		srp_release_transport(ib_srp_transport_template);
+ 		ib_sa_unregister_client(&srp_sa_client);
+ 		class_unregister(&srp_class);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++		destroy_workqueue(srp_wq);
++#endif
+ 		return ret;
+ 	}
+ 
+@@ -2675,6 +2759,9 @@ static void __exit srp_cleanup_module(void)
+ 	ib_sa_unregister_client(&srp_sa_client);
+ 	class_unregister(&srp_class);
+ 	srp_release_transport(ib_srp_transport_template);
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 36)
++	destroy_workqueue(srp_wq);
++#endif
+ }
+ 
+ module_init(srp_init_module);
