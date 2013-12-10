@@ -9,7 +9,7 @@ include/rdma/
 include/uapi/rdma/
 include/scsi/srp.h
 net/rds/
-include/linux/rds.h
+include/uapi/linux/rds.h
 net/sunrpc/xprtrdma
 drivers/scsi/Makefile
 drivers/scsi/scsi_priv.h
