@@ -8,4 +8,4 @@ obj-$(CONFIG_RDS)               += net/rds/
 obj-$(CONFIG_SUNRPC_XPRT_RDMA)  += net/sunrpc/xprtrdma/
 # obj-$(CONFIG_SCSI_CXGB3_ISCSI)  += drivers/scsi/cxgbi/
 # obj-$(CONFIG_SCSI_CXGB4_ISCSI)  += drivers/scsi/cxgbi/
-# obj-$(CONFIG_SCSI_SRP_ATTRS)    += drivers/scsi/
+obj-$(CONFIG_SCSI_SRP_ATTRS)    += drivers/scsi/
