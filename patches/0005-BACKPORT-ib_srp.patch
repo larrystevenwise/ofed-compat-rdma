@@ -56,7 +56,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (ret == 0)
  		ret = srp_connect_target(target);
  
-+#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 6, 0))
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3, 6, 0)) || defined(CONFIG_COMPAT_SCSI_TARGET_UNBLOCK)
  	scsi_target_unblock(&shost->shost_gendev, ret == 0 ? SDEV_RUNNING :
  			    SDEV_TRANSPORT_OFFLINE);
 +#else
