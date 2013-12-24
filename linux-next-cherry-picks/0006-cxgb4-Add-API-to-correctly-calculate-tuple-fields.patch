@@ -1,0 +1,405 @@
+From dcf7b6f5bdeaa13d5e465d8795d2e7d6d1e27b65 Mon Sep 17 00:00:00 2001
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Date: Wed, 18 Dec 2013 16:38:23 +0530
+Subject: [PATCH] cxgb4: Add API to correctly calculate tuple fields
+
+Adds API cxgb4_select_ntuple so as to enable Upper Level Drivers to correctly
+calculate the tuple fields.
+
+Adds constant definitions for TP_VLAN_PRI_MAP for the Compressed
+Filter Tuple field widths and structures and uses them.
+
+Also, the CPL Parameters field for T5 is 40 bits so we need to prototype
+cxgb4_select_ntuple() to calculate and return u64 values.
+
+Based on original work by Casey Leedom <leedom@chelsio.com>
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |   21 +++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   20 +----
+ drivers/net/ethernet/chelsio/cxgb4/l2t.c        |   35 ++++++++
+ drivers/net/ethernet/chelsio/cxgb4/l2t.h        |    3 +-
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |  103 +++++++++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/t4_regs.h    |   69 +++++++++++++++
+ 6 files changed, 235 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 6c93088..56e0415 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -228,6 +228,25 @@ struct tp_params {
+ 
+ 	uint32_t dack_re;            /* DACK timer resolution */
+ 	unsigned short tx_modq[NCHAN];	/* channel to modulation queue map */
++
++	u32 vlan_pri_map;               /* cached TP_VLAN_PRI_MAP */
++	u32 ingress_config;             /* cached TP_INGRESS_CONFIG */
++
++	/* TP_VLAN_PRI_MAP Compressed Filter Tuple field offsets.  This is a
++	 * subset of the set of fields which may be present in the Compressed
++	 * Filter Tuple portion of filters and TCP TCB connections.  The
++	 * fields which are present are controlled by the TP_VLAN_PRI_MAP.
++	 * Since a variable number of fields may or may not be present, their
++	 * shifted field positions within the Compressed Filter Tuple may
++	 * vary, or not even be present if the field isn't selected in
++	 * TP_VLAN_PRI_MAP.  Since some of these fields are needed in various
++	 * places we store their offsets here, or a -1 if the field isn't
++	 * present.
++	 */
++	int vlan_shift;
++	int vnic_shift;
++	int port_shift;
++	int protocol_shift;
+ };
+ 
+ struct vpd_params {
+@@ -926,6 +945,8 @@ int t4_prep_fw(struct adapter *adap, struct fw_info *fw_info,
+ 	       const u8 *fw_data, unsigned int fw_size,
+ 	       struct fw_hdr *card_fw, enum dev_state state, int *reset);
+ int t4_prep_adapter(struct adapter *adapter);
++int t4_init_tp_params(struct adapter *adap);
++int t4_filter_field_shift(const struct adapter *adap, int filter_sel);
+ int t4_port_init(struct adapter *adap, int mbox, int pf, int vf);
+ void t4_fatal_err(struct adapter *adapter);
+ int t4_config_rss_range(struct adapter *adapter, int mbox, unsigned int viid,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index f9ca36c..fff02ed 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -3755,7 +3755,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
+ 	lli.ucq_density = 1 << QUEUESPERPAGEPF0_GET(
+ 			t4_read_reg(adap, SGE_INGRESS_QUEUES_PER_PAGE_PF) >>
+ 			(adap->fn * 4));
+-	lli.filt_mode = adap->filter_mode;
++	lli.filt_mode = adap->params.tp.vlan_pri_map;
+ 	/* MODQ_REQ_MAP sets queues 0-3 to chan 0-3 */
+ 	for (i = 0; i < NCHAN; i++)
+ 		lli.tx_modq[i] = i;
+@@ -4229,13 +4229,13 @@ int cxgb4_create_server_filter(const struct net_device *dev, unsigned int stid,
+ 			f->fs.val.lip[i] = val[i];
+ 			f->fs.mask.lip[i] = ~0;
+ 		}
+-		if (adap->filter_mode & F_PORT) {
++		if (adap->params.tp.vlan_pri_map & F_PORT) {
+ 			f->fs.val.iport = port;
+ 			f->fs.mask.iport = mask;
+ 		}
+ 	}
+ 
+-	if (adap->filter_mode & F_PROTOCOL) {
++	if (adap->params.tp.vlan_pri_map & F_PROTOCOL) {
+ 		f->fs.val.proto = IPPROTO_TCP;
+ 		f->fs.mask.proto = ~0;
+ 	}
+@@ -5121,7 +5121,7 @@ static int adap_init0(struct adapter *adap)
+ 	enum dev_state state;
+ 	u32 params[7], val[7];
+ 	struct fw_caps_config_cmd caps_cmd;
+-	int reset = 1, j;
++	int reset = 1;
+ 
+ 	/*
+ 	 * Contact FW, advertising Master capability (and potentially forcing
+@@ -5463,21 +5463,11 @@ static int adap_init0(struct adapter *adap)
+ 	/*
+ 	 * These are finalized by FW initialization, load their values now.
+ 	 */
+-	v = t4_read_reg(adap, TP_TIMER_RESOLUTION);
+-	adap->params.tp.tre = TIMERRESOLUTION_GET(v);
+-	adap->params.tp.dack_re = DELAYEDACKRESOLUTION_GET(v);
+ 	t4_read_mtu_tbl(adap, adap->params.mtus, NULL);
+ 	t4_load_mtus(adap, adap->params.mtus, adap->params.a_wnd,
+ 		     adap->params.b_wnd);
+ 
+-	/* MODQ_REQ_MAP defaults to setting queues 0-3 to chan 0-3 */
+-	for (j = 0; j < NCHAN; j++)
+-		adap->params.tp.tx_modq[j] = j;
+-
+-	t4_read_indirect(adap, TP_PIO_ADDR, TP_PIO_DATA,
+-			 &adap->filter_mode, 1,
+-			 TP_VLAN_PRI_MAP);
+-
++	t4_init_tp_params(adap);
+ 	adap->flags |= FW_OK;
+ 	return 0;
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/l2t.c b/drivers/net/ethernet/chelsio/cxgb4/l2t.c
+index 2987809..cb05be9 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/l2t.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/l2t.c
+@@ -45,6 +45,7 @@
+ #include "l2t.h"
+ #include "t4_msg.h"
+ #include "t4fw_api.h"
++#include "t4_regs.h"
+ 
+ #define VLAN_NONE 0xfff
+ 
+@@ -411,6 +412,40 @@ done:
+ }
+ EXPORT_SYMBOL(cxgb4_l2t_get);
+ 
++u64 cxgb4_select_ntuple(struct net_device *dev,
++			const struct l2t_entry *l2t)
++{
++	struct adapter *adap = netdev2adap(dev);
++	struct tp_params *tp = &adap->params.tp;
++	u64 ntuple = 0;
++
++	/* Initialize each of the fields which we care about which are present
++	 * in the Compressed Filter Tuple.
++	 */
++	if (tp->vlan_shift >= 0 && l2t->vlan != VLAN_NONE)
++		ntuple |= (F_FT_VLAN_VLD | l2t->vlan) << tp->vlan_shift;
++
++	if (tp->port_shift >= 0)
++		ntuple |= (u64)l2t->lport << tp->port_shift;
++
++	if (tp->protocol_shift >= 0)
++		ntuple |= (u64)IPPROTO_TCP << tp->protocol_shift;
++
++	if (tp->vnic_shift >= 0) {
++		u32 viid = cxgb4_port_viid(dev);
++		u32 vf = FW_VIID_VIN_GET(viid);
++		u32 pf = FW_VIID_PFN_GET(viid);
++		u32 vld = FW_VIID_VIVLD_GET(viid);
++
++		ntuple |= (u64)(V_FT_VNID_ID_VF(vf) |
++				V_FT_VNID_ID_PF(pf) |
++				V_FT_VNID_ID_VLD(vld)) << tp->vnic_shift;
++	}
++
++	return ntuple;
++}
++EXPORT_SYMBOL(cxgb4_select_ntuple);
++
+ /*
+  * Called when address resolution fails for an L2T entry to handle packets
+  * on the arpq head.  If a packet specifies a failure handler it is invoked,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/l2t.h b/drivers/net/ethernet/chelsio/cxgb4/l2t.h
+index 108c0f1..85eb5c7 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/l2t.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/l2t.h
+@@ -98,7 +98,8 @@ int cxgb4_l2t_send(struct net_device *dev, struct sk_buff *skb,
+ struct l2t_entry *cxgb4_l2t_get(struct l2t_data *d, struct neighbour *neigh,
+ 				const struct net_device *physdev,
+ 				unsigned int priority);
+-
++u64 cxgb4_select_ntuple(struct net_device *dev,
++			const struct l2t_entry *l2t);
+ void t4_l2t_update(struct adapter *adap, struct neighbour *neigh);
+ struct l2t_entry *t4_l2t_alloc_switching(struct l2t_data *d);
+ int t4_l2t_set_switching(struct adapter *adap, struct l2t_entry *e, u16 vlan,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 74a6fce..e1413ea 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -3808,6 +3808,109 @@ int t4_prep_adapter(struct adapter *adapter)
+ 	return 0;
+ }
+ 
++/**
++ *      t4_init_tp_params - initialize adap->params.tp
++ *      @adap: the adapter
++ *
++ *      Initialize various fields of the adapter's TP Parameters structure.
++ */
++int t4_init_tp_params(struct adapter *adap)
++{
++	int chan;
++	u32 v;
++
++	v = t4_read_reg(adap, TP_TIMER_RESOLUTION);
++	adap->params.tp.tre = TIMERRESOLUTION_GET(v);
++	adap->params.tp.dack_re = DELAYEDACKRESOLUTION_GET(v);
++
++	/* MODQ_REQ_MAP defaults to setting queues 0-3 to chan 0-3 */
++	for (chan = 0; chan < NCHAN; chan++)
++		adap->params.tp.tx_modq[chan] = chan;
++
++	/* Cache the adapter's Compressed Filter Mode and global Incress
++	 * Configuration.
++	 */
++	t4_read_indirect(adap, TP_PIO_ADDR, TP_PIO_DATA,
++			 &adap->params.tp.vlan_pri_map, 1,
++			 TP_VLAN_PRI_MAP);
++	t4_read_indirect(adap, TP_PIO_ADDR, TP_PIO_DATA,
++			 &adap->params.tp.ingress_config, 1,
++			 TP_INGRESS_CONFIG);
++
++	/* Now that we have TP_VLAN_PRI_MAP cached, we can calculate the field
++	 * shift positions of several elements of the Compressed Filter Tuple
++	 * for this adapter which we need frequently ...
++	 */
++	adap->params.tp.vlan_shift = t4_filter_field_shift(adap, F_VLAN);
++	adap->params.tp.vnic_shift = t4_filter_field_shift(adap, F_VNIC_ID);
++	adap->params.tp.port_shift = t4_filter_field_shift(adap, F_PORT);
++	adap->params.tp.protocol_shift = t4_filter_field_shift(adap,
++							       F_PROTOCOL);
++
++	/* If TP_INGRESS_CONFIG.VNID == 0, then TP_VLAN_PRI_MAP.VNIC_ID
++	 * represents the presense of an Outer VLAN instead of a VNIC ID.
++	 */
++	if ((adap->params.tp.ingress_config & F_VNIC) == 0)
++		adap->params.tp.vnic_shift = -1;
++
++	return 0;
++}
++
++/**
++ *      t4_filter_field_shift - calculate filter field shift
++ *      @adap: the adapter
++ *      @filter_sel: the desired field (from TP_VLAN_PRI_MAP bits)
++ *
++ *      Return the shift position of a filter field within the Compressed
++ *      Filter Tuple.  The filter field is specified via its selection bit
++ *      within TP_VLAN_PRI_MAL (filter mode).  E.g. F_VLAN.
++ */
++int t4_filter_field_shift(const struct adapter *adap, int filter_sel)
++{
++	unsigned int filter_mode = adap->params.tp.vlan_pri_map;
++	unsigned int sel;
++	int field_shift;
++
++	if ((filter_mode & filter_sel) == 0)
++		return -1;
++
++	for (sel = 1, field_shift = 0; sel < filter_sel; sel <<= 1) {
++		switch (filter_mode & sel) {
++		case F_FCOE:
++			field_shift += W_FT_FCOE;
++			break;
++		case F_PORT:
++			field_shift += W_FT_PORT;
++			break;
++		case F_VNIC_ID:
++			field_shift += W_FT_VNIC_ID;
++			break;
++		case F_VLAN:
++			field_shift += W_FT_VLAN;
++			break;
++		case F_TOS:
++			field_shift += W_FT_TOS;
++			break;
++		case F_PROTOCOL:
++			field_shift += W_FT_PROTOCOL;
++			break;
++		case F_ETHERTYPE:
++			field_shift += W_FT_ETHERTYPE;
++			break;
++		case F_MACMATCH:
++			field_shift += W_FT_MACMATCH;
++			break;
++		case F_MPSHITTYPE:
++			field_shift += W_FT_MPSHITTYPE;
++			break;
++		case F_FRAGMENTATION:
++			field_shift += W_FT_FRAGMENTATION;
++			break;
++		}
++	}
++	return field_shift;
++}
++
+ int t4_port_init(struct adapter *adap, int mbox, int pf, int vf)
+ {
+ 	u8 addr[6];
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+index d3dd218..4082522 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
+@@ -1171,14 +1171,50 @@
+ 
+ #define A_TP_TX_SCHED_PCMD 0x25
+ 
++#define S_VNIC    11
++#define V_VNIC(x) ((x) << S_VNIC)
++#define F_VNIC    V_VNIC(1U)
++
++#define S_FRAGMENTATION    9
++#define V_FRAGMENTATION(x) ((x) << S_FRAGMENTATION)
++#define F_FRAGMENTATION    V_FRAGMENTATION(1U)
++
++#define S_MPSHITTYPE    8
++#define V_MPSHITTYPE(x) ((x) << S_MPSHITTYPE)
++#define F_MPSHITTYPE    V_MPSHITTYPE(1U)
++
++#define S_MACMATCH    7
++#define V_MACMATCH(x) ((x) << S_MACMATCH)
++#define F_MACMATCH    V_MACMATCH(1U)
++
++#define S_ETHERTYPE    6
++#define V_ETHERTYPE(x) ((x) << S_ETHERTYPE)
++#define F_ETHERTYPE    V_ETHERTYPE(1U)
++
+ #define S_PROTOCOL    5
+ #define V_PROTOCOL(x) ((x) << S_PROTOCOL)
+ #define F_PROTOCOL    V_PROTOCOL(1U)
+ 
++#define S_TOS    4
++#define V_TOS(x) ((x) << S_TOS)
++#define F_TOS    V_TOS(1U)
++
++#define S_VLAN    3
++#define V_VLAN(x) ((x) << S_VLAN)
++#define F_VLAN    V_VLAN(1U)
++
++#define S_VNIC_ID    2
++#define V_VNIC_ID(x) ((x) << S_VNIC_ID)
++#define F_VNIC_ID    V_VNIC_ID(1U)
++
+ #define S_PORT    1
+ #define V_PORT(x) ((x) << S_PORT)
+ #define F_PORT    V_PORT(1U)
+ 
++#define S_FCOE    0
++#define V_FCOE(x) ((x) << S_FCOE)
++#define F_FCOE    V_FCOE(1U)
++
+ #define NUM_MPS_CLS_SRAM_L_INSTANCES 336
+ #define NUM_MPS_T5_CLS_SRAM_L_INSTANCES 512
+ 
+@@ -1217,4 +1253,37 @@
+ #define V_CHIPID(x) ((x) << S_CHIPID)
+ #define G_CHIPID(x) (((x) >> S_CHIPID) & M_CHIPID)
+ 
++/* TP_VLAN_PRI_MAP controls which subset of fields will be present in the
++ * Compressed Filter Tuple for LE filters.  Each bit set in TP_VLAN_PRI_MAP
++ * selects for a particular field being present.  These fields, when present
++ * in the Compressed Filter Tuple, have the following widths in bits.
++ */
++#define W_FT_FCOE                       1
++#define W_FT_PORT                       3
++#define W_FT_VNIC_ID                    17
++#define W_FT_VLAN                       17
++#define W_FT_TOS                        8
++#define W_FT_PROTOCOL                   8
++#define W_FT_ETHERTYPE                  16
++#define W_FT_MACMATCH                   9
++#define W_FT_MPSHITTYPE                 3
++#define W_FT_FRAGMENTATION              1
++
++/* Some of the Compressed Filter Tuple fields have internal structure.  These
++ * bit shifts/masks describe those structures.  All shifts are relative to the
++ * base position of the fields within the Compressed Filter Tuple
++ */
++#define S_FT_VLAN_VLD                   16
++#define V_FT_VLAN_VLD(x)                ((x) << S_FT_VLAN_VLD)
++#define F_FT_VLAN_VLD                   V_FT_VLAN_VLD(1U)
++
++#define S_FT_VNID_ID_VF                 0
++#define V_FT_VNID_ID_VF(x)              ((x) << S_FT_VNID_ID_VF)
++
++#define S_FT_VNID_ID_PF                 7
++#define V_FT_VNID_ID_PF(x)              ((x) << S_FT_VNID_ID_PF)
++
++#define S_FT_VNID_ID_VLD                16
++#define V_FT_VNID_ID_VLD(x)             ((x) << S_FT_VNID_ID_VLD)
++
+ #endif /* __T4_REGS_H */
+-- 
+1.7.1
+

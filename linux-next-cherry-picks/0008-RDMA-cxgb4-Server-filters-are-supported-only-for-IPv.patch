@@ -1,0 +1,29 @@
+From 8c04469057c3307d92d2c7076edcf9eb8f752bca Mon Sep 17 00:00:00 2001
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Date: Wed, 18 Dec 2013 16:38:25 +0530
+Subject: [PATCH] RDMA/cxgb4: Server filters are supported only for IPv4
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/infiniband/hw/cxgb4/cm.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 02c7515..bfd4ed7 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -2938,7 +2938,8 @@ int c4iw_create_listen(struct iw_cm_id *cm_id, int backlog)
+ 	/*
+ 	 * Allocate a server TID.
+ 	 */
+-	if (dev->rdev.lldi.enable_fw_ofld_conn)
++	if (dev->rdev.lldi.enable_fw_ofld_conn &&
++	    ep->com.local_addr.ss_family == AF_INET)
+ 		ep->stid = cxgb4_alloc_sftid(dev->rdev.lldi.tids,
+ 					     cm_id->local_addr.ss_family, ep);
+ 	else
+-- 
+1.7.1
+
