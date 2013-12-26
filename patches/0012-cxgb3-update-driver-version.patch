@@ -1,0 +1,13 @@
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/version.h b/drivers/net/ethernet/chelsio/cxgb3/version.h
+index 165bfb9..1cfffe2 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/version.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/version.h
+@@ -35,7 +35,7 @@
+ #define DRV_DESC "Chelsio T3 Network Driver"
+ #define DRV_NAME "cxgb3"
+ /* Driver version */
+-#define DRV_VERSION "1.1.5-ko"
++#define DRV_VERSION "1.1.5-ofed"
+ 
+ /* Firmware version */
+ #define FW_VERSION_MAJOR 7
