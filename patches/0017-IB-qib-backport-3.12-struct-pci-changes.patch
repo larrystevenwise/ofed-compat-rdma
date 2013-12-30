@@ -1,0 +1,72 @@
+Deal with struct pci changes.
+
+From: Dennis Dalessandro <dennis.dalessandro@intel.com>
+
+
+---
+ drivers/infiniband/hw/qib/qib_pcie.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
+index 3f14009..340845c 100644
+--- a/drivers/infiniband/hw/qib/qib_pcie.c
++++ b/drivers/infiniband/hw/qib/qib_pcie.c
+@@ -283,12 +283,20 @@ int qib_pcie_params(struct qib_devdata *dd, u32 minw, u32 *nent,
+ 		goto bail;
+ 	}
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
++	pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSIX);
++#else
+ 	pos = dd->pcidev->msix_cap;
++#endif
+ 	if (nent && *nent && pos) {
+ 		qib_msix_setup(dd, pos, nent, entry);
+ 		ret = 0; /* did it, either MSIx or INTx */
+ 	} else {
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
++		pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSI);
++#else
+ 		pos = dd->pcidev->msi_cap;
++#endif		
+ 		if (pos)
+ 			ret = qib_msi_setup(dd, pos);
+ 		else
+@@ -357,7 +365,11 @@ int qib_reinit_intr(struct qib_devdata *dd)
+ 	if (!dd->msi_lo)
+ 		goto bail;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
++	pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSI);
++#else
+ 	pos = dd->pcidev->msi_cap;
++#endif
+ 	if (!pos) {
+ 		qib_dev_err(dd,
+ 			"Can't find MSI capability, can't restore MSI settings\n");
+@@ -425,8 +437,12 @@ void qib_enable_intx(struct pci_dev *pdev)
+ 	new = cw & ~PCI_COMMAND_INTX_DISABLE;
+ 	if (new != cw)
+ 		pci_write_config_word(pdev, PCI_COMMAND, new);
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
+ 
++	pos = pci_find_capability(pdev, PCI_CAP_ID_MSI);
++#else
+ 	pos = pdev->msi_cap;
++#endif	
+ 	if (pos) {
+ 		/* then turn off MSI */
+ 		pci_read_config_word(pdev, pos + PCI_MSI_FLAGS, &cw);
+@@ -434,7 +450,12 @@ void qib_enable_intx(struct pci_dev *pdev)
+ 		if (new != cw)
+ 			pci_write_config_word(pdev, pos + PCI_MSI_FLAGS, new);
+ 	}
++	
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,12,0))
++	pos = pci_find_capability(pdev, PCI_CAP_ID_MSIX);
++#else
+ 	pos = pdev->msix_cap;
++#endif
+ 	if (pos) {
+ 		/* then turn off MSIx */
+ 		pci_read_config_word(pdev, pos + PCI_MSIX_FLAGS, &cw);
