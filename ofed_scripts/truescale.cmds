@@ -1,3 +1,4 @@
+# Copyright (c) 2013 Intel Corporation. All rights reserved.
 # Copyright (c) 2010 QLogic Corporation.
 # All rights reserved.
 #
@@ -38,6 +39,15 @@
 qb=/sys/class/infiniband/qib
 ir=/proc/irq
 serdes_parm=txselect
+service="/etc/init.d/irqbalance"
+irqbalance_conf=/etc/sysconfig/irqbalance
+OPENIBD_CONFIG=${OPENIBD_CONFIG:-"/etc/infiniband/openib.conf"}
+CONFIG=$OPENIBD_CONFIG
+
+if [ -f $CONFIG ]
+then
+	. $CONFIG
+fi
 
 warn_and_log()
 {
@@ -162,7 +172,14 @@ setup_qmh()
 setup_qme()
 {
     local parm parmf sn pbase
-    local -i nunit=0 bay idx
+    local -i nunit=0 bay idx bpver=${QIB_QME_BPVER:1}
+    local -a bp0_idx bp1_idx set
+
+    # tx settings for Dell Backplane v1.0
+    bp0_idx=( 0 22 23 24 25 26 24 27 28 22 23 24 25 26 24 27 28 )
+    # tx settings for Dell Backplane v1.1
+    bp1_idx=( 0 29 29 30 31 32 33 30 29 29 29 30 31 32 33 30 29 )
+    
     for parm in parameters/${serdes_parm} ${serdes_parm}; do
 	if [ -e /sys/module/ib_qib/$parm ]; then
 		parmf=/sys/module/ib_qib/$parm
@@ -178,31 +195,34 @@ setup_qme()
     parm=( $(echo ${qb}*) )
     nunit=${#parm[*]}
 
+    if [ -e /sys/module/ib_qib/parameters/qme_bp ]; then
+	read bpver < /sys/module/ib_qib/parameters/qme_bp
+	if [ ${bpver} -ne 0 -a ${bpver} -ne 1 ]; then
+	    warn_and_log "Invalid Dell backplane version (${bpver}). Defaulting to 1."
+	    bpver=1
+	fi
+    fi
+    eval 'set=( ${bp'${bpver}'_idx[@]} )'
+
     # we get two serial numbers normally, use 2nd if present, else first
     sn="$(dmidecode -t 2 | grep -i serial | tail -1)"
     case ${sn} in
-    *[sS]erial\ [nN]umber*)
-      bay="$(echo $sn | sed -e 's/\.$//' -e 's/.*\.0*//')"
-      case $bay in
-      1) idx=22 ;;
-      2|10|15) idx=20 ;;
-      3|7|11|12|13|14) idx=26 ;;
-      4) idx=25 ;;
-      5|6) idx=24 ;;
-      8) idx=21 ;;
-      9|16) idx=23 ;;
-      *) warn_and_log Unexpected QME7342 bay info: ${sn}, no Tx params
-	return;;
-      esac
-      # H1 is same for all QME bays, so no need to specify.
-      while [ $nunit -ne 0 ]; do
-	    (( nunit-- ))
-	    pbase="${pbase} ${nunit},1=${idx} ${nunit},2=${idx}"
-      done
-      echo -n ${pbase} > $parmf
-      ;;
-    *) warn_and_log No QME7342 bay information, no Tx params
-      return;;
+	*[sS]erial\ [nN]umber*)
+	    bay="$(echo $sn | sed -e 's/\.$//' -e 's/.*\.0*//' -e 's/[abcd]$//')"
+	    if [ ${bay} -gt ${#set[@]} ]; then
+		warn_and_log Unexpected QME7342 bay info: ${sn}, no Tx params
+		return
+	    fi
+	    idx=${set[bay]}
+	    # H1 is same for all QME bays, so no need to specify.
+	    while [ $nunit -ne 0 ]; do
+		(( nunit-- ))
+		pbase="${pbase} ${nunit},1=${idx} ${nunit},2=${idx}"
+	    done
+	    echo -n ${pbase} > $parmf
+	    ;;
+	*) warn_and_log No QME7342 bay information, no Tx params
+	    return;;
     esac
 }
 
@@ -225,19 +245,38 @@ set_irq_affinity()
     local -a irqs cpulist
     local -i nunits=0 idx=1 unit=0 firstcore=1 irq=0 balance=0 \
 	minor=0 is_el6=0
-    local cpus= mask= pcibus= irqtype= kver=
+    local cpus= mask= pcibus= irqtype= kver= banned= prevbanned= tbanned=
 
     kver=$(uname -r | sed -re 's/([0-9]*\.[0-9]*\.[0-9]*).*/\1/g')
     minor=$(echo ${kver} | cut -d. -f3)
     [ -n "$(uname -r | grep ${kver}'.*el6.*')" ] && is_el6=1
     [ -n "$(ps aux | grep irqbalance | grep -v grep | awk '{print $2}')" ] && \
 	balance=1
-
-    if [[ ${balance} -eq 0 ]] && \
-	[[ ${minor} -ge 36 || ${is_el6} -eq 1 ]]; then
+    
+    if [ ${balance} -eq 1 ]; then
+	# stop irqbalance
+	if [ ! -f ${service} ]; then
+	    if [ -f /usr/sbin/irqbalance ]; then
+		# Deal with different names for the irqbalance service on
+		# different distros
+		service=$(rpm -ql $(rpm -qf /usr/sbin/irqbalance) 2>/dev/null | \
+		    grep /etc/init.d)
+	    fi
+	fi
+	
+	if [ -n "${service}" ]; then
+	    ${service} stop 2>/dev/null
+	    [ ${?} -ne 0 ] && balance=0
+	else
+	    balance=0
+	fi
+    fi
+    
+    if [[ ${minor} -ge 36 || ${is_el6} -eq 1 ]]; then
 	# irqbalance is off and we are running on a kernel which
 	# supports the irq affinity hint
 	irqs=$(grep 'ib_qib' /proc/interrupts | sed -re 's/([0-9]*):.*/\1/g')
+	banned=$(echo $irqs)
 	for irq in ${irqs}; do
 	    if [ -e ${ir}/${irq}/affinity_hint ]; then
 		mask=$(cat ${ir}/${irq}/affinity_hint)
@@ -256,7 +295,8 @@ set_irq_affinity()
 	    else
 		cpulist=( $(get_localcpus $(dirname ${pcibus})/local_cpus) )
 	    fi
-	    if [ ${#cpulist[*]} -eq 0 -o ${#cpulist[*]} -eq $(grep -c processor /proc/cpuinfo) ]; then
+	    if [ ${#cpulist[*]} -eq 0 -o \
+		${#cpulist[*]} -eq $(grep -c processor /proc/cpuinfo) ]; then
 		cpulist=( $(get_localcpus /sys/devices/system/cpu/cpu0/topology/core_siblings) )
 		if [ ${#cpulist[*]} -eq 0 ]; then
 		    warn_and_log Could not find local CPUs for Unit${unit}.
@@ -266,24 +306,91 @@ set_irq_affinity()
 
 	    idx=${firstcore}
 	    irqs=$(grep 'ib_qib'${unit} /proc/interrupts)
-	    echo "${irqs}" | while read L; do
-		irq=$(echo ${L} | sed -re 's/([0-9]*):.*/\1/g')
-		irqtype=$(echo ${L} | \
-		    sed -re 's/.*ib_qib[0-9]*\ ?\(?([A-Za-z0-9]*)?.*?\)?.*?/\1/g')
-		if [ X${irqtype} == Xkctx ]; then
-		    mask=$(( 2 ** ${cpulist[${idx}]} ))
-		    (( idx++ ))
-		    [ ${idx} -gt $(( ${#cpulist[*]}-${firstcore} )) ] && \
-			idx=${firstcore}
-		else
-		    mask=$(( 2 ** ${cpulist[0]} ))
-		fi
-		printf "%x" ${mask} > ${ir}/${irq}/smp_affinity	    
-	    done
+	    banned=$(echo "${irqs}" | (b= ; while read L; do
+			irq=$(echo ${L} | sed -re 's/([0-9]*):.*/\1/g')
+			[ -z "${b}" ] && b="${irq}" || b="${b} ${irq}"
+			irqtype=$(echo ${L} | \
+			    sed -re 's/.*ib_qib[0-9]*\ ?\(?([A-Za-z0-9]*)?.*?\)?.*?/\1/g')
+			if [ X${irqtype} == Xkctx ]; then
+			    mask=$(( 2 ** ${cpulist[${idx}]} ))
+			    (( idx++ ))
+			    [ ${idx} -gt $(( ${#cpulist[*]}-${firstcore} )) ] && \
+				idx=${firstcore}
+			else
+			    mask=$(( 2 ** ${cpulist[0]} ))
+			fi
+			printf "%x" ${mask} > ${ir}/${irq}/smp_affinity	    
+		    done; echo ${b}))
 	done
     fi
+
     
+    if [ ${balance} -eq 1 ]; then
+	if [ -f ${irqbalance_conf} ]; then
+	    prevbanned="$(grep IRQBALANCE_BANNED_INTERRUPTS ${irqbalance_conf})"
+	    prevbanned=$( (eval "${prevbanned}"; echo $IRQBALANCE_BANNED_INTERRUPTS) )
+	    [ -n "${prevbanned}" ] && banned="${prevbanned} ${banned}"
+	fi
+	
+	sed -ie '/^IRQBALANCE_BANNED_INTERRUPTS=/d' ${irqbalance_conf}
+	tbanned=$(for i in $banned; do
+	    echo $i
+	done | sort | uniq)
+	banned=$(echo $tbanned)
+	echo "IRQBALANCE_BANNED_INTERRUPTS=\"${banned}\"" >> \
+	    ${irqbalance_conf}
+
+	${service} start
+    fi
     return
+}
+
+clean_irq_affinity()
+{
+    local irqs= banned= prevbanned=
+    local -i balance=0
+    
+    [ -n "$(ps aux | grep irqbalance | grep -v grep | awk '{print $2}')" ] && \
+	balance=1
+    
+    if [ ${balance} -eq 1 ]; then
+	# stop irqbalance
+	if [ ! -f ${service} ]; then
+	    if [ -f /usr/sbin/irqbalance ]; then
+		# Deal with different names for the irqbalance service on
+		# different distros
+		service=$(rpm -ql $(rpm -qf /usr/sbin/irqbalance) 2>/dev/null | \
+		    grep /etc/init.d)
+	    fi
+	fi
+	
+	if [ -n "${service}" ]; then
+	    ${service} stop 2>/dev/null
+	    [ ${?} -ne 0 ] && balance=0
+	else
+	    balance=0
+	fi
+    fi
+
+    irqs=$(grep 'ib_qib' /proc/interrupts | sed -re 's/([0-9]*):.*/\1/g')
+    
+    if [ -f ${irqbalance_conf} ]; then
+	banned="$(grep IRQBALANCE_BANNED_INTERRUPTS ${irqbalance_conf})"
+	banned=$( (eval "${banned}"; echo $IRQBALANCE_BANNED_INTERRUPTS) )
+	for irq in ${irqs}; do
+	    banned="$(echo "${banned}" | sed -e 's/'$irq'//g')"
+	done
+	banned="$(echo ${banned} | sed -e 's/\ */\ /g')"
+	sed -ie '/^IRQBALANCE_BANNED_INTERRUPTS=/d' ${irqbalance_conf}
+	if [ -n "${banned}" -a "X${banned}" != "X " ]; then
+	    echo "IRQBALANCE_BANNED_INTERRUPTS=${banned}" >> \
+		${irqbalance_conf}
+	fi
+    fi
+
+    if [ ${balance} -eq 1 ]; then
+	${service} start
+    fi
 }
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
@@ -306,13 +413,22 @@ start)
 	mount -t ipathfs none /ipathfs
 
 	# make sure /dev/ipath files get created with correct permissions
-	if [ ! -c /dev/ipath ]; then sleep 2; fi
-	if [ ! -c /dev/ipath ]; then sleep 3; fi
-	chmod 666 /dev/ipath /dev/ipath[0-9]* >/dev/null 2>&1
+	typeset -i timeout=30 count=0
+	while [ $((count++)) -lt $timeout ]; do
+	    if [ -c /dev/ipath ]; then
+		chmod 666 /dev/ipath /dev/ipath[0-9]* >/dev/null 2>&1
+		break
+	    fi
+	    sleep 1
+	done
+	if [ $count -ge $timeout ]; then
+	    warn_and_log Failed to modify permissions on /dev/ipath\* files
+	fi
 	
 	set_irq_affinity
 	;;
 stop)
+	clean_irq_affinity
 	if [ -d /ipathfs ]; then
 		umount /ipathfs
 		rmdir /ipathfs

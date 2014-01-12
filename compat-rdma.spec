@@ -432,6 +432,8 @@ fi
        echo >> %{RDMA_CONF_DIR}/openib.conf
        echo "# Load QIB" >> %{RDMA_CONF_DIR}/openib.conf
        echo "QIB_LOAD=yes" >> %{RDMA_CONF_DIR}/openib.conf
+       echo "# QIB QME BP VER" >> %{RDMA_CONF_DIR}/openib.conf
+       echo "QIB_QME_BPVER=1" >> %{RDMA_CONF_DIR}/openib.conf
 %endif
 
 %if %{build_ipath}
