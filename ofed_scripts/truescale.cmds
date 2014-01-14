@@ -469,44 +469,49 @@ clean_irq_affinity()
 }
 
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
+has_qib=$(lspci -n 2>/dev/null | grep -i "1077\|1fc1")
 
 case "$1" in
 start)
-	has_qmh7342=$(grep QMH7342 ${qb}*/hca_type 2>/dev/null)
-	if [ "${has_qmh7342}" ]; then
+	if [ "${has_qib}" ]; then
+	    has_qmh7342=$(grep QMH7342 ${qb}*/hca_type 2>/dev/null)
+	    if [ "${has_qmh7342}" ]; then
 		setup_qmh
-	else
+	    else
 		has_qme7342=$(grep QME7342 ${qb}*/hca_type 2>/dev/null)
 		if [ "${has_qme7342}" ]; then
 		    setup_qme
 		fi
-	fi
-
-	umount /ipathfs >/dev/null 2>&1
-	rm -rf /ipathfs
-	mkdir -p -m 755 /ipathfs 2>&1
-	mount -t ipathfs none /ipathfs
-
-	# make sure /dev/ipath files get created with correct permissions
-	typeset -i timeout=30 count=0
-	while [ $((count++)) -lt $timeout ]; do
-	    if [ -c /dev/ipath ]; then
-		chmod 666 /dev/ipath /dev/ipath[0-9]* >/dev/null 2>&1
-		break
 	    fi
-	    sleep 1
-	done
-	if [ $count -ge $timeout ]; then
-	    warn_and_log Failed to modify permissions on /dev/ipath\* files
+	    
+	    umount /ipathfs >/dev/null 2>&1
+	    rm -rf /ipathfs
+	    mkdir -p -m 755 /ipathfs 2>&1
+	    mount -t ipathfs none /ipathfs
+
+            # make sure /dev/ipath files get created with correct permissions
+	    typeset -i timeout=30 count=0
+	    while [ $((count++)) -lt $timeout ]; do
+		if [ -c /dev/ipath ]; then
+		    chmod 666 /dev/ipath /dev/ipath[0-9]* >/dev/null 2>&1
+		    break
+		fi
+		sleep 1
+	    done
+	    if [ $count -ge $timeout ]; then
+		warn_and_log Failed to modify permissions on /dev/ipath\* files
+	    fi
+	    
+	    set_irq_affinity
 	fi
-	
-	set_irq_affinity
 	;;
 stop)
-	clean_irq_affinity
-	if [ -d /ipathfs ]; then
+	if [ "${has_qib}" ]; then
+	    clean_irq_affinity
+	    if [ -d /ipathfs ]; then
 		umount /ipathfs
 		rmdir /ipathfs
+	    fi
 	fi
 	;;
 esac
