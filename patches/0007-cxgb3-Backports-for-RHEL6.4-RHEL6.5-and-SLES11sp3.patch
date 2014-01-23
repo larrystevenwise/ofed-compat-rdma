@@ -1,5 +1,21 @@
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Subject: [PATCH] cxgb3: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb3/adapter.h       |   19 +++
+ drivers/net/ethernet/chelsio/cxgb3/common.h        |    3 +
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  118 +++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |  107 ++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb3/l2t.c           |    9 ++
+ drivers/net/ethernet/chelsio/cxgb3/l2t.h           |    5 +
+ drivers/net/ethernet/chelsio/cxgb3/sge.c           |   46 ++++++++
+ drivers/net/ethernet/chelsio/cxgb3/t3_hw.c         |    4 +
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 +++-
+ 9 files changed, 325 insertions(+), 3 deletions(-)
+
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
-index 8b395b5..27bd384 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/adapter.h
 +++ b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
 @@ -45,10 +45,20 @@
@@ -49,7 +65,7 @@ index 8b395b5..27bd384 100644
  	struct net_device *netdev;
  	struct netdev_queue *tx_q;	/* associated netdev TX queue */
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/common.h b/drivers/net/ethernet/chelsio/cxgb3/common.h
-index 8c82248..97bd0a7 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/common.h
 +++ b/drivers/net/ethernet/chelsio/cxgb3/common.h
 @@ -316,6 +316,9 @@ struct tp_params {
@@ -63,10 +79,10 @@ index 8c82248..97bd0a7 100644
  	unsigned int rspq_size;	/* # of entries in response queue */
  	unsigned int fl_size;	/* # of entries in regular free list */
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-index b650951..df32cc5 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-@@ -647,6 +647,28 @@ static void enable_all_napi(struct adapter *adap)
+@@ -648,6 +648,28 @@ static void enable_all_napi(struct adapter *adap)
  			napi_enable(&adap->sge.qs[i].napi);
  }
  
@@ -95,7 +111,7 @@ index b650951..df32cc5 100644
  /**
   *	setup_sge_qsets - configure SGE Tx/Rx/response queues
   *	@adap: the adapter
-@@ -1174,6 +1196,7 @@ static void t3_synchronize_rx(struct adapter *adap, const struct port_info *p)
+@@ -1175,6 +1197,7 @@ static void t3_synchronize_rx(struct adapter *adap, const struct port_info *p)
  	}
  }
  
@@ -103,7 +119,7 @@ index b650951..df32cc5 100644
  static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
  {
  	struct port_info *pi = netdev_priv(dev);
-@@ -1195,6 +1218,27 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
+@@ -1196,6 +1219,27 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
  	}
  	t3_synchronize_rx(adapter, pi);
  }
@@ -131,7 +147,7 @@ index b650951..df32cc5 100644
  
  /**
   *	cxgb_up - enable the adapter
-@@ -1208,7 +1252,10 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
+@@ -1209,7 +1253,10 @@ static void cxgb_vlan_mode(struct net_device *dev, netdev_features_t features)
   */
  static int cxgb_up(struct adapter *adap)
  {
@@ -143,7 +159,7 @@ index b650951..df32cc5 100644
  
  	if (!(adap->flags & FULL_INIT_DONE)) {
  		err = t3_check_fw_version(adap);
-@@ -1245,8 +1292,10 @@ static int cxgb_up(struct adapter *adap)
+@@ -1246,8 +1293,10 @@ static int cxgb_up(struct adapter *adap)
  		if (err)
  			goto out;
  
@@ -154,7 +170,7 @@ index b650951..df32cc5 100644
  
  		setup_rss(adap);
  		if (!(adap->flags & NAPI_INIT))
-@@ -1775,6 +1824,7 @@ static int restart_autoneg(struct net_device *dev)
+@@ -1776,6 +1825,7 @@ static int restart_autoneg(struct net_device *dev)
  	return 0;
  }
  
@@ -162,7 +178,7 @@ index b650951..df32cc5 100644
  static int set_phys_id(struct net_device *dev,
  		       enum ethtool_phys_id_state state)
  {
-@@ -1797,6 +1847,28 @@ static int set_phys_id(struct net_device *dev,
+@@ -1798,6 +1848,28 @@ static int set_phys_id(struct net_device *dev,
  
  	return 0;
  }
@@ -191,7 +207,7 @@ index b650951..df32cc5 100644
  
  static int get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
  {
-@@ -2110,7 +2182,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+@@ -2111,7 +2183,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
  	.set_pauseparam = set_pauseparam,
  	.get_link = ethtool_op_get_link,
  	.get_strings = get_strings,
@@ -203,7 +219,7 @@ index b650951..df32cc5 100644
  	.nway_reset = restart_autoneg,
  	.get_sset_count = get_sset_count,
  	.get_ethtool_stats = get_stats,
-@@ -2225,6 +2301,7 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+@@ -2226,6 +2302,7 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
  			}
  		}
  
@@ -211,7 +227,7 @@ index b650951..df32cc5 100644
  		if (t.lro >= 0) {
  			if (t.lro)
  				dev->wanted_features |= NETIF_F_GRO;
-@@ -2232,6 +2309,10 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
+@@ -2233,6 +2310,10 @@ static int cxgb_extension_ioctl(struct net_device *dev, void __user *useraddr)
  				dev->wanted_features &= ~NETIF_F_GRO;
  			netdev_update_features(dev);
  		}
@@ -222,7 +238,7 @@ index b650951..df32cc5 100644
  
  		break;
  	}
-@@ -2557,6 +2638,7 @@ static int cxgb_set_mac_addr(struct net_device *dev, void *p)
+@@ -2558,6 +2639,7 @@ static int cxgb_set_mac_addr(struct net_device *dev, void *p)
  	return 0;
  }
  
@@ -230,7 +246,7 @@ index b650951..df32cc5 100644
  static netdev_features_t cxgb_fix_features(struct net_device *dev,
  	netdev_features_t features)
  {
-@@ -2581,6 +2663,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+@@ -2582,6 +2664,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
  
  	return 0;
  }
@@ -238,7 +254,7 @@ index b650951..df32cc5 100644
  
  #ifdef CONFIG_NET_POLL_CONTROLLER
  static void cxgb_netpoll(struct net_device *dev)
-@@ -3042,11 +3125,19 @@ static void t3_io_resume(struct pci_dev *pdev)
+@@ -3043,11 +3126,19 @@ static void t3_io_resume(struct pci_dev *pdev)
  	rtnl_unlock();
  }
  
@@ -258,7 +274,7 @@ index b650951..df32cc5 100644
  
  /*
   * Set the number of qsets based on the number of CPUs and the number of ports,
-@@ -3162,8 +3253,12 @@ static const struct net_device_ops cxgb_netdev_ops = {
+@@ -3163,8 +3254,12 @@ static const struct net_device_ops cxgb_netdev_ops = {
  	.ndo_do_ioctl		= cxgb_ioctl,
  	.ndo_change_mtu		= cxgb_change_mtu,
  	.ndo_set_mac_address	= cxgb_set_mac_addr,
@@ -271,7 +287,7 @@ index b650951..df32cc5 100644
  #ifdef CONFIG_NET_POLL_CONTROLLER
  	.ndo_poll_controller	= cxgb_netpoll,
  #endif
-@@ -3290,14 +3385,35 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+@@ -3291,14 +3386,35 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
  		netdev->irq = pdev->irq;
  		netdev->mem_start = mmio_start;
  		netdev->mem_end = mmio_start + mmio_len - 1;
@@ -308,10 +324,10 @@ index b650951..df32cc5 100644
  		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
  	}
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-index 76ae099..3033d05 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-@@ -64,8 +64,14 @@ static const unsigned int MAX_ATIDS = 64 * 1024;
+@@ -65,8 +65,14 @@ static const unsigned int MAX_ATIDS = 64 * 1024;
  static const unsigned int ATID_BASE = 0x10000;
  
  static void cxgb_neigh_update(struct neighbour *neigh);
@@ -327,7 +343,7 @@ index 76ae099..3033d05 100644
  
  static inline int offload_activated(struct t3cdev *tdev)
  {
-@@ -180,18 +186,36 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
+@@ -181,18 +187,36 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
  	int i;
  
  	for_each_port(adapter, i) {
@@ -364,7 +380,7 @@ index 76ae099..3033d05 100644
  			}
  			rcu_read_unlock();
  			return dev;
-@@ -969,9 +993,14 @@ static int nb_callback(struct notifier_block *self, unsigned long event,
+@@ -970,9 +994,14 @@ static int nb_callback(struct notifier_block *self, unsigned long event,
  	}
  	case (NETEVENT_REDIRECT):{
  		struct netevent_redirect *nr = ctx;
@@ -379,7 +395,7 @@ index 76ae099..3033d05 100644
  		break;
  	}
  	default:
-@@ -1107,6 +1136,7 @@ static void set_l2t_ix(struct t3cdev *tdev, u32 tid, struct l2t_entry *e)
+@@ -1108,6 +1137,7 @@ static void set_l2t_ix(struct t3cdev *tdev, u32 tid, struct l2t_entry *e)
  	tdev->send(tdev, skb);
  }
  
@@ -387,7 +403,7 @@ index 76ae099..3033d05 100644
  static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new,
  			  struct neighbour *neigh,
  			  const void *daddr)
-@@ -1127,7 +1157,11 @@ static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new,
+@@ -1128,7 +1158,11 @@ static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new,
  	BUG_ON(!tdev);
  
  	/* Add new L2T entry */
@@ -399,7 +415,7 @@ index 76ae099..3033d05 100644
  	if (!e) {
  		pr_err("%s: couldn't allocate new l2t entry!\n", __func__);
  		return;
-@@ -1150,6 +1184,77 @@ static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new,
+@@ -1151,6 +1185,77 @@ static void cxgb_redirect(struct dst_entry *old, struct dst_entry *new,
  	}
  	l2t_release(tdev, e);
  }
@@ -478,7 +494,7 @@ index 76ae099..3033d05 100644
  /*
   * Allocate a chunk of memory using kmalloc or, if that fails, vmalloc.
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/l2t.c b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
-index 8d53438..ea9bd19 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/l2t.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/l2t.c
 @@ -298,8 +298,13 @@ static inline void reuse_entry(struct l2t_entry *e, struct neighbour *neigh)
@@ -508,7 +524,7 @@ index 8d53438..ea9bd19 100644
  		goto done_rcu;
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/l2t.h b/drivers/net/ethernet/chelsio/cxgb3/l2t.h
-index 8cffcdf..1db5a71 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/l2t.h
 +++ b/drivers/net/ethernet/chelsio/cxgb3/l2t.h
 @@ -109,8 +109,13 @@ static inline void set_arp_failure_handler(struct sk_buff *skb,
@@ -526,7 +542,7 @@ index 8cffcdf..1db5a71 100644
  		     struct l2t_entry *e);
  void t3_l2t_send_event(struct t3cdev *dev, struct l2t_entry *e);
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
-index 9c89dc8..9414ae0 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c
 @@ -2019,7 +2019,11 @@ static void rx_eth(struct adapter *adap, struct sge_rspq *rq,
@@ -615,7 +631,7 @@ index 9c89dc8..9414ae0 100644
  }
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/t3_hw.c b/drivers/net/ethernet/chelsio/cxgb3/t3_hw.c
-index c74a898..83103f0 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/t3_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/t3_hw.c
 @@ -3307,7 +3307,11 @@ static void config_pcie(struct adapter *adap)
@@ -631,7 +647,7 @@ index c74a898..83103f0 100644
  	rpllmt = rpl_tmr[log2_width][pldsize] + fst_trn_rx * 4;
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
-index 3af19a5..b3c99fd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/xgmac.c
 @@ -311,17 +311,32 @@ int t3_mac_set_rx_mode(struct cmac *mac, struct net_device *dev)

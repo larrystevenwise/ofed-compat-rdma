@@ -1,14 +1,13 @@
-Work around new idr style
-
 From: Dennis Dalessandro <dennis.dalessandro@intel.com>
+Subject: [PATCH] Work around new idr style
 
-
+Signed-off-by: Dennis Dalessandro <dennis.dalessandro@intel.com>
 ---
  drivers/infiniband/hw/qib/qib_init.c |   23 +++++++++++++++++++++--
  1 files changed, 21 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_init.c b/drivers/infiniband/hw/qib/qib_init.c
-index 24e802f..6dcb460 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/qib/qib_init.c
 +++ b/drivers/infiniband/hw/qib/qib_init.c
 @@ -1096,6 +1096,12 @@ struct qib_devdata *qib_alloc_devdata(struct pci_dev *pdev, size_t extra)

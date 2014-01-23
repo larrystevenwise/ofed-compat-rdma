@@ -77,4 +77,4 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#endif
  	.kill_sb =	ipathfs_kill_super,
  };
- 
+ MODULE_ALIAS_FS("ipathfs");

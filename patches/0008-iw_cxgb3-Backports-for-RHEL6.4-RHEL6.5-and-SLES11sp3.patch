@@ -1,5 +1,14 @@
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Subject: [PATCH] iw_cxgb3: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb3/iwch.h    |   17 +++++++++++++-
+ drivers/infiniband/hw/cxgb3/iwch_cm.c |   39 +++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletions(-)
+
 diff --git a/drivers/infiniband/hw/cxgb3/iwch.h b/drivers/infiniband/hw/cxgb3/iwch.h
-index 8378622..470527f 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb3/iwch.h
 +++ b/drivers/infiniband/hw/cxgb3/iwch.h
 @@ -153,7 +153,7 @@ static inline int insert_handle(struct iwch_dev *rhp, struct idr *idr,
@@ -34,7 +43,7 @@ index 8378622..470527f 100644
  
  static inline void remove_handle(struct iwch_dev *rhp, struct idr *idr, u32 id)
 diff --git a/drivers/infiniband/hw/cxgb3/iwch_cm.c b/drivers/infiniband/hw/cxgb3/iwch_cm.c
-index 095bb04..320ea47 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb3/iwch_cm.c
 +++ b/drivers/infiniband/hw/cxgb3/iwch_cm.c
 @@ -337,12 +337,33 @@ static struct rtable *find_route(struct t3cdev *dev, __be32 local_ip,

@@ -1,8 +1,18 @@
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Subject: [PATCH] cxgb4: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |   17 ++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  208 ++++++++++++++++++++---
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  108 ++++++++++++
+ 3 files changed, 308 insertions(+), 25 deletions(-)
+
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 6154404..ad01c8b 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -367,6 +367,9 @@ struct sge_rspq;
+@@ -309,6 +309,9 @@ struct sge_rspq;
  
  struct port_info {
  	struct adapter *adapter;
@@ -12,7 +22,7 @@ index 6154404..ad01c8b 100644
  	u16    viid;
  	s16    xact_addr_filt;        /* index of exact MAC address filter */
  	u16    rss_size;              /* size of VI's RSS table slice */
-@@ -376,6 +379,9 @@ struct port_info {
+@@ -318,6 +321,9 @@ struct port_info {
  	u8     port_id;
  	u8     tx_chan;
  	u8     lport;                 /* associated offload logical port */
@@ -22,7 +32,7 @@ index 6154404..ad01c8b 100644
  	u8     nqsets;                /* # of qsets */
  	u8     first_qset;            /* index of first qset */
  	u8     rss_mode;
-@@ -383,6 +389,13 @@ struct port_info {
+@@ -325,6 +331,13 @@ struct port_info {
  	u16   *rss;
  };
  
@@ -36,7 +46,7 @@ index 6154404..ad01c8b 100644
  struct dentry;
  struct work_struct;
  
-@@ -417,7 +430,11 @@ struct sge_fl {                     /* SGE free-buffer queue state */
+@@ -359,7 +372,11 @@ struct sge_fl {                     /* SGE free-buffer queue state */
  
  /* A packet gather list */
  struct pkt_gl {
@@ -49,7 +59,7 @@ index 6154404..ad01c8b 100644
  	unsigned int nfrags;              /* # of fragments */
  	unsigned int tot_len;             /* total length of fragments */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 4c3c875..846cc48 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -70,8 +70,6 @@
@@ -103,7 +113,7 @@ index 4c3c875..846cc48 100644
  			ret = t4_alloc_mac_filt(pi->adapter, mb, pi->viid, free,
  					naddr, addr, filt_idx, &mhash, sleep);
  			if (ret < 0)
-@@ -2682,10 +2697,19 @@ static int set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
+@@ -2748,10 +2763,19 @@ static int set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
  	return err;
  }
  
@@ -123,7 +133,7 @@ index 4c3c875..846cc48 100644
  	int err;
  
  	if (!(changed & NETIF_F_HW_VLAN_CTAG_RX))
-@@ -2698,14 +2722,55 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+@@ -2764,14 +2788,55 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
  		dev->features = features ^ NETIF_F_HW_VLAN_CTAG_RX;
  	return err;
  }
@@ -179,7 +189,7 @@ index 4c3c875..846cc48 100644
  static int get_rss_table(struct net_device *dev, u32 *p)
  {
  	const struct port_info *pi = netdev_priv(dev);
-@@ -2727,9 +2792,14 @@ static int set_rss_table(struct net_device *dev, const u32 *p)
+@@ -2793,9 +2858,14 @@ static int set_rss_table(struct net_device *dev, const u32 *p)
  		return write_rss(pi, pi->rss);
  	return 0;
  }
@@ -194,7 +204,7 @@ index 4c3c875..846cc48 100644
  {
  	const struct port_info *pi = netdev_priv(dev);
  
-@@ -2808,7 +2878,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+@@ -2874,7 +2944,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
  	.set_pauseparam    = set_pauseparam,
  	.get_link          = ethtool_op_get_link,
  	.get_strings       = get_strings,
@@ -206,7 +216,7 @@ index 4c3c875..846cc48 100644
  	.nway_reset        = restart_autoneg,
  	.get_sset_count    = get_sset_count,
  	.get_ethtool_stats = get_stats,
-@@ -2816,10 +2890,18 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+@@ -2882,10 +2956,18 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
  	.get_regs          = get_regs,
  	.get_wol           = get_wol,
  	.set_wol           = set_wol,
@@ -225,7 +235,7 @@ index 4c3c875..846cc48 100644
  	.flash_device      = set_flash,
  };
  
-@@ -2830,7 +2912,11 @@ static ssize_t mem_read(struct file *file, char __user *buf, size_t count,
+@@ -2896,7 +2978,11 @@ static ssize_t mem_read(struct file *file, char __user *buf, size_t count,
  			loff_t *ppos)
  {
  	loff_t pos = *ppos;
@@ -237,7 +247,7 @@ index 4c3c875..846cc48 100644
  	unsigned int mem = (uintptr_t)file->private_data & 3;
  	struct adapter *adap = file->private_data - mem;
  
-@@ -3947,33 +4033,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
+@@ -3983,33 +4069,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
  	struct inet6_ifaddr *ifa = data;
  	struct net_device *event_dev;
  	int ret = NOTIFY_DONE;
@@ -271,7 +281,7 @@ index 4c3c875..846cc48 100644
  	} else
  		ret = clip_add(ifa->idev->dev, ifa, event);
  
-@@ -3999,7 +4062,11 @@ static int update_dev_clip(struct net_device *root_dev, struct net_device *dev)
+@@ -4035,7 +4098,11 @@ static int update_dev_clip(struct net_device *root_dev, struct net_device *dev)
  		return ret;
  
  	read_lock_bh(&idev->lock);
@@ -283,7 +293,7 @@ index 4c3c875..846cc48 100644
  		ret = cxgb4_clip_get(dev,
  				(const struct in6_addr *)ifa->addr.s6_addr);
  		if (ret < 0)
-@@ -4013,6 +4080,10 @@ static int update_dev_clip(struct net_device *root_dev, struct net_device *dev)
+@@ -4049,6 +4116,10 @@ static int update_dev_clip(struct net_device *root_dev, struct net_device *dev)
  static int update_root_dev_clip(struct net_device *dev)
  {
  	struct net_device *root_dev = NULL;
@@ -294,7 +304,7 @@ index 4c3c875..846cc48 100644
  	int i, ret = 0;
  
  	/* First populate the real net device's IPv6 addresses */
-@@ -4022,7 +4093,13 @@ static int update_root_dev_clip(struct net_device *dev)
+@@ -4058,7 +4129,13 @@ static int update_root_dev_clip(struct net_device *dev)
  
  	/* Parse all bond and vlan devices layered on top of the physical dev */
  	for (i = 0; i < VLAN_N_VID; i++) {
@@ -308,7 +318,7 @@ index 4c3c875..846cc48 100644
  		if (!root_dev)
  			continue;
  
-@@ -4287,6 +4364,7 @@ int cxgb4_remove_server_filter(const struct net_device *dev, unsigned int stid,
+@@ -4318,6 +4395,7 @@ int cxgb4_remove_server_filter(const struct net_device *dev, unsigned int stid,
  }
  EXPORT_SYMBOL(cxgb4_remove_server_filter);
  
@@ -316,7 +326,7 @@ index 4c3c875..846cc48 100644
  static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
  						struct rtnl_link_stats64 *ns)
  {
-@@ -4328,6 +4406,50 @@ static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
+@@ -4359,6 +4437,50 @@ static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
  		ns->rx_length_errors + stats.rx_len_err + ns->rx_fifo_errors;
  	return ns;
  }
@@ -367,7 +377,7 @@ index 4c3c875..846cc48 100644
  
  static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
  {
-@@ -4428,10 +4550,16 @@ static const struct net_device_ops cxgb4_netdev_ops = {
+@@ -4459,10 +4581,16 @@ static const struct net_device_ops cxgb4_netdev_ops = {
  	.ndo_open             = cxgb_open,
  	.ndo_stop             = cxgb_close,
  	.ndo_start_xmit       = t4_eth_xmit,
@@ -384,7 +394,7 @@ index 4c3c875..846cc48 100644
  	.ndo_validate_addr    = eth_validate_addr,
  	.ndo_do_ioctl         = cxgb_ioctl,
  	.ndo_change_mtu       = cxgb_change_mtu,
-@@ -5586,11 +5714,19 @@ static void eeh_resume(struct pci_dev *pdev)
+@@ -5555,11 +5683,19 @@ static void eeh_resume(struct pci_dev *pdev)
  	rtnl_unlock();
  }
  
@@ -404,7 +414,7 @@ index 4c3c875..846cc48 100644
  
  static inline bool is_10g_port(const struct link_config *lc)
  {
-@@ -5783,7 +5919,11 @@ static int init_rss(struct adapter *adap)
+@@ -5752,7 +5888,11 @@ static int init_rss(struct adapter *adap)
  		if (!pi->rss)
  			return -ENOMEM;
  		for (j = 0; j < pi->rss_size; j++)
@@ -416,7 +426,7 @@ index 4c3c875..846cc48 100644
  	}
  	return 0;
  }
-@@ -5855,7 +5995,9 @@ static void free_some_resources(struct adapter *adapter)
+@@ -5824,7 +5964,9 @@ static void free_some_resources(struct adapter *adapter)
  		t4_fw_bye(adapter, adapter->fn);
  }
  
@@ -426,7 +436,7 @@ index 4c3c875..846cc48 100644
  #define VLAN_FEAT (NETIF_F_SG | NETIF_F_IP_CSUM | TSO_FLAGS | \
  		   NETIF_F_IPV6_CSUM | NETIF_F_HIGHDMA)
  #define SEGMENT_SIZE 128
-@@ -5989,19 +6131,35 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+@@ -5958,19 +6100,35 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
  		pi = netdev_priv(netdev);
  		pi->adapter = adapter;
  		pi->xact_addr_filt = -1;
@@ -463,7 +473,7 @@ index 4c3c875..846cc48 100644
  		netdev->netdev_ops = &cxgb4_netdev_ops;
  		SET_ETHTOOL_OPS(netdev, &cxgb_ethtool_ops);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index cc380c3..ae3f8aa 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
 @@ -68,6 +68,11 @@
@@ -613,7 +623,7 @@ index cc380c3..ae3f8aa 100644
  	ret = napi_gro_frags(&rxq->rspq.napi);
 @@ -1663,6 +1728,9 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
  	struct sge *s = &q->adap->sge;
- 	int cpl_trace_pkt = is_t4(q->adap->params.chip) ?
+ 	int cpl_trace_pkt = is_t4(q->adap->chip) ?
  			    CPL_TRACE_PKT : CPL_TRACE_PKT_T5;
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
 +	struct port_info *pi;

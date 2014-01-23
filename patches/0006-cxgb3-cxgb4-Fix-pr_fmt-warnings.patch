@@ -1,6 +1,4 @@
-From 6e82a8471598de501464ffa6ef2d0847d438c95c Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Mon, 16 Dec 2013 13:06:47 +0530
 Subject: [PATCH] cxgb3/cxgb4: Fix pr_fmt warnings
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
@@ -11,7 +9,7 @@ Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
  3 files changed, 3 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
-index b650951..a69ebcc 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 @@ -30,6 +30,7 @@
@@ -23,7 +21,7 @@ index b650951..a69ebcc 100644
  
  #include <linux/module.h>
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
-index 76ae099..a58dd28 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
 +++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
 @@ -30,6 +30,7 @@
@@ -35,7 +33,7 @@ index 76ae099..a58dd28 100644
  
  #include <linux/list.h>
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index a9bce6b..4c3c875 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -32,6 +32,7 @@
@@ -46,6 +44,3 @@ index a9bce6b..4c3c875 100644
  #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
  #include <linux/bitmap.h>
--- 
-1.7.1
-
