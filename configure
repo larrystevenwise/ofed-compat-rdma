@@ -162,6 +162,9 @@ Usage:  `basename $0` [options]
 
     --with-ocrdma-mod    make CONFIG_INFINIBAND_OCRDMA=m [no]
     --without-ocrdma-mod    [yes]
+    
+    --with-be2net-mod    make CONFIG_BE2NET=m [no]
+    --without-be2net-mod    [yes]
 
     --with-nes_debug-mod    make CONFIG_INFINIBAND_NES_DEBUG=y [no]
     --without-nes_debug-mod    [yes]
@@ -599,9 +602,16 @@ main()
                         ;;
                         --with-ocrdma-mod)
                             CONFIG_INFINIBAND_OCRDMA="m"
+                            CONFIG_BE2NET="m"
                         ;;
                         --without-ocrdma-mod)
                             CONFIG_INFINIBAND_OCRDMA=
+                        ;;
+                        --with-be2net-mod)
+                            CONFIG_BE2NET="m"
+                        ;;
+                        --without-be2net-mod)
+                            CONFIG_BE2NET=
                         ;;
                         --with-nfsrdma-mod)
                             CONFIG_SUNRPC_XPRT_RDMA="m"
@@ -707,6 +717,7 @@ CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI:-''}
 CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI:-''}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES:-''}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA:-''}
+CONFIG_BE2NET=${CONFIG_BE2NET:-''}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA:-''} 
 CONFIG_SUNRPC=${CONFIG_SUNRPC:-''} 
@@ -824,6 +835,7 @@ CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI}
 CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA}
+CONFIG_BE2NET=${CONFIG_BE2NET}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA}
 CONFIG_SUNRPC=${CONFIG_SUNRPC}
@@ -1115,6 +1127,11 @@ if [ "X${CONFIG_INFINIBAND_OCRDMA}" == "Xm" ]; then
 else
         DEFINE_INFINIBAND_OCRDMA="#undef CONFIG_INFINIBAND_OCRDMA"
 fi
+if [ "X${CONFIG_BE2NET}" == "Xm" ]; then
+        DEFINE_BE2NET="#undef CONFIG_BE2NET\n#define CONFIG_BE2NET 1"
+else
+        DEFINE_BE2NET="#undef CONFIG_BE2NET"
+fi
 if [ "X${CONFIG_INFINIBAND_NES_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_NES_DEBUG="#undef CONFIG_INFINIBAND_NES_DEBUG\n#define CONFIG_INFINIBAND_NES_DEBUG 1"
 else
@@ -1196,6 +1213,7 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB4}" | grep -v undef)
 $(echo -e "${DEFINE_CHELSIO_T4}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}" | grep -v undef)
+$(echo -e "${DEFINE_BE2NET}" | grep -v undef)
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}" | grep -v undef)
 $(echo -e "${DEFINE_SUNRPC}" | grep -v undef)
@@ -1297,6 +1315,7 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_INFINIBAND_NES
 #undef CONFIG_INFINIBAND_NES_DEBUG
 #undef CONFIG_INFINIBAND_OCRDMA
+#undef CONFIG_BE2NET
 
 #undef CONFIG_SUNRPC_XPRT_RDMA
 #undef CONFIG_SUNRPC
@@ -1350,6 +1369,7 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB4}")
 $(echo -e "${DEFINE_CHELSIO_T4}")
 $(echo -e "${DEFINE_INFINIBAND_NES}")
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}")
+$(echo -e "${DEFINE_BE2NET}")
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}")
 $(echo -e "${DEFINE_SUNRPC}")

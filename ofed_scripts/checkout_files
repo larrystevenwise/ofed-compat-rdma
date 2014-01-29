@@ -2,6 +2,7 @@ Documentation/infiniband/
 drivers/infiniband/
 drivers/net/ethernet/chelsio/cxgb3/
 drivers/net/ethernet/chelsio/cxgb4/
+drivers/net/ethernet/emulex/benet/
 drivers/net/ethernet/mellanox/
 include/linux/mlx4/
 include/linux/mlx5/
