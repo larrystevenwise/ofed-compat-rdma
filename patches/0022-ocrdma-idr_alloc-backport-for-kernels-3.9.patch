@@ -1,0 +1,45 @@
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Subject: [PATCH] ocrdma: idr_alloc backport for kernels < 3.9
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |   18 ++++++++++++++++++
+ 1 files changed, 18 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -52,6 +52,20 @@ static DEFINE_IDR(ocrdma_dev_id);
+ 
+ static union ib_gid ocrdma_zero_sgid;
+ 
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0))
++static int ocrdma_get_instance(void)
++{
++	int instance = 0;
++
++	/* Assign an unused number */
++	if (!idr_pre_get(&ocrdma_dev_id, GFP_KERNEL))
++		return -1;
++	if (idr_get_new(&ocrdma_dev_id, NULL, &instance))
++		return -1;
++	return instance;
++}
++#endif
++
+ void ocrdma_get_guid(struct ocrdma_dev *dev, u8 *guid)
+ {
+ 	u8 mac_addr[6];
+@@ -411,7 +425,11 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
+ 		goto idr_err;
+ 
+ 	memcpy(&dev->nic_info, dev_info, sizeof(*dev_info));
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3, 9, 0))
++	dev->id = ocrdma_get_instance();
++#else
+ 	dev->id = idr_alloc(&ocrdma_dev_id, NULL, 0, 0, GFP_KERNEL);
++#endif
+ 	if (dev->id < 0)
+ 		goto idr_err;
+ 
