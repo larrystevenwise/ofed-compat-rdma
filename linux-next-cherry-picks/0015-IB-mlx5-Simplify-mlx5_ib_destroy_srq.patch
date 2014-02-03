@@ -1,0 +1,26 @@
+From: Eli Cohen <eli@dev.mellanox.co.il>
+Subject: [PATCH] IB/mlx5: Simplify mlx5_ib_destroy_srq
+
+Make use of destroy_srq_kernel() to clear SRQ resouces.
+
+Signed-off-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/infiniband/hw/mlx5/srq.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/mlx5/srq.c b/drivers/infiniband/hw/mlx5/srq.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/mlx5/srq.c
++++ b/drivers/infiniband/hw/mlx5/srq.c
+@@ -390,9 +390,7 @@ int mlx5_ib_destroy_srq(struct ib_srq *srq)
+ 		mlx5_ib_db_unmap_user(to_mucontext(srq->uobject->context), &msrq->db);
+ 		ib_umem_release(msrq->umem);
+ 	} else {
+-		kfree(msrq->wrid);
+-		mlx5_buf_free(&dev->mdev, &msrq->buf);
+-		mlx5_db_free(&dev->mdev, &msrq->db);
++		destroy_srq_kernel(dev, msrq);
+ 	}
+ 
+ 	kfree(srq);

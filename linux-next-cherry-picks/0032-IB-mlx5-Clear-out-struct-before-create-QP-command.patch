@@ -1,0 +1,25 @@
+From: Eli Cohen <eli@dev.mellanox.co.il>
+Subject: [PATCH] IB/mlx5: Clear out struct before create QP command
+
+Output structs are expected by firmware to be cleared when a command is called.
+Clear the "out" struct instead of "dout" which is used only later.
+
+Signed-off-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/qp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/qp.c b/drivers/net/ethernet/mellanox/mlx5/core/qp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx5/core/qp.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/qp.c
+@@ -74,7 +74,7 @@ int mlx5_core_create_qp(struct mlx5_core_dev *dev,
+ 	struct mlx5_destroy_qp_mbox_out dout;
+ 	int err;
+ 
+-	memset(&dout, 0, sizeof(dout));
++	memset(&out, 0, sizeof(out));
+ 	in->hdr.opcode = cpu_to_be16(MLX5_CMD_OP_CREATE_QP);
+ 
+ 	err = mlx5_cmd_exec(dev, in, inlen, &out, sizeof(out));

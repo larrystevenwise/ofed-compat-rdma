@@ -1,0 +1,26 @@
+From: Haggai Eran <haggaie@mellanox.com>
+Subject: [PATCH] mlx5_core: Fix out arg size in access_register command
+
+The output size should be the sum of the core access reg output struct
+plus the size of the specific register data provided by the caller.
+
+Signed-off-by: Haggai Eran <haggaie@mellanox.com>
+Signed-off-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/port.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/port.c b/drivers/net/ethernet/mellanox/mlx5/core/port.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/mellanox/mlx5/core/port.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/port.c
+@@ -57,7 +57,7 @@ int mlx5_core_access_reg(struct mlx5_core_dev *dev, void *data_in,
+ 	in->arg = cpu_to_be32(arg);
+ 	in->register_id = cpu_to_be16(reg_num);
+ 	err = mlx5_cmd_exec(dev, in, sizeof(*in) + size_in, out,
+-			    sizeof(out) + size_out);
++			    sizeof(*out) + size_out);
+ 	if (err)
+ 		goto ex2;
+ 
