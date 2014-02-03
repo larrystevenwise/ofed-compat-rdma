@@ -1,6 +1,4 @@
-From 603e7729920e42b3c2f4dbfab9eef4878cb6e8fa Mon Sep 17 00:00:00 2001
 From: Jan Kara <jack@suse.cz>
-Date: Fri, 4 Oct 2013 09:29:12 -0400
 Subject: [PATCH] IB/qib: Convert qib_user_sdma_pin_pages() to use get_user_pages_fast()
 
 qib_user_sdma_queue_pkts() gets called with mmap_sem held for
@@ -26,7 +24,7 @@ Signed-off-by: Roland Dreier <roland@purestorage.com>
  1 files changed, 1 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/infiniband/hw/qib/qib_user_sdma.c b/drivers/infiniband/hw/qib/qib_user_sdma.c
-index d0a0ea0..165aee2 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/qib/qib_user_sdma.c
 +++ b/drivers/infiniband/hw/qib/qib_user_sdma.c
 @@ -594,8 +594,7 @@ static int qib_user_sdma_pin_pages(const struct qib_devdata *dd,
@@ -51,6 +49,3 @@ index d0a0ea0..165aee2 100644
  		if (ret < 0)
  			goto done_unlock;
  		else {
--- 
-1.7.0.7
-

@@ -1,6 +1,4 @@
-From 16e47624e76b43dbef5671af7b9e26589d7018b9 Mon Sep 17 00:00:00 2001
 From: Hariprasad Shenai <hariprasad@chelsio.com>
-Date: Tue, 3 Dec 2013 17:05:58 +0530
 Subject: [PATCH] cxgb4: Add new scheme to update T4/T5 firmware
 
 Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
@@ -13,12 +11,12 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  4 files changed, 290 insertions(+), 191 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 9710a16..6c93088 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -49,13 +49,15 @@
- #include <asm/io.h>
+@@ -50,13 +50,15 @@
  #include "cxgb4_uld.h"
+ #include "t4_hw.h"
  
 -#define FW_VERSION_MAJOR 1
 -#define FW_VERSION_MINOR 4
@@ -38,7 +36,7 @@ index 9710a16..6c93088 100644
  
  #define CH_WARN(adap, fmt, ...) dev_warn(adap->pdev_dev, fmt, ## __VA_ARGS__)
  
-@@ -287,6 +289,23 @@ struct adapter_params {
+@@ -288,6 +290,23 @@ struct adapter_params {
  	unsigned int ofldq_wr_cred;
  };
  
@@ -62,7 +60,7 @@ index 9710a16..6c93088 100644
  struct trace_params {
  	u32 data[TRACE_LEN / 4];
  	u32 mask[TRACE_LEN / 4];
-@@ -901,7 +920,11 @@ int get_vpd_params(struct adapter *adapter, struct vpd_params *p);
+@@ -919,7 +938,11 @@ int get_vpd_params(struct adapter *adapter, struct vpd_params *p);
  int t4_load_fw(struct adapter *adapter, const u8 *fw_data, unsigned int size);
  unsigned int t4_flash_cfg_addr(struct adapter *adapter);
  int t4_load_cfg(struct adapter *adapter, const u8 *cfg_data, unsigned int size);
@@ -76,10 +74,10 @@ index 9710a16..6c93088 100644
  int t4_port_init(struct adapter *adap, int mbox, int pf, int vf);
  void t4_fatal_err(struct adapter *adapter);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 35933cd..d6b12e0 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -276,9 +276,9 @@ static DEFINE_PCI_DEVICE_TABLE(cxgb4_pci_tbl) = {
+@@ -275,9 +275,9 @@ static DEFINE_PCI_DEVICE_TABLE(cxgb4_pci_tbl) = {
  	{ 0, }
  };
  
@@ -91,7 +89,7 @@ index 35933cd..d6b12e0 100644
  #define FW5_CFNAME "cxgb4/t5-config.txt"
  
  MODULE_DESCRIPTION(DRV_DESC);
-@@ -286,7 +286,7 @@ MODULE_AUTHOR("Chelsio Communications");
+@@ -285,7 +285,7 @@ MODULE_AUTHOR("Chelsio Communications");
  MODULE_LICENSE("Dual BSD/GPL");
  MODULE_VERSION(DRV_VERSION);
  MODULE_DEVICE_TABLE(pci, cxgb4_pci_tbl);
@@ -100,7 +98,7 @@ index 35933cd..d6b12e0 100644
  MODULE_FIRMWARE(FW5_FNAME);
  
  /*
-@@ -1071,72 +1071,6 @@ freeout:	t4_free_sge_resources(adap);
+@@ -1087,72 +1087,6 @@ freeout:	t4_free_sge_resources(adap);
  }
  
  /*
@@ -173,7 +171,7 @@ index 35933cd..d6b12e0 100644
   * Allocate a chunk of memory using kmalloc or, if that fails, vmalloc.
   * The allocated memory is cleared.
   */
-@@ -4668,8 +4602,10 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4796,8 +4730,10 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	const struct firmware *cf;
  	unsigned long mtype = 0, maddr = 0;
  	u32 finiver, finicsum, cfcsum;
@@ -185,7 +183,7 @@ index 35933cd..d6b12e0 100644
  
  	/*
  	 * Reset device if necessary.
-@@ -4688,7 +4624,7 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4816,7 +4752,7 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	 */
  	switch (CHELSIO_CHIP_VERSION(adapter->params.chip)) {
  	case CHELSIO_T4:
@@ -194,7 +192,7 @@ index 35933cd..d6b12e0 100644
  		break;
  	case CHELSIO_T5:
  		fw_config_file = FW5_CFNAME;
-@@ -4702,13 +4638,16 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4830,13 +4766,16 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  
  	ret = request_firmware(&cf, fw_config_file, adapter->pdev_dev);
  	if (ret < 0) {
@@ -213,7 +211,7 @@ index 35933cd..d6b12e0 100644
  		if (cf->size >= FLASH_CFG_MAX_SIZE)
  			ret = -ENOMEM;
  		else {
-@@ -4776,6 +4715,26 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4904,6 +4843,26 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  		      FW_LEN16(caps_cmd));
  	ret = t4_wr_mbox(adapter, adapter->mbox, &caps_cmd, sizeof(caps_cmd),
  			 &caps_cmd);
@@ -240,7 +238,7 @@ index 35933cd..d6b12e0 100644
  	if (ret < 0)
  		goto bye;
  
-@@ -4816,7 +4775,6 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4944,7 +4903,6 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	if (ret < 0)
  		goto bye;
  
@@ -248,7 +246,7 @@ index 35933cd..d6b12e0 100644
  	/*
  	 * Return successfully and note that we're operating with parameters
  	 * not supplied by the driver, rather than from hard-wired
-@@ -4824,11 +4782,8 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4952,11 +4910,8 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	 */
  	adapter->flags |= USING_SOFT_PARAMS;
  	dev_info(adapter->pdev_dev, "Successfully configured using Firmware "\
@@ -262,7 +260,7 @@ index 35933cd..d6b12e0 100644
  	return 0;
  
  	/*
-@@ -4837,9 +4792,9 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4965,9 +4920,9 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	 * want to issue a warning since this is fairly common.)
  	 */
  bye:
@@ -275,7 +273,7 @@ index 35933cd..d6b12e0 100644
  	return ret;
  }
  
-@@ -5086,6 +5041,47 @@ bye:
+@@ -5214,6 +5169,47 @@ bye:
  	return ret;
  }
  
@@ -323,7 +321,7 @@ index 35933cd..d6b12e0 100644
  /*
   * Phase 0 of initialization: contact FW, obtain config, perform basic init.
   */
-@@ -5123,44 +5119,54 @@ static int adap_init0(struct adapter *adap)
+@@ -5251,44 +5247,54 @@ static int adap_init0(struct adapter *adap)
  	 * later reporting and B. to warn if the currently loaded firmware
  	 * is excessively mismatched relative to the driver.)
  	 */
@@ -413,7 +411,7 @@ index 35933cd..d6b12e0 100644
  	}
  
  	/*
-@@ -5245,7 +5251,7 @@ static int adap_init0(struct adapter *adap)
+@@ -5373,7 +5379,7 @@ static int adap_init0(struct adapter *adap)
  				if (ret == -ENOENT) {
  					dev_info(adap->pdev_dev,
  					    "No Configuration File present "
@@ -423,7 +421,7 @@ index 35933cd..d6b12e0 100644
  					ret = adap_init0_no_config(adap, reset);
  				}
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 83b5e42..74a6fce 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -863,104 +863,169 @@ unlock:
@@ -661,7 +659,7 @@ index 83b5e42..74a6fce 100644
   *	t4_flash_erase_sectors - erase a range of flash sectors
   *	@adapter: the adapter
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
-index 6f77ac4..74fea74 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
 @@ -2157,7 +2157,7 @@ struct fw_debug_cmd {
@@ -685,6 +683,3 @@ index 6f77ac4..74fea74 100644
  #define FW_HDR_FW_VER_MAJOR_GET(x) (((x) >> 24) & 0xff)
  #define FW_HDR_FW_VER_MINOR_GET(x) (((x) >> 16) & 0xff)
  #define FW_HDR_FW_VER_MICRO_GET(x) (((x) >> 8) & 0xff)
--- 
-1.7.1
-

@@ -1,6 +1,4 @@
-From a4ea025fc24532bae8a038d038f8e0f15b8a7d98 Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Wed, 18 Dec 2013 16:38:24 +0530
 Subject: [PATCH] RDMA/cxgb4: Calculate the filter server TID properly
 
 Based on original work by Santosh Rastapur <santosh@chelsio.com>
@@ -13,10 +11,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  1 files changed, 1 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
-index 12fef76..02c7515 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
-@@ -3323,9 +3323,7 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+@@ -3394,9 +3394,7 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
  	/*
  	 * Calculate the server tid from filter hit index from cpl_rx_pkt.
  	 */
@@ -27,6 +25,3 @@ index 12fef76..02c7515 100644
  
  	lep = (struct c4iw_ep *)lookup_stid(dev->rdev.lldi.tids, stid);
  	if (!lep) {
--- 
-1.7.1
-

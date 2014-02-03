@@ -1,5 +1,14 @@
+From: Kumar Sanghvi <kumaras@chelsio.com>
+Subject: [PATCH] cxgb4: Assign filter server TIDs properly
+
+Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   30 ++++++++++++++++++----
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h  |    9 ++++++-
+ 2 files changed, 32 insertions(+), 7 deletions(-)
+
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 951787f..94a6e62 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -3073,7 +3073,14 @@ int cxgb4_alloc_stid(struct tid_info *t, int family, void *data)
@@ -74,7 +83,7 @@ index 951787f..94a6e62 100644
  
  	f = &adap->tids.ftid_tab[stid];
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
-index 6f21f24..4dd0a82 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
 @@ -131,7 +131,14 @@ static inline void *lookup_atid(const struct tid_info *t, unsigned int atid)

@@ -1,6 +1,4 @@
-From 41b4f86c1368758a02129e0629a9cc7c2811fa32 Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Wed, 18 Dec 2013 16:38:26 +0530
 Subject: [PATCH] RDMA/cxgb4: Use cxgb4_select_ntuple to correctly calculate ntuple fields
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
@@ -11,10 +9,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  1 files changed, 17 insertions(+), 54 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
-index bfd4ed7..4512687 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
-@@ -524,50 +524,6 @@ static int send_abort(struct c4iw_ep *ep, struct sk_buff *skb, gfp_t gfp)
+@@ -570,50 +570,6 @@ static int send_abort(struct c4iw_ep *ep, struct sk_buff *skb, gfp_t gfp)
  	return c4iw_l2t_send(&ep->com.dev->rdev, skb, ep->l2t);
  }
  
@@ -65,7 +63,7 @@ index bfd4ed7..4512687 100644
  static int send_connect(struct c4iw_ep *ep)
  {
  	struct cpl_act_open_req *req;
-@@ -641,8 +597,9 @@ static int send_connect(struct c4iw_ep *ep)
+@@ -687,8 +643,9 @@ static int send_connect(struct c4iw_ep *ep)
  			req->local_ip = la->sin_addr.s_addr;
  			req->peer_ip = ra->sin_addr.s_addr;
  			req->opt0 = cpu_to_be64(opt0);
@@ -77,7 +75,7 @@ index bfd4ed7..4512687 100644
  			req->opt2 = cpu_to_be32(opt2);
  		} else {
  			req6 = (struct cpl_act_open_req6 *)skb_put(skb, wrlen);
-@@ -662,9 +619,9 @@ static int send_connect(struct c4iw_ep *ep)
+@@ -708,9 +665,9 @@ static int send_connect(struct c4iw_ep *ep)
  			req6->peer_ip_lo = *((__be64 *)
  						(ra6->sin6_addr.s6_addr + 8));
  			req6->opt0 = cpu_to_be64(opt0);
@@ -90,7 +88,7 @@ index bfd4ed7..4512687 100644
  			req6->opt2 = cpu_to_be32(opt2);
  		}
  	} else {
-@@ -681,8 +638,9 @@ static int send_connect(struct c4iw_ep *ep)
+@@ -727,8 +684,9 @@ static int send_connect(struct c4iw_ep *ep)
  			t5_req->peer_ip = ra->sin_addr.s_addr;
  			t5_req->opt0 = cpu_to_be64(opt0);
  			t5_req->params = cpu_to_be64(V_FILTER_TUPLE(
@@ -102,7 +100,7 @@ index bfd4ed7..4512687 100644
  			t5_req->opt2 = cpu_to_be32(opt2);
  		} else {
  			t5_req6 = (struct cpl_t5_act_open_req6 *)
-@@ -703,7 +661,9 @@ static int send_connect(struct c4iw_ep *ep)
+@@ -749,7 +707,9 @@ static int send_connect(struct c4iw_ep *ep)
  						(ra6->sin6_addr.s6_addr + 8));
  			t5_req6->opt0 = cpu_to_be64(opt0);
  			t5_req6->params = (__force __be64)cpu_to_be32(
@@ -113,7 +111,7 @@ index bfd4ed7..4512687 100644
  			t5_req6->opt2 = cpu_to_be32(opt2);
  		}
  	}
-@@ -1630,7 +1590,8 @@ static void send_fw_act_open_req(struct c4iw_ep *ep, unsigned int atid)
+@@ -1676,7 +1636,8 @@ static void send_fw_act_open_req(struct c4iw_ep *ep, unsigned int atid)
  	memset(req, 0, sizeof(*req));
  	req->op_compl = htonl(V_WR_OP(FW_OFLD_CONNECTION_WR));
  	req->len16_pkd = htonl(FW_WR_LEN16(DIV_ROUND_UP(sizeof(*req), 16)));
@@ -123,7 +121,7 @@ index bfd4ed7..4512687 100644
  				     ep->l2t));
  	sin = (struct sockaddr_in *)&ep->com.local_addr;
  	req->le.lport = sin->sin_port;
-@@ -3396,7 +3357,9 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+@@ -3475,7 +3436,9 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
  	window = (__force u16) htons((__force u16)tcph->window);
  
  	/* Calcuate filter portion for LE region. */
@@ -134,6 +132,3 @@ index bfd4ed7..4512687 100644
  
  	/*
  	 * Synthesize the cpl_pass_accept_req. We have everything except the
--- 
-1.7.1
-

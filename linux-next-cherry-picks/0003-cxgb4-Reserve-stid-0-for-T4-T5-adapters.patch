@@ -1,6 +1,4 @@
-From b6f8eaece6d5f0247931b6dac140e6cf876f48de Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Wed, 18 Dec 2013 16:38:19 +0530
 Subject: [PATCH] cxgb4: Reserve stid 0 for T4/T5 adapters
 
 When creating offload server entries, an IPv6 passive connection request
@@ -21,10 +19,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  1 files changed, 6 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index d6b12e0..f36f8e1 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -3134,6 +3134,7 @@ static int tid_init(struct tid_info *t)
+@@ -3221,6 +3221,7 @@ static int tid_init(struct tid_info *t)
  	size_t size;
  	unsigned int stid_bmap_size;
  	unsigned int natids = t->natids;
@@ -32,7 +30,7 @@ index d6b12e0..f36f8e1 100644
  
  	stid_bmap_size = BITS_TO_LONGS(t->nstids + t->nsftids);
  	size = t->ntids * sizeof(*t->tid_tab) +
-@@ -3167,6 +3168,11 @@ static int tid_init(struct tid_info *t)
+@@ -3254,6 +3255,11 @@ static int tid_init(struct tid_info *t)
  		t->afree = t->atid_tab;
  	}
  	bitmap_zero(t->stid_bmap, t->nstids + t->nsftids);
@@ -44,6 +42,3 @@ index d6b12e0..f36f8e1 100644
  	return 0;
  }
  
--- 
-1.7.1
-

@@ -1,6 +1,4 @@
-From d14807dd8e7eaa41a8fee5fc3acbdaf2a0258b76 Mon Sep 17 00:00:00 2001
 From: Hariprasad Shenai <hariprasad@chelsio.com>
-Date: Tue, 3 Dec 2013 17:05:56 +0530
 Subject: [PATCH] cxgb4: Much cleaner implementation of is_t4()/is_t5()
 
 Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
@@ -14,10 +12,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  5 files changed, 73 insertions(+), 70 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index ecd2fb3..9710a16 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -240,6 +240,26 @@ struct pci_params {
+@@ -241,6 +241,26 @@ struct pci_params {
  	unsigned char width;
  };
  
@@ -44,7 +42,7 @@ index ecd2fb3..9710a16 100644
  struct adapter_params {
  	struct tp_params  tp;
  	struct vpd_params vpd;
-@@ -259,7 +279,7 @@ struct adapter_params {
+@@ -260,7 +280,7 @@ struct adapter_params {
  
  	unsigned char nports;             /* # of ethernet ports */
  	unsigned char portvec;
@@ -53,7 +51,7 @@ index ecd2fb3..9710a16 100644
  	unsigned char offload;
  
  	unsigned char bypass;
-@@ -512,25 +532,6 @@ struct sge {
+@@ -530,25 +550,6 @@ struct sge {
  
  struct l2t_data;
  
@@ -79,7 +77,7 @@ index ecd2fb3..9710a16 100644
  #ifdef CONFIG_PCI_IOV
  
  /* T4 supports SRIOV on PF0-3 and T5 on PF0-7.  However, the Serial
-@@ -715,12 +716,12 @@ enum {
+@@ -733,12 +734,12 @@ enum {
  
  static inline int is_t5(enum chip_type chip)
  {
@@ -95,10 +93,10 @@ index ecd2fb3..9710a16 100644
  
  static inline u32 t4_read_reg(struct adapter *adap, u32 reg_addr)
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 8b929ee..35933cd 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -1083,7 +1083,7 @@ static int upgrade_fw(struct adapter *adap)
+@@ -1099,7 +1099,7 @@ static int upgrade_fw(struct adapter *adap)
  	struct device *dev = adap->pdev_dev;
  	char *fw_file_name;
  
@@ -107,7 +105,7 @@ index 8b929ee..35933cd 100644
  	case CHELSIO_T4:
  		fw_file_name = FW_FNAME;
  		exp_major = FW_VERSION_MAJOR;
-@@ -1093,7 +1093,7 @@ static int upgrade_fw(struct adapter *adap)
+@@ -1109,7 +1109,7 @@ static int upgrade_fw(struct adapter *adap)
  		exp_major = FW_VERSION_MAJOR_T5;
  		break;
  	default:
@@ -116,7 +114,7 @@ index 8b929ee..35933cd 100644
  		return -EINVAL;
  	}
  
-@@ -1415,7 +1415,7 @@ static int get_sset_count(struct net_device *dev, int sset)
+@@ -1431,7 +1431,7 @@ static int get_sset_count(struct net_device *dev, int sset)
  static int get_regs_len(struct net_device *dev)
  {
  	struct adapter *adap = netdev2adap(dev);
@@ -125,7 +123,7 @@ index 8b929ee..35933cd 100644
  		return T4_REGMAP_SIZE;
  	else
  		return T5_REGMAP_SIZE;
-@@ -1499,7 +1499,7 @@ static void get_stats(struct net_device *dev, struct ethtool_stats *stats,
+@@ -1515,7 +1515,7 @@ static void get_stats(struct net_device *dev, struct ethtool_stats *stats,
  	data += sizeof(struct port_stats) / sizeof(u64);
  	collect_sge_port_stats(adapter, pi, (struct queue_port_stats *)data);
  	data += sizeof(struct queue_port_stats) / sizeof(u64);
@@ -134,7 +132,7 @@ index 8b929ee..35933cd 100644
  		t4_write_reg(adapter, SGE_STAT_CFG, STATSOURCE_T5(7));
  		val1 = t4_read_reg(adapter, SGE_STAT_TOTAL);
  		val2 = t4_read_reg(adapter, SGE_STAT_MATCH);
-@@ -1521,8 +1521,8 @@ static void get_stats(struct net_device *dev, struct ethtool_stats *stats,
+@@ -1537,8 +1537,8 @@ static void get_stats(struct net_device *dev, struct ethtool_stats *stats,
   */
  static inline unsigned int mk_adap_vers(const struct adapter *ap)
  {
@@ -145,7 +143,7 @@ index 8b929ee..35933cd 100644
  }
  
  static void reg_block_dump(struct adapter *ap, void *buf, unsigned int start,
-@@ -2189,7 +2189,7 @@ static void get_regs(struct net_device *dev, struct ethtool_regs *regs,
+@@ -2205,7 +2205,7 @@ static void get_regs(struct net_device *dev, struct ethtool_regs *regs,
  	static const unsigned int *reg_ranges;
  	int arr_size = 0, buf_size = 0;
  
@@ -154,7 +152,7 @@ index 8b929ee..35933cd 100644
  		reg_ranges = &t4_reg_ranges[0];
  		arr_size = ARRAY_SIZE(t4_reg_ranges);
  		buf_size = T4_REGMAP_SIZE;
-@@ -2967,7 +2967,7 @@ static int setup_debugfs(struct adapter *adap)
+@@ -3054,7 +3054,7 @@ static int setup_debugfs(struct adapter *adap)
  		size = t4_read_reg(adap, MA_EDRAM1_BAR);
  		add_debugfs_mem(adap, "edc1", MEM_EDC1, EDRAM_SIZE_GET(size));
  	}
@@ -163,7 +161,7 @@ index 8b929ee..35933cd 100644
  		size = t4_read_reg(adap, MA_EXT_MEMORY_BAR);
  		if (i & EXT_MEM_ENABLE)
  			add_debugfs_mem(adap, "mc", MEM_MC,
-@@ -3419,7 +3419,7 @@ unsigned int cxgb4_dbfifo_count(const struct net_device *dev, int lpfifo)
+@@ -3506,7 +3506,7 @@ unsigned int cxgb4_dbfifo_count(const struct net_device *dev, int lpfifo)
  
  	v1 = t4_read_reg(adap, A_SGE_DBFIFO_STATUS);
  	v2 = t4_read_reg(adap, SGE_DBFIFO_STATUS2);
@@ -172,7 +170,7 @@ index 8b929ee..35933cd 100644
  		lp_count = G_LP_COUNT(v1);
  		hp_count = G_HP_COUNT(v1);
  	} else {
-@@ -3588,7 +3588,7 @@ static void drain_db_fifo(struct adapter *adap, int usecs)
+@@ -3675,7 +3675,7 @@ static void drain_db_fifo(struct adapter *adap, int usecs)
  	do {
  		v1 = t4_read_reg(adap, A_SGE_DBFIFO_STATUS);
  		v2 = t4_read_reg(adap, SGE_DBFIFO_STATUS2);
@@ -181,7 +179,7 @@ index 8b929ee..35933cd 100644
  			lp_count = G_LP_COUNT(v1);
  			hp_count = G_HP_COUNT(v1);
  		} else {
-@@ -3708,7 +3708,7 @@ static void process_db_drop(struct work_struct *work)
+@@ -3795,7 +3795,7 @@ static void process_db_drop(struct work_struct *work)
  
  	adap = container_of(work, struct adapter, db_drop_task);
  
@@ -190,7 +188,7 @@ index 8b929ee..35933cd 100644
  		disable_dbs(adap);
  		notify_rdma_uld(adap, CXGB4_CONTROL_DB_DROP);
  		drain_db_fifo(adap, 1);
-@@ -3753,7 +3753,7 @@ static void process_db_drop(struct work_struct *work)
+@@ -3840,7 +3840,7 @@ static void process_db_drop(struct work_struct *work)
  
  void t4_db_full(struct adapter *adap)
  {
@@ -199,7 +197,7 @@ index 8b929ee..35933cd 100644
  		t4_set_reg_field(adap, SGE_INT_ENABLE3,
  				 DBFIFO_HP_INT | DBFIFO_LP_INT, 0);
  		queue_work(workq, &adap->db_full_task);
-@@ -3762,7 +3762,7 @@ void t4_db_full(struct adapter *adap)
+@@ -3849,7 +3849,7 @@ void t4_db_full(struct adapter *adap)
  
  void t4_db_dropped(struct adapter *adap)
  {
@@ -208,7 +206,7 @@ index 8b929ee..35933cd 100644
  		queue_work(workq, &adap->db_drop_task);
  }
  
-@@ -3789,7 +3789,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
+@@ -3876,7 +3876,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
  	lli.nchan = adap->params.nports;
  	lli.nports = adap->params.nports;
  	lli.wr_cred = adap->params.ofldq_wr_cred;
@@ -217,7 +215,7 @@ index 8b929ee..35933cd 100644
  	lli.iscsi_iolen = MAXRXDATA_GET(t4_read_reg(adap, TP_PARA_REG2));
  	lli.udb_density = 1 << QUEUESPERPAGEPF0_GET(
  			t4_read_reg(adap, SGE_EGRESS_QUEUES_PER_PAGE_PF) >>
-@@ -4483,7 +4483,7 @@ static void setup_memwin(struct adapter *adap)
+@@ -4611,7 +4611,7 @@ static void setup_memwin(struct adapter *adap)
  	u32 bar0, mem_win0_base, mem_win1_base, mem_win2_base;
  
  	bar0 = pci_resource_start(adap->pdev, 0);  /* truncation intentional */
@@ -226,7 +224,7 @@ index 8b929ee..35933cd 100644
  		mem_win0_base = bar0 + MEMWIN0_BASE;
  		mem_win1_base = bar0 + MEMWIN1_BASE;
  		mem_win2_base = bar0 + MEMWIN2_BASE;
-@@ -4686,7 +4686,7 @@ static int adap_init0_config(struct adapter *adapter, int reset)
+@@ -4814,7 +4814,7 @@ static int adap_init0_config(struct adapter *adapter, int reset)
  	 * then use that.  Otherwise, use the configuration file stored
  	 * in the adapter flash ...
  	 */
@@ -235,7 +233,7 @@ index 8b929ee..35933cd 100644
  	case CHELSIO_T4:
  		fw_config_file = FW_CFNAME;
  		break;
-@@ -5787,7 +5787,7 @@ static void print_port_info(const struct net_device *dev)
+@@ -5927,7 +5927,7 @@ static void print_port_info(const struct net_device *dev)
  
  	netdev_info(dev, "Chelsio %s rev %d %s %sNIC PCIe x%d%s%s\n",
  		    adap->params.vpd.id,
@@ -244,7 +242,7 @@ index 8b929ee..35933cd 100644
  		    is_offload(adap) ? "R" : "", adap->params.pci.width, spd,
  		    (adap->flags & USING_MSIX) ? " MSI-X" :
  		    (adap->flags & USING_MSI) ? " MSI" : "");
-@@ -5910,7 +5910,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+@@ -6052,7 +6052,7 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
  	if (err)
  		goto out_unmap_bar0;
  
@@ -253,7 +251,7 @@ index 8b929ee..35933cd 100644
  		s_qpp = QUEUESPERPAGEPF1 * adapter->fn;
  		qpp = 1 << QUEUESPERPAGEPF0_GET(t4_read_reg(adapter,
  		      SGE_EGRESS_QUEUES_PER_PAGE_PF) >> s_qpp);
-@@ -6064,7 +6064,7 @@ sriov:
+@@ -6222,7 +6222,7 @@ sriov:
   out_free_dev:
  	free_some_resources(adapter);
   out_unmap_bar:
@@ -262,7 +260,7 @@ index 8b929ee..35933cd 100644
  		iounmap(adapter->bar2);
   out_unmap_bar0:
  	iounmap(adapter->regs);
-@@ -6116,7 +6116,7 @@ static void remove_one(struct pci_dev *pdev)
+@@ -6275,7 +6275,7 @@ static void remove_one(struct pci_dev *pdev)
  
  		free_some_resources(adapter);
  		iounmap(adapter->regs);
@@ -272,10 +270,10 @@ index 8b929ee..35933cd 100644
  		kfree(adapter);
  		pci_disable_pcie_error_reporting(pdev);
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-index ac311f5..cc380c3 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -509,7 +509,7 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
+@@ -528,7 +528,7 @@ static inline void ring_fl_db(struct adapter *adap, struct sge_fl *q)
  	u32 val;
  	if (q->pend_cred >= 8) {
  		val = PIDX(q->pend_cred / 8);
@@ -284,7 +282,7 @@ index ac311f5..cc380c3 100644
  			val |= DBTYPE(1);
  		wmb();
  		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL), DBPRIO(1) |
-@@ -847,7 +847,7 @@ static inline void ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
+@@ -870,7 +870,7 @@ static inline void ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
  	wmb();            /* write descriptors before telling HW */
  	spin_lock(&q->db_lock);
  	if (!q->db_disabled) {
@@ -293,7 +291,7 @@ index ac311f5..cc380c3 100644
  			t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL),
  				     QID(q->cntxt_id) | PIDX(n));
  		} else {
-@@ -1596,7 +1596,7 @@ static noinline int handle_trace_pkt(struct adapter *adap,
+@@ -1648,7 +1648,7 @@ static noinline int handle_trace_pkt(struct adapter *adap,
  		return 0;
  	}
  
@@ -302,16 +300,16 @@ index ac311f5..cc380c3 100644
  		__skb_pull(skb, sizeof(struct cpl_trace_pkt));
  	else
  		__skb_pull(skb, sizeof(struct cpl_t5_trace_pkt));
-@@ -1661,7 +1661,7 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
+@@ -1726,7 +1726,7 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
  	const struct cpl_rx_pkt *pkt;
  	struct sge_eth_rxq *rxq = container_of(q, struct sge_eth_rxq, rspq);
  	struct sge *s = &q->adap->sge;
 -	int cpl_trace_pkt = is_t4(q->adap->chip) ?
 +	int cpl_trace_pkt = is_t4(q->adap->params.chip) ?
  			    CPL_TRACE_PKT : CPL_TRACE_PKT_T5;
- 
- 	if (unlikely(*(u8 *)rsp == cpl_trace_pkt))
-@@ -2182,7 +2182,7 @@ err:
+ #if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
+ 	struct port_info *pi;
+@@ -2290,7 +2290,7 @@ err:
  static void init_txq(struct adapter *adap, struct sge_txq *q, unsigned int id)
  {
  	q->cntxt_id = id;
@@ -320,7 +318,7 @@ index ac311f5..cc380c3 100644
  		unsigned int s_qpp;
  		unsigned short udb_density;
  		unsigned long qpshift;
-@@ -2641,7 +2641,7 @@ static int t4_sge_init_hard(struct adapter *adap)
+@@ -2749,7 +2749,7 @@ static int t4_sge_init_hard(struct adapter *adap)
  	 * Set up to drop DOORBELL writes when the DOORBELL FIFO overflows
  	 * and generate an interrupt when this occurs so we can recover.
  	 */
@@ -330,7 +328,7 @@ index ac311f5..cc380c3 100644
  				 V_HP_INT_THRESH(M_HP_INT_THRESH) |
  				 V_LP_INT_THRESH(M_LP_INT_THRESH),
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 4cbb2f9..83b5e42 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -296,7 +296,7 @@ int t4_mc_read(struct adapter *adap, int idx, u32 addr, __be32 *data, u64 *ecc)
@@ -504,7 +502,7 @@ index 4cbb2f9..83b5e42 100644
  
  	/*
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
-index ef146c0..a7d8189 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 @@ -1092,6 +1092,11 @@
@@ -519,6 +517,3 @@ index ef146c0..a7d8189 100644
  #define LE_DB_CONFIG 0x19c04
  #define  HASHEN 0x00100000U
  
--- 
-1.7.1
-

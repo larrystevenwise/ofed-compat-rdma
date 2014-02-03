@@ -1,6 +1,4 @@
-From 7c89e5550ccb2a3118854639d9525847e896c686 Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Wed, 18 Dec 2013 16:38:20 +0530
 Subject: [PATCH] cxgb4: Include TCP as protocol when creating server filters
 
 We were creating LE Workaround Server Filters without specifying
@@ -20,10 +18,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  2 files changed, 9 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index f36f8e1..df1d6b8 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -4217,6 +4217,11 @@ int cxgb4_create_server_filter(const struct net_device *dev, unsigned int stid,
+@@ -4294,6 +4294,11 @@ int cxgb4_create_server_filter(const struct net_device *dev, unsigned int stid,
  		}
  	}
  
@@ -36,7 +34,7 @@ index f36f8e1..df1d6b8 100644
  	f->fs.iq = queue;
  	/* Mark filter as locked */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
-index 0a8205d..d3dd218 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 @@ -1171,6 +1171,10 @@
@@ -50,6 +48,3 @@ index 0a8205d..d3dd218 100644
  #define S_PORT    1
  #define V_PORT(x) ((x) << S_PORT)
  #define F_PORT    V_PORT(1U)
--- 
-1.7.1
-

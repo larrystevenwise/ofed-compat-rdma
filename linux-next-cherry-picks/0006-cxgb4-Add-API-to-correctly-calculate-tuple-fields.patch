@@ -1,6 +1,4 @@
-From dcf7b6f5bdeaa13d5e465d8795d2e7d6d1e27b65 Mon Sep 17 00:00:00 2001
 From: Kumar Sanghvi <kumaras@chelsio.com>
-Date: Wed, 18 Dec 2013 16:38:23 +0530
 Subject: [PATCH] cxgb4: Add API to correctly calculate tuple fields
 
 Adds API cxgb4_select_ntuple so as to enable Upper Level Drivers to correctly
@@ -27,10 +25,10 @@ Signed-off-by: David S. Miller <davem@davemloft.net>
  6 files changed, 235 insertions(+), 16 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-index 6c93088..56e0415 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
-@@ -228,6 +228,25 @@ struct tp_params {
+@@ -229,6 +229,25 @@ struct tp_params {
  
  	uint32_t dack_re;            /* DACK timer resolution */
  	unsigned short tx_modq[NCHAN];	/* channel to modulation queue map */
@@ -56,7 +54,7 @@ index 6c93088..56e0415 100644
  };
  
  struct vpd_params {
-@@ -926,6 +945,8 @@ int t4_prep_fw(struct adapter *adap, struct fw_info *fw_info,
+@@ -944,6 +963,8 @@ int t4_prep_fw(struct adapter *adap, struct fw_info *fw_info,
  	       const u8 *fw_data, unsigned int fw_size,
  	       struct fw_hdr *card_fw, enum dev_state state, int *reset);
  int t4_prep_adapter(struct adapter *adapter);
@@ -66,10 +64,10 @@ index 6c93088..56e0415 100644
  void t4_fatal_err(struct adapter *adapter);
  int t4_config_rss_range(struct adapter *adapter, int mbox, unsigned int viid,
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index f9ca36c..fff02ed 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -3755,7 +3755,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
+@@ -3842,7 +3842,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
  	lli.ucq_density = 1 << QUEUESPERPAGEPF0_GET(
  			t4_read_reg(adap, SGE_INGRESS_QUEUES_PER_PAGE_PF) >>
  			(adap->fn * 4));
@@ -78,7 +76,7 @@ index f9ca36c..fff02ed 100644
  	/* MODQ_REQ_MAP sets queues 0-3 to chan 0-3 */
  	for (i = 0; i < NCHAN; i++)
  		lli.tx_modq[i] = i;
-@@ -4229,13 +4229,13 @@ int cxgb4_create_server_filter(const struct net_device *dev, unsigned int stid,
+@@ -4306,13 +4306,13 @@ int cxgb4_create_server_filter(const struct net_device *dev, unsigned int stid,
  			f->fs.val.lip[i] = val[i];
  			f->fs.mask.lip[i] = ~0;
  		}
@@ -94,7 +92,7 @@ index f9ca36c..fff02ed 100644
  		f->fs.val.proto = IPPROTO_TCP;
  		f->fs.mask.proto = ~0;
  	}
-@@ -5121,7 +5121,7 @@ static int adap_init0(struct adapter *adap)
+@@ -5249,7 +5249,7 @@ static int adap_init0(struct adapter *adap)
  	enum dev_state state;
  	u32 params[7], val[7];
  	struct fw_caps_config_cmd caps_cmd;
@@ -103,7 +101,7 @@ index f9ca36c..fff02ed 100644
  
  	/*
  	 * Contact FW, advertising Master capability (and potentially forcing
-@@ -5463,21 +5463,11 @@ static int adap_init0(struct adapter *adap)
+@@ -5591,21 +5591,11 @@ static int adap_init0(struct adapter *adap)
  	/*
  	 * These are finalized by FW initialization, load their values now.
  	 */
@@ -127,7 +125,7 @@ index f9ca36c..fff02ed 100644
  	return 0;
  
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/l2t.c b/drivers/net/ethernet/chelsio/cxgb4/l2t.c
-index 2987809..cb05be9 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/l2t.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/l2t.c
 @@ -45,6 +45,7 @@
@@ -180,7 +178,7 @@ index 2987809..cb05be9 100644
   * Called when address resolution fails for an L2T entry to handle packets
   * on the arpq head.  If a packet specifies a failure handler it is invoked,
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/l2t.h b/drivers/net/ethernet/chelsio/cxgb4/l2t.h
-index 108c0f1..85eb5c7 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/l2t.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/l2t.h
 @@ -98,7 +98,8 @@ int cxgb4_l2t_send(struct net_device *dev, struct sk_buff *skb,
@@ -194,7 +192,7 @@ index 108c0f1..85eb5c7 100644
  struct l2t_entry *t4_l2t_alloc_switching(struct l2t_data *d);
  int t4_l2t_set_switching(struct adapter *adap, struct l2t_entry *e, u16 vlan,
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 74a6fce..e1413ea 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -3808,6 +3808,109 @@ int t4_prep_adapter(struct adapter *adapter)
@@ -308,7 +306,7 @@ index 74a6fce..e1413ea 100644
  {
  	u8 addr[6];
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
-index d3dd218..4082522 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_regs.h
 @@ -1171,14 +1171,50 @@
@@ -362,9 +360,9 @@ index d3dd218..4082522 100644
  #define NUM_MPS_CLS_SRAM_L_INSTANCES 336
  #define NUM_MPS_T5_CLS_SRAM_L_INSTANCES 512
  
-@@ -1217,4 +1253,37 @@
- #define V_CHIPID(x) ((x) << S_CHIPID)
- #define G_CHIPID(x) (((x) >> S_CHIPID) & M_CHIPID)
+@@ -1208,4 +1244,37 @@
+ #define EDC_STRIDE_T5 (EDC_T51_BASE_ADDR - EDC_T50_BASE_ADDR)
+ #define EDC_REG_T5(reg, idx) (reg + EDC_STRIDE_T5 * idx)
  
 +/* TP_VLAN_PRI_MAP controls which subset of fields will be present in the
 + * Compressed Filter Tuple for LE filters.  Each bit set in TP_VLAN_PRI_MAP
@@ -400,6 +398,3 @@ index d3dd218..4082522 100644
 +#define V_FT_VNID_ID_VLD(x)             ((x) << S_FT_VNID_ID_VLD)
 +
  #endif /* __T4_REGS_H */
--- 
-1.7.1
-
