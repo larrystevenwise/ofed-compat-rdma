@@ -75,12 +75,14 @@ if [[ ${CONFIG_COMPAT_KERNEL_3_2} = "y" ]]; then
 	set_config CONFIG_COMPAT_USE_LRO y
 fi
 
-SLES_11_3_KERNEL=$(echo ${KVERSION} | sed -n 's/^\(3\.0\.76\+\)\-\(.*\)\-\(.*\)/\1-\2-\3/p')
-if [[ ! -z ${SLES_11_3_KERNEL} ]]; then
+case ${KVERSION} in
+	3.0.7[6-9]-[0-9].[0-9]* | 3.0.[8-9][0-9]-[0-9].[0-9]* | 3.0.[1-9][0-9][0-9]-[0-9].[0-9]*)
+	SLES_11_3_KERNEL=${KVERSION}
 	SLES_MAJOR="11"
 	SLES_MINOR="3"
 	set_config CONFIG_COMPAT_SLES_11_3 y
-fi
+	;;
+esac
 
 SLES_11_2_KERNEL=$(echo ${KVERSION} | sed -n 's/^\(3\.0\.[0-9]\+\)\-\(.*\)\-\(.*\)/\1-\2-\3/p')
 if [[ ! -z ${SLES_11_2_KERNEL} ]]; then
@@ -149,7 +151,8 @@ if [[ ${CONFIG_COMPAT_SLES_11_2} = "y" ]]; then
 	set_config CONFIG_COMPAT_EN_SYSFS y
 fi
 
-if [[ ${CONFIG_COMPAT_SLES_11_3} = "y" ]]; then
+if (grep -q 'scsi_target_unblock(struct device \*, enum scsi_device_state)' ${KLIB_BUILD}/include/scsi/scsi_device.h  > /dev/null 2>&1 ||
+    grep -q 'scsi_target_unblock(struct device \*, enum scsi_device_state)' /lib/modules/${KVERSION}/source/include/scsi/scsi_device.h  > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_SCSI_TARGET_UNBLOCK y
 fi
 
