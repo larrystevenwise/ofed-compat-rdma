@@ -1071,6 +1071,30 @@ EOF
     return $RC
 }
 
+unload_rec()
+{
+        local mod=$1
+        shift
+
+        if is_module $mod ; then
+                ${modprobe} -r $mod >/dev/null 2>&1
+                if [ $? -ne 0 ];then
+                        for dep in `/sbin/rmmod $mod 2>&1 | grep "is in use by" | sed -r -e 's/.*use by //g' | sed -e 's/,/ /g'`
+                        do
+                                # if $dep was not loaded by openibd, don't unload it; fail with error.
+                                if ! `echo $UNLOAD_MODULES | grep -q $dep` ; then
+                                        rm_mod $mod
+                                else
+                                        unload_rec $dep
+                                fi
+                        done
+                fi
+                if is_module $mod ; then
+                        rm_mod $mod
+                fi
+        fi
+}
+
 rm_mod()
 {
         local mod=$1
@@ -1095,72 +1119,38 @@ unload()
         local unload_log
 
         if is_module $mod; then
-		case $mod in
-			ib_ipath)
-				# infinipath depends on modprobe.conf remove rule
-				${modprobe} -v -r $mod > /dev/null 2>&1
-				sleep 2
-			;;
-			ib_qib)
-				if [ -s ${_truescale} ]; then
-					 . ${_truescale} stop
-				fi
-                                rm_mod $mod
-				sleep 2
-			;;
-			ib_mthca | mlx4_ib | mlx5_ib | ib_ehca | iw_cxgb3 | iw_cxgb4 | iw_nes)
-                                rm_mod $mod
-				sleep 2
-			;;
-			*)
-			# is_module ib_ipoib && ${modprobe} -r ib_ipoib > /dev/null 2>&1
-                	${modprobe} -r $mod > /dev/null 2>&1
-                	if [ $? -ne 0 ] || is_module $mod; then
-                	        # Try rmmod if modprobe failed: case that previous installation included more IB modules.
-                	        rm_mod $mod
-                	fi
-			;;
-		esac
+            case $mod in
+                ib_ipath)
+                    # infinipath depends on modprobe.conf remove rule
+                    unload_rec $mod
+                    sleep 2
+                    ;;
+                ib_qib)
+                    if [ -s ${_truescale} ]; then
+                        . ${_truescale} stop
+                    fi
+
+                    if [ -d /ipathfs ]; then
+                        umount /ipathfs
+                        rmdir /ipathfs
+                    fi
+
+                    unload_rec $mod
+                    sleep 2
+                    ;;
+                ib_mthca | mlx4_ib | mlx5_ib | ib_ehca | iw_cxgb3 | iw_cxgb4 | iw_nes)
+                    unload_rec $mod
+                    sleep 2
+                    ;;
+                *)
+                    unload_rec $mod
+                    if [ $? -ne 0 ] || is_module $mod; then
+                        # Try rmmod if modprobe failed: case that previous installation included more IB modules.
+                        unload_rec $mod
+                    fi
+                    ;;
+            esac
         fi
-}
-
-stop_gen1()
-{
-    if is_module ib_ipoib; then
-        # Unload IPoIB interfaces
-        get_interfaces
-        for i in $interfaces
-        do
-                if [[ ! -e ${WD}/ifcfg-${i} && ! -e ${NETWORK_CONF_DIR}/ifcfg-${i} ]]; then
-                        # echo "No configuration found for ${i}"
-                        continue
-                fi
-
-                REMOVE_NETWORK_CONF=0
-                if [ ! -e ${NETWORK_CONF_DIR}/ifcfg-${i} ]; then
-                        ln -snf ${WD}/ifcfg-${i} ${NETWORK_CONF_DIR}/ifcfg-${i}
-                        REMOVE_NETWORK_CONF=1
-                fi
-
-                ifdown ${i} > /dev/null 2>&1
-                RC=$(($RC+$?))
-                [ $RC -eq 0 ] && echo_success $"Shutting down interface $i: " || echo_failure $"Shutting down interface $i: "
-                if [ $REMOVE_NETWORK_CONF -eq 1 ]; then
-                        rm -f ${NETWORK_CONF_DIR}/ifcfg-${i}
-                fi
-        done
-
-        [ $RC -ne 0 ] && echo "Please reboot the host." &&  exit 1
-        sleep 2
-    fi
-
-
-    if [ "${GEN1_UNLOAD_MODULES}" != "" ]; then
-        for mod in  ${GEN1_UNLOAD_MODULES}
-        do
-            unload $mod "Please reboot the host."
-        done
-    fi
 }
 
 stop()
@@ -1207,11 +1197,6 @@ stop()
                         echo
                         exit 1
                 fi
-        fi
-
-        # Stop Gen1 modules if they are UP after uninstall
-        if is_module ib_tavor; then
-                stop_gen1
         fi
 
         # Stop IPoIB HA daemon if running
