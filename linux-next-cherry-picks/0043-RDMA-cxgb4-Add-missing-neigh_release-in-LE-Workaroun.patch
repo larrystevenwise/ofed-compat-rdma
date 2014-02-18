@@ -1,0 +1,14 @@
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 5a1bf82..c72367d 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -3431,6 +3431,9 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+ 		goto free_dst;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
++	neigh_release(neigh);
++#endif
+ 	step = dev->rdev.lldi.nrxq / dev->rdev.lldi.nchan;
+ 	rss_qid = dev->rdev.lldi.rxq_ids[pi->port_id * step];
+ 	window = (__force u16) htons((__force u16)tcph->window);
