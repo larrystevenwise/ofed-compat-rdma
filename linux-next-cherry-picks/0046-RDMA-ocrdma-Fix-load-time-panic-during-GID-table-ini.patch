@@ -1,0 +1,40 @@
+From 94e15b2d7dfedfdcde819dc5c6590226a172b84a Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Sat, 1 Feb 2014 18:54:25 +0530
+Subject: [PATCH 4/4] RDMA/ocrdma: Fix load time panic during GID table init
+
+driver should use rdma_vlan_dev_real_dev() instead of using vlan_dev_real_dev()
+while building GID table for a vlan interface.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 0ce7674..48794bb 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -161,7 +161,9 @@ static void ocrdma_add_vlan_sgids(struct ocrdma_dev *dev)
+ 
+ 	rcu_read_lock();
+ 	for_each_netdev_rcu(&init_net, tmp) {
+-		if (netdev == tmp || vlan_dev_real_dev(tmp) == netdev) {
++		if (
++			netdev && (netdev == tmp ||
++				rdma_vlan_dev_real_dev(tmp) == netdev)) {
+ 			if (!netif_running(tmp) || !netif_oper_up(tmp))
+ 				continue;
+ 			if (netdev != tmp) {
+@@ -208,7 +210,7 @@ static int ocrdma_inet6addr_event(struct notifier_block *notifier,
+ 	is_vlan = netdev->priv_flags & IFF_802_1Q_VLAN;
+ 	if (is_vlan) {
+ 		vid = vlan_dev_vlan_id(netdev);
+-		netdev = vlan_dev_real_dev(netdev);
++		netdev = rdma_vlan_dev_real_dev(netdev);
+ 	}
+ 
+ 	rcu_read_lock();
+-- 
+1.7.1
+

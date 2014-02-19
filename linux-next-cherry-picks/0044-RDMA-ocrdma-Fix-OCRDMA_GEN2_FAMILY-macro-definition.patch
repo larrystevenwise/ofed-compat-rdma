@@ -1,0 +1,29 @@
+From fef5ee19f628a745ea46a74d7a962721f38ab2e3 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 5 Dec 2013 04:16:07 +0000
+Subject: [PATCH 2/4] RDMA/ocrdma: Fix OCRDMA_GEN2_FAMILY macro definition
+
+OCRDMA_GEN2_FAMILY is wrongly defined as 0x02 -- it should be 0x0F.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+index 2708903..60d5ac2 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+@@ -31,7 +31,7 @@
+ #define Bit(_b) (1 << (_b))
+ 
+ #define OCRDMA_GEN1_FAMILY	0xB
+-#define OCRDMA_GEN2_FAMILY	0x2
++#define OCRDMA_GEN2_FAMILY	0x0F
+ 
+ #define OCRDMA_SUBSYS_ROCE 10
+ enum {
+-- 
+1.7.1
+
