@@ -1,0 +1,47 @@
+From ee947e52b96caa36435896fdc19cd351a805bd27 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 30 Jan 2014 11:58:44 +0530
+Subject: [PATCH 06/16] RDMA/ocrdma: update version string
+
+Update the driver vrsion string and node description string.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma.h      |    4 +++-
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    4 ++--
+ 2 files changed, 5 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index 44064c7..2eb4d22 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -39,7 +39,9 @@
+ #include <be_roce.h>
+ #include "ocrdma_sli.h"
+ 
+-#define OCRDMA_ROCE_DEV_VERSION "1.0.0"
++#define OCRDMA_ROCE_DRV_VERSION "10.2.145.0-ofed"
++
++#define OCRDMA_ROCE_DRV_DESC "Emulex OneConnect RoCE Driver"
+ #define OCRDMA_NODE_DESC "Emulex OneConnect RoCE HCA"
+ 
+ #define OCRDMA_MAX_AH 512
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 8f4e97c..5d30161 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -41,8 +41,8 @@
+ #include "ocrdma_hw.h"
+ #include "ocrdma_abi.h"
+ 
+-MODULE_VERSION(OCRDMA_ROCE_DEV_VERSION);
+-MODULE_DESCRIPTION("Emulex RoCE HCA Driver");
++MODULE_VERSION(OCRDMA_ROCE_DRV_VERSION);
++MODULE_DESCRIPTION(OCRDMA_ROCE_DRV_DESC " " OCRDMA_ROCE_DRV_VERSION);
+ MODULE_AUTHOR("Emulex Corporation");
+ MODULE_LICENSE("GPL");
+ 
+-- 
+1.7.1
+

@@ -1,0 +1,1059 @@
+From dec68de33a6a9cb72512bdbeba81850335dc1749 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Tue, 18 Feb 2014 16:44:08 +0530
+Subject: [PATCH 14/16] RDMA/ocrdma: Support for Skyhawk statistics
+
+Issue mailbox command to get the statistics counters
+from the skyhawk hardware
+
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/Makefile       |    2 +-
+ drivers/infiniband/hw/ocrdma/ocrdma.h       |   28 ++
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c    |   42 ++
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.h    |    1 +
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c  |    8 +
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h   |  152 +++++++
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.c |  623 +++++++++++++++++++++++++++
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.h |   54 +++
+ 8 files changed, 909 insertions(+), 1 deletions(-)
+ create mode 100644 drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+ create mode 100644 drivers/infiniband/hw/ocrdma/ocrdma_stats.h
+
+diff --git a/drivers/infiniband/hw/ocrdma/Makefile b/drivers/infiniband/hw/ocrdma/Makefile
+index 06a5bed..d1bfd4f 100644
+--- a/drivers/infiniband/hw/ocrdma/Makefile
++++ b/drivers/infiniband/hw/ocrdma/Makefile
+@@ -2,4 +2,4 @@ ccflags-y := -Idrivers/net/ethernet/emulex/benet
+ 
+ obj-$(CONFIG_INFINIBAND_OCRDMA)	+= ocrdma.o
+ 
+-ocrdma-y :=	ocrdma_main.o ocrdma_verbs.o ocrdma_hw.o ocrdma_ah.o
++ocrdma-y :=	ocrdma_main.o ocrdma_verbs.o ocrdma_hw.o ocrdma_ah.o ocrdma_stats.o
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index 55eb0e6..15c8ee4 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -53,6 +53,8 @@
+ 
+ #define OCRDMA_UVERBS(CMD_NAME) (1ull << IB_USER_VERBS_CMD_##CMD_NAME)
+ 
++#define convert_to_64bit(lo, hi) ((u64)hi << 32 | (u64)lo)
++
+ struct ocrdma_dev_attr {
+ 	u8 fw_ver[32];
+ 	u32 vendor_id;
+@@ -136,6 +138,18 @@ struct mqe_ctx {
+ 	bool cmd_done;
+ };
+ 
++struct ocrdma_stats {
++	u8 type;
++	struct ocrdma_dev *dev;
++};
++
++struct stats_mem {
++	struct ocrdma_mqe mqe;
++	void *va;
++	dma_addr_t pa;
++	u32 size;
++	char *debugfs_mem;
++};
+ 
+ struct phy_info {
+ 	u16 auto_speeds_supported;
+@@ -197,6 +211,20 @@ struct ocrdma_dev {
+ 	u64 stag_arr[OCRDMA_MAX_STAG];
+ 	u16 pvid;
+ 	u32 asic_id;
++
++	ulong last_stats_time;
++	struct mutex stats_lock; /* provide synch for debugfs operations */
++	struct stats_mem stats_mem;
++	struct ocrdma_stats rsrc_stats;
++	struct ocrdma_stats rx_stats;
++	struct ocrdma_stats wqe_stats;
++	struct ocrdma_stats tx_stats;
++	struct ocrdma_stats db_err_stats;
++	struct ocrdma_stats tx_qp_err_stats;
++	struct ocrdma_stats rx_qp_err_stats;
++	struct ocrdma_stats tx_dbg_stats;
++	struct ocrdma_stats rx_dbg_stats;
++	struct dentry *dir;
+ };
+ 
+ struct ocrdma_cq {
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index f36aa5d..3642383 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -1176,6 +1176,48 @@ mbx_err:
+ 	return status;
+ }
+ 
++int ocrdma_mbx_rdma_stats(struct ocrdma_dev *dev, bool reset)
++{
++	struct ocrdma_rdma_stats_req *req = dev->stats_mem.va;
++	struct ocrdma_mqe *mqe = &dev->stats_mem.mqe;
++	struct ocrdma_rdma_stats_resp *old_stats = NULL;
++	int status;
++
++	old_stats = kzalloc(sizeof(*old_stats), GFP_KERNEL);
++	if (old_stats == NULL)
++		return -ENOMEM;
++
++	memset(mqe, 0, sizeof(*mqe));
++	mqe->hdr.pyld_len = dev->stats_mem.size;
++	mqe->hdr.spcl_sge_cnt_emb |=
++			(1 << OCRDMA_MQE_HDR_SGE_CNT_SHIFT) &
++				OCRDMA_MQE_HDR_SGE_CNT_MASK;
++	mqe->u.nonemb_req.sge[0].pa_lo = (u32) (dev->stats_mem.pa & 0xffffffff);
++	mqe->u.nonemb_req.sge[0].pa_hi = (u32) upper_32_bits(dev->stats_mem.pa);
++	mqe->u.nonemb_req.sge[0].len = dev->stats_mem.size;
++
++	/* Cache the old stats */
++	memcpy(old_stats, req, sizeof(struct ocrdma_rdma_stats_resp));
++	memset(req, 0, dev->stats_mem.size);
++
++	ocrdma_init_mch((struct ocrdma_mbx_hdr *)req,
++			OCRDMA_CMD_GET_RDMA_STATS,
++			OCRDMA_SUBSYS_ROCE,
++			dev->stats_mem.size);
++	if (reset)
++		req->reset_stats = reset;
++
++	status = ocrdma_nonemb_mbx_cmd(dev, mqe, dev->stats_mem.va);
++	if (status)
++		/* Copy from cache, if mbox fails */
++		memcpy(req, old_stats, sizeof(struct ocrdma_rdma_stats_resp));
++	else
++		ocrdma_le32_to_cpu(req, dev->stats_mem.size);
++
++	kfree(old_stats);
++	return status;
++}
++
+ int ocrdma_mbx_get_ctrl_attribs(struct ocrdma_dev *dev)
+ {
+ 	int status = -ENOMEM;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.h b/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
+index 3f8aa86..76ff06d 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
+@@ -135,5 +135,6 @@ bool ocrdma_is_qp_in_rq_flushlist(struct ocrdma_cq *, struct ocrdma_qp *);
+ void ocrdma_flush_qp(struct ocrdma_qp *);
+ int ocrdma_get_irq(struct ocrdma_dev *dev, struct ocrdma_eq *eq);
+ 
++int ocrdma_mbx_rdma_stats(struct ocrdma_dev *, bool reset);
+ char *port_speed_string(struct ocrdma_dev *dev);
+ #endif				/* __OCRDMA_HW_H__ */
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 488a512..95b364d 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -39,6 +39,7 @@
+ #include "ocrdma_ah.h"
+ #include "be_roce.h"
+ #include "ocrdma_hw.h"
++#include "ocrdma_stats.h"
+ #include "ocrdma_abi.h"
+ 
+ MODULE_VERSION(OCRDMA_ROCE_DRV_VERSION);
+@@ -436,6 +437,9 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
+ 	spin_lock(&ocrdma_devlist_lock);
+ 	list_add_tail_rcu(&dev->entry, &ocrdma_dev_list);
+ 	spin_unlock(&ocrdma_devlist_lock);
++	/* Init stats */
++	ocrdma_add_port_stats(dev);
++
+ 	pr_info("%s %s: %s \"%s\" port %d\n",
+ 		dev_name(&dev->nic_info.pdev->dev), hca_name(dev),
+ 		port_speed_string(dev), dev->model_number,
+@@ -473,6 +477,7 @@ static void ocrdma_remove(struct ocrdma_dev *dev)
+ 	/* first unregister with stack to stop all the active traffic
+ 	 * of the registered clients.
+ 	 */
++	ocrdma_rem_port_stats(dev);
+ 	ib_unregister_device(&dev->ibdev);
+ 
+ 	spin_lock(&ocrdma_devlist_lock);
+@@ -561,6 +566,8 @@ static int __init ocrdma_init_module(void)
+ {
+ 	int status;
+ 
++	ocrdma_init_debugfs();
++
+ #if IS_ENABLED(CONFIG_IPV6)
+ 	status = register_inet6addr_notifier(&ocrdma_inet6addr_notifier);
+ 	if (status)
+@@ -578,6 +585,7 @@ static void __exit ocrdma_exit_module(void)
+ {
+ 	be_roce_unregister_driver(&ocrdma_drv);
+ 	ocrdma_unregister_inet6addr_notifier();
++	ocrdma_rem_debugfs();
+ }
+ 
+ module_init(ocrdma_init_module);
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+index 9e72aec..6e048b7 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+@@ -72,6 +72,7 @@ enum {
+ 
+ 	OCRDMA_CMD_ATTACH_MCAST,
+ 	OCRDMA_CMD_DETACH_MCAST,
++	OCRDMA_CMD_GET_RDMA_STATS,
+ 
+ 	OCRDMA_CMD_MAX
+ };
+@@ -1745,6 +1746,157 @@ struct ocrdma_av {
+ 	u32 valid;
+ } __packed;
+ 
++struct ocrdma_rsrc_stats {
++	u32 dpp_pds;
++	u32 non_dpp_pds;
++	u32 rc_dpp_qps;
++	u32 uc_dpp_qps;
++	u32 ud_dpp_qps;
++	u32 rc_non_dpp_qps;
++	u32 rsvd;
++	u32 uc_non_dpp_qps;
++	u32 ud_non_dpp_qps;
++	u32 rsvd1;
++	u32 srqs;
++	u32 rbqs;
++	u32 r64K_nsmr;
++	u32 r64K_to_2M_nsmr;
++	u32 r2M_to_44M_nsmr;
++	u32 r44M_to_1G_nsmr;
++	u32 r1G_to_4G_nsmr;
++	u32 nsmr_count_4G_to_32G;
++	u32 r32G_to_64G_nsmr;
++	u32 r64G_to_128G_nsmr;
++	u32 r128G_to_higher_nsmr;
++	u32 embedded_nsmr;
++	u32 frmr;
++	u32 prefetch_qps;
++	u32 ondemand_qps;
++	u32 phy_mr;
++	u32 mw;
++	u32 rsvd2[7];
++};
++
++struct ocrdma_db_err_stats {
++	u32 sq_doorbell_errors;
++	u32 cq_doorbell_errors;
++	u32 rq_srq_doorbell_errors;
++	u32 cq_overflow_errors;
++	u32 rsvd[4];
++};
++
++struct ocrdma_wqe_stats {
++	u32 large_send_rc_wqes_lo;
++	u32 large_send_rc_wqes_hi;
++	u32 large_write_rc_wqes_lo;
++	u32 large_write_rc_wqes_hi;
++	u32 rsvd[4];
++	u32 read_wqes_lo;
++	u32 read_wqes_hi;
++	u32 frmr_wqes_lo;
++	u32 frmr_wqes_hi;
++	u32 mw_bind_wqes_lo;
++	u32 mw_bind_wqes_hi;
++	u32 invalidate_wqes_lo;
++	u32 invalidate_wqes_hi;
++	u32 rsvd1[2];
++	u32 dpp_wqe_drops;
++	u32 rsvd2[5];
++};
++
++struct ocrdma_tx_stats {
++	u32 send_pkts_lo;
++	u32 send_pkts_hi;
++	u32 write_pkts_lo;
++	u32 write_pkts_hi;
++	u32 read_pkts_lo;
++	u32 read_pkts_hi;
++	u32 read_rsp_pkts_lo;
++	u32 read_rsp_pkts_hi;
++	u32 ack_pkts_lo;
++	u32 ack_pkts_hi;
++	u32 send_bytes_lo;
++	u32 send_bytes_hi;
++	u32 write_bytes_lo;
++	u32 write_bytes_hi;
++	u32 read_req_bytes_lo;
++	u32 read_req_bytes_hi;
++	u32 read_rsp_bytes_lo;
++	u32 read_rsp_bytes_hi;
++	u32 ack_timeouts;
++	u32 rsvd[5];
++};
++
++
++struct ocrdma_tx_qp_err_stats {
++	u32 local_length_errors;
++	u32 local_protection_errors;
++	u32 local_qp_operation_errors;
++	u32 retry_count_exceeded_errors;
++	u32 rnr_retry_count_exceeded_errors;
++	u32 rsvd[3];
++};
++
++struct ocrdma_rx_stats {
++	u32 roce_frame_bytes_lo;
++	u32 roce_frame_bytes_hi;
++	u32 roce_frame_icrc_drops;
++	u32 roce_frame_payload_len_drops;
++	u32 ud_drops;
++	u32 qp1_drops;
++	u32 psn_error_request_packets;
++	u32 psn_error_resp_packets;
++	u32 rnr_nak_timeouts;
++	u32 rnr_nak_receives;
++	u32 roce_frame_rxmt_drops;
++	u32 nak_count_psn_sequence_errors;
++	u32 rc_drop_count_lookup_errors;
++	u32 rq_rnr_naks;
++	u32 srq_rnr_naks;
++	u32 roce_frames_lo;
++	u32 roce_frames_hi;
++	u32 rsvd;
++};
++
++struct ocrdma_rx_qp_err_stats {
++	u32 nak_invalid_requst_errors;
++	u32 nak_remote_operation_errors;
++	u32 nak_count_remote_access_errors;
++	u32 local_length_errors;
++	u32 local_protection_errors;
++	u32 local_qp_operation_errors;
++	u32 rsvd[2];
++};
++
++struct ocrdma_tx_dbg_stats {
++	u32 data[100];
++};
++
++struct ocrdma_rx_dbg_stats {
++	u32 data[200];
++};
++
++struct ocrdma_rdma_stats_req {
++	struct ocrdma_mbx_hdr hdr;
++	u8 reset_stats;
++	u8 rsvd[3];
++} __packed;
++
++struct ocrdma_rdma_stats_resp {
++	struct ocrdma_mbx_hdr hdr;
++	struct ocrdma_rsrc_stats act_rsrc_stats;
++	struct ocrdma_rsrc_stats th_rsrc_stats;
++	struct ocrdma_db_err_stats	db_err_stats;
++	struct ocrdma_wqe_stats		wqe_stats;
++	struct ocrdma_tx_stats		tx_stats;
++	struct ocrdma_tx_qp_err_stats	tx_qp_err_stats;
++	struct ocrdma_rx_stats		rx_stats;
++	struct ocrdma_rx_qp_err_stats	rx_qp_err_stats;
++	struct ocrdma_tx_dbg_stats	tx_dbg_stats;
++	struct ocrdma_rx_dbg_stats	rx_dbg_stats;
++} __packed;
++
++
+ struct mgmt_hba_attribs {
+ 	u8 flashrom_version_string[32];
+ 	u8 manufacturer_name[32];
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+new file mode 100644
+index 0000000..6b3852a
+--- /dev/null
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+@@ -0,0 +1,623 @@
++/*******************************************************************
++ * This file is part of the Emulex RoCE Device Driver for          *
++ * RoCE (RDMA over Converged Ethernet) adapters.                   *
++ * Copyright (C) 2008-2014 Emulex. All rights reserved.            *
++ * EMULEX and SLI are trademarks of Emulex.                        *
++ * www.emulex.com                                                  *
++ *                                                                 *
++ * This program is free software; you can redistribute it and/or   *
++ * modify it under the terms of version 2 of the GNU General       *
++ * Public License as published by the Free Software Foundation.    *
++ * This program is distributed in the hope that it will be useful. *
++ * ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND          *
++ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,  *
++ * FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT, ARE      *
++ * DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD *
++ * TO BE LEGALLY INVALID.  See the GNU General Public License for  *
++ * more details, a copy of which can be found in the file COPYING  *
++ * included with this package.                                     *
++ *
++ * Contact Information:
++ * linux-drivers@emulex.com
++ *
++ * Emulex
++ * 3333 Susan Street
++ * Costa Mesa, CA 92626
++ *******************************************************************/
++
++#include <rdma/ib_addr.h>
++#include "ocrdma_stats.h"
++
++static struct dentry *ocrdma_dbgfs_dir;
++
++static int ocrdma_add_stat(char *start, char *pcur,
++				char *name, u64 count)
++{
++	char buff[128] = {0};
++	int cpy_len = 0;
++
++	snprintf(buff, 128, "%s: %llu\n", name, count);
++	cpy_len = strlen(buff);
++
++	if (pcur + cpy_len > start + OCRDMA_MAX_DBGFS_MEM) {
++		pr_err("%s: No space in stats buff\n", __func__);
++		return 0;
++	}
++
++	memcpy(pcur, buff, cpy_len);
++	return cpy_len;
++}
++
++static bool ocrdma_alloc_stats_mem(struct ocrdma_dev *dev)
++{
++	struct stats_mem *mem = &dev->stats_mem;
++
++	/* Alloc mbox command mem*/
++	mem->size = max_t(u32, sizeof(struct ocrdma_rdma_stats_req),
++			sizeof(struct ocrdma_rdma_stats_resp));
++
++	mem->va   = dma_alloc_coherent(&dev->nic_info.pdev->dev, mem->size,
++					 &mem->pa, GFP_KERNEL);
++	if (!mem->va) {
++		pr_err("%s: stats mbox allocation failed\n", __func__);
++		return false;
++	}
++
++	memset(mem->va, 0, mem->size);
++
++	/* Alloc debugfs mem */
++	mem->debugfs_mem = kzalloc(OCRDMA_MAX_DBGFS_MEM, GFP_KERNEL);
++	if (!mem->debugfs_mem) {
++		pr_err("%s: stats debugfs mem allocation failed\n", __func__);
++		return false;
++	}
++
++	return true;
++}
++
++static void ocrdma_release_stats_mem(struct ocrdma_dev *dev)
++{
++	struct stats_mem *mem = &dev->stats_mem;
++
++	if (mem->va)
++		dma_free_coherent(&dev->nic_info.pdev->dev, mem->size,
++				  mem->va, mem->pa);
++	kfree(mem->debugfs_mem);
++}
++
++static char *ocrdma_resource_stats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++			(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_rsrc_stats *rsrc_stats = &rdma_stats->act_rsrc_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "active_dpp_pds",
++				(u64)rsrc_stats->dpp_pds);
++	pcur += ocrdma_add_stat(stats, pcur, "active_non_dpp_pds",
++				(u64)rsrc_stats->non_dpp_pds);
++	pcur += ocrdma_add_stat(stats, pcur, "active_rc_dpp_qps",
++				(u64)rsrc_stats->rc_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_uc_dpp_qps",
++				(u64)rsrc_stats->uc_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_ud_dpp_qps",
++				(u64)rsrc_stats->ud_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_rc_non_dpp_qps",
++				(u64)rsrc_stats->rc_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_uc_non_dpp_qps",
++				(u64)rsrc_stats->uc_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_ud_non_dpp_qps",
++				(u64)rsrc_stats->ud_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_srqs",
++				(u64)rsrc_stats->srqs);
++	pcur += ocrdma_add_stat(stats, pcur, "active_rbqs",
++				(u64)rsrc_stats->rbqs);
++	pcur += ocrdma_add_stat(stats, pcur, "active_64K_nsmr",
++				(u64)rsrc_stats->r64K_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_64K_to_2M_nsmr",
++				(u64)rsrc_stats->r64K_to_2M_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_2M_to_44M_nsmr",
++				(u64)rsrc_stats->r2M_to_44M_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_44M_to_1G_nsmr",
++				(u64)rsrc_stats->r44M_to_1G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_1G_to_4G_nsmr",
++				(u64)rsrc_stats->r1G_to_4G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_nsmr_count_4G_to_32G",
++				(u64)rsrc_stats->nsmr_count_4G_to_32G);
++	pcur += ocrdma_add_stat(stats, pcur, "active_32G_to_64G_nsmr",
++				(u64)rsrc_stats->r32G_to_64G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_64G_to_128G_nsmr",
++				(u64)rsrc_stats->r64G_to_128G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_128G_to_higher_nsmr",
++				(u64)rsrc_stats->r128G_to_higher_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_embedded_nsmr",
++				(u64)rsrc_stats->embedded_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_frmr",
++				(u64)rsrc_stats->frmr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_prefetch_qps",
++				(u64)rsrc_stats->prefetch_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_ondemand_qps",
++				(u64)rsrc_stats->ondemand_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "active_phy_mr",
++				(u64)rsrc_stats->phy_mr);
++	pcur += ocrdma_add_stat(stats, pcur, "active_mw",
++				(u64)rsrc_stats->mw);
++
++	/* Print the threshold stats */
++	rsrc_stats = &rdma_stats->th_rsrc_stats;
++
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_dpp_pds",
++				(u64)rsrc_stats->dpp_pds);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_non_dpp_pds",
++				(u64)rsrc_stats->non_dpp_pds);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_rc_dpp_qps",
++				(u64)rsrc_stats->rc_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_uc_dpp_qps",
++				(u64)rsrc_stats->uc_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_ud_dpp_qps",
++				(u64)rsrc_stats->ud_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_rc_non_dpp_qps",
++				(u64)rsrc_stats->rc_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_uc_non_dpp_qps",
++				(u64)rsrc_stats->uc_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_ud_non_dpp_qps",
++				(u64)rsrc_stats->ud_non_dpp_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_srqs",
++				(u64)rsrc_stats->srqs);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_rbqs",
++				(u64)rsrc_stats->rbqs);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_64K_nsmr",
++				(u64)rsrc_stats->r64K_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_64K_to_2M_nsmr",
++				(u64)rsrc_stats->r64K_to_2M_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_2M_to_44M_nsmr",
++				(u64)rsrc_stats->r2M_to_44M_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_44M_to_1G_nsmr",
++				(u64)rsrc_stats->r44M_to_1G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_1G_to_4G_nsmr",
++				(u64)rsrc_stats->r1G_to_4G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_nsmr_count_4G_to_32G",
++				(u64)rsrc_stats->nsmr_count_4G_to_32G);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_32G_to_64G_nsmr",
++				(u64)rsrc_stats->r32G_to_64G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_64G_to_128G_nsmr",
++				(u64)rsrc_stats->r64G_to_128G_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_128G_to_higher_nsmr",
++				(u64)rsrc_stats->r128G_to_higher_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_embedded_nsmr",
++				(u64)rsrc_stats->embedded_nsmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_frmr",
++				(u64)rsrc_stats->frmr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_prefetch_qps",
++				(u64)rsrc_stats->prefetch_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_ondemand_qps",
++				(u64)rsrc_stats->ondemand_qps);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_phy_mr",
++				(u64)rsrc_stats->phy_mr);
++	pcur += ocrdma_add_stat(stats, pcur, "threshold_mw",
++				(u64)rsrc_stats->mw);
++	return stats;
++}
++
++static char *ocrdma_rx_stats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_rx_stats *rx_stats = &rdma_stats->rx_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat
++		(stats, pcur, "roce_frame_bytes",
++		 convert_to_64bit(rx_stats->roce_frame_bytes_lo,
++		 rx_stats->roce_frame_bytes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "roce_frame_icrc_drops",
++				(u64)rx_stats->roce_frame_icrc_drops);
++	pcur += ocrdma_add_stat(stats, pcur, "roce_frame_payload_len_drops",
++				(u64)rx_stats->roce_frame_payload_len_drops);
++	pcur += ocrdma_add_stat(stats, pcur, "ud_drops",
++				(u64)rx_stats->ud_drops);
++	pcur += ocrdma_add_stat(stats, pcur, "qp1_drops",
++				(u64)rx_stats->qp1_drops);
++	pcur += ocrdma_add_stat(stats, pcur, "psn_error_request_packets",
++				(u64)rx_stats->psn_error_request_packets);
++	pcur += ocrdma_add_stat(stats, pcur, "psn_error_resp_packets",
++				(u64)rx_stats->psn_error_resp_packets);
++	pcur += ocrdma_add_stat(stats, pcur, "rnr_nak_timeouts",
++				(u64)rx_stats->rnr_nak_timeouts);
++	pcur += ocrdma_add_stat(stats, pcur, "rnr_nak_receives",
++				(u64)rx_stats->rnr_nak_receives);
++	pcur += ocrdma_add_stat(stats, pcur, "roce_frame_rxmt_drops",
++				(u64)rx_stats->roce_frame_rxmt_drops);
++	pcur += ocrdma_add_stat(stats, pcur, "nak_count_psn_sequence_errors",
++				(u64)rx_stats->nak_count_psn_sequence_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "rc_drop_count_lookup_errors",
++				(u64)rx_stats->rc_drop_count_lookup_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "rq_rnr_naks",
++				(u64)rx_stats->rq_rnr_naks);
++	pcur += ocrdma_add_stat(stats, pcur, "srq_rnr_naks",
++				(u64)rx_stats->srq_rnr_naks);
++	pcur += ocrdma_add_stat(stats, pcur, "roce_frames",
++				convert_to_64bit(rx_stats->roce_frames_lo,
++						 rx_stats->roce_frames_hi));
++
++	return stats;
++}
++
++static char *ocrdma_tx_stats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_tx_stats *tx_stats = &rdma_stats->tx_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "send_pkts",
++				convert_to_64bit(tx_stats->send_pkts_lo,
++						 tx_stats->send_pkts_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "write_pkts",
++				convert_to_64bit(tx_stats->write_pkts_lo,
++						 tx_stats->write_pkts_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "read_pkts",
++				convert_to_64bit(tx_stats->read_pkts_lo,
++						 tx_stats->read_pkts_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "read_rsp_pkts",
++				convert_to_64bit(tx_stats->read_rsp_pkts_lo,
++						 tx_stats->read_rsp_pkts_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "ack_pkts",
++				convert_to_64bit(tx_stats->ack_pkts_lo,
++						 tx_stats->ack_pkts_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "send_bytes",
++				convert_to_64bit(tx_stats->send_bytes_lo,
++						 tx_stats->send_bytes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "write_bytes",
++				convert_to_64bit(tx_stats->write_bytes_lo,
++						 tx_stats->write_bytes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "read_req_bytes",
++				convert_to_64bit(tx_stats->read_req_bytes_lo,
++						 tx_stats->read_req_bytes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "read_rsp_bytes",
++				convert_to_64bit(tx_stats->read_rsp_bytes_lo,
++						 tx_stats->read_rsp_bytes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "ack_timeouts",
++				(u64)tx_stats->ack_timeouts);
++
++	return stats;
++}
++
++static char *ocrdma_wqe_stats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_wqe_stats	*wqe_stats = &rdma_stats->wqe_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "large_send_rc_wqes",
++		convert_to_64bit(wqe_stats->large_send_rc_wqes_lo,
++				 wqe_stats->large_send_rc_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "large_write_rc_wqes",
++		convert_to_64bit(wqe_stats->large_write_rc_wqes_lo,
++				 wqe_stats->large_write_rc_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "read_wqes",
++				convert_to_64bit(wqe_stats->read_wqes_lo,
++						 wqe_stats->read_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "frmr_wqes",
++				convert_to_64bit(wqe_stats->frmr_wqes_lo,
++						 wqe_stats->frmr_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "mw_bind_wqes",
++				convert_to_64bit(wqe_stats->mw_bind_wqes_lo,
++						 wqe_stats->mw_bind_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "invalidate_wqes",
++		convert_to_64bit(wqe_stats->invalidate_wqes_lo,
++				 wqe_stats->invalidate_wqes_hi));
++	pcur += ocrdma_add_stat(stats, pcur, "dpp_wqe_drops",
++				(u64)wqe_stats->dpp_wqe_drops);
++	return stats;
++}
++
++static char *ocrdma_db_errstats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_db_err_stats *db_err_stats = &rdma_stats->db_err_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "sq_doorbell_errors",
++				(u64)db_err_stats->sq_doorbell_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "cq_doorbell_errors",
++				(u64)db_err_stats->cq_doorbell_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "rq_srq_doorbell_errors",
++				(u64)db_err_stats->rq_srq_doorbell_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "cq_overflow_errors",
++				(u64)db_err_stats->cq_overflow_errors);
++	return stats;
++}
++
++static char *ocrdma_rxqp_errstats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_rx_qp_err_stats *rx_qp_err_stats =
++		 &rdma_stats->rx_qp_err_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "nak_invalid_requst_errors",
++			(u64)rx_qp_err_stats->nak_invalid_requst_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "nak_remote_operation_errors",
++			(u64)rx_qp_err_stats->nak_remote_operation_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "nak_count_remote_access_errors",
++			(u64)rx_qp_err_stats->nak_count_remote_access_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "local_length_errors",
++			(u64)rx_qp_err_stats->local_length_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "local_protection_errors",
++			(u64)rx_qp_err_stats->local_protection_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "local_qp_operation_errors",
++			(u64)rx_qp_err_stats->local_qp_operation_errors);
++	return stats;
++}
++
++static char *ocrdma_txqp_errstats(struct ocrdma_dev *dev)
++{
++	char *stats = dev->stats_mem.debugfs_mem, *pcur;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_tx_qp_err_stats *tx_qp_err_stats =
++		&rdma_stats->tx_qp_err_stats;
++
++	memset(stats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	pcur = stats;
++	pcur += ocrdma_add_stat(stats, pcur, "local_length_errors",
++			(u64)tx_qp_err_stats->local_length_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "local_protection_errors",
++			(u64)tx_qp_err_stats->local_protection_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "local_qp_operation_errors",
++			(u64)tx_qp_err_stats->local_qp_operation_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "retry_count_exceeded_errors",
++			(u64)tx_qp_err_stats->retry_count_exceeded_errors);
++	pcur += ocrdma_add_stat(stats, pcur, "rnr_retry_count_exceeded_errors",
++			(u64)tx_qp_err_stats->rnr_retry_count_exceeded_errors);
++	return stats;
++}
++
++static char *ocrdma_tx_dbg_stats(struct ocrdma_dev *dev)
++{
++	int i;
++	char *pstats = dev->stats_mem.debugfs_mem;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_tx_dbg_stats *tx_dbg_stats =
++		&rdma_stats->tx_dbg_stats;
++
++	memset(pstats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	for (i = 0; i < 100; i++)
++		pstats += snprintf(pstats, 80, "DW[%d] = 0x%x\n", i,
++				 tx_dbg_stats->data[i]);
++
++	return dev->stats_mem.debugfs_mem;
++}
++
++static char *ocrdma_rx_dbg_stats(struct ocrdma_dev *dev)
++{
++	int i;
++	char *pstats = dev->stats_mem.debugfs_mem;
++	struct ocrdma_rdma_stats_resp *rdma_stats =
++		(struct ocrdma_rdma_stats_resp *)dev->stats_mem.va;
++	struct ocrdma_rx_dbg_stats *rx_dbg_stats =
++		&rdma_stats->rx_dbg_stats;
++
++	memset(pstats, 0, (OCRDMA_MAX_DBGFS_MEM));
++
++	for (i = 0; i < 200; i++)
++		pstats += snprintf(pstats, 80, "DW[%d] = 0x%x\n", i,
++				 rx_dbg_stats->data[i]);
++
++	return dev->stats_mem.debugfs_mem;
++}
++
++static void ocrdma_update_stats(struct ocrdma_dev *dev)
++{
++	ulong now = jiffies, secs;
++	int status = 0;
++
++	secs = jiffies_to_msecs(now - dev->last_stats_time) / 1000U;
++	if (secs) {
++		/* update */
++		status = ocrdma_mbx_rdma_stats(dev, false);
++		if (status)
++			pr_err("%s: stats mbox failed with status = %d\n",
++			       __func__, status);
++		dev->last_stats_time = jiffies;
++	}
++}
++
++static ssize_t ocrdma_dbgfs_ops_read(struct file *filp, char __user *buffer,
++					size_t usr_buf_len, loff_t *ppos)
++{
++	struct ocrdma_stats *pstats = filp->private_data;
++	struct ocrdma_dev *dev = pstats->dev;
++	ssize_t status = 0;
++	char *data = NULL;
++
++	/* No partial reads */
++	if (*ppos != 0)
++		return 0;
++
++	mutex_lock(&dev->stats_lock);
++
++	ocrdma_update_stats(dev);
++
++	switch (pstats->type) {
++	case OCRDMA_RSRC_STATS:
++		data = ocrdma_resource_stats(dev);
++		break;
++	case OCRDMA_RXSTATS:
++		data = ocrdma_rx_stats(dev);
++		break;
++	case OCRDMA_WQESTATS:
++		data = ocrdma_wqe_stats(dev);
++		break;
++	case OCRDMA_TXSTATS:
++		data = ocrdma_tx_stats(dev);
++		break;
++	case OCRDMA_DB_ERRSTATS:
++		data = ocrdma_db_errstats(dev);
++		break;
++	case OCRDMA_RXQP_ERRSTATS:
++		data = ocrdma_rxqp_errstats(dev);
++		break;
++	case OCRDMA_TXQP_ERRSTATS:
++		data = ocrdma_txqp_errstats(dev);
++		break;
++	case OCRDMA_TX_DBG_STATS:
++		data = ocrdma_tx_dbg_stats(dev);
++		break;
++	case OCRDMA_RX_DBG_STATS:
++		data = ocrdma_rx_dbg_stats(dev);
++		break;
++
++	default:
++		status = -EFAULT;
++		goto exit;
++	}
++
++	if (usr_buf_len < strlen(data)) {
++		status = -ENOSPC;
++		goto exit;
++	}
++
++	status = simple_read_from_buffer(buffer, usr_buf_len, ppos, data,
++					 strlen(data));
++exit:
++	mutex_unlock(&dev->stats_lock);
++	return status;
++}
++
++int ocrdma_debugfs_open(struct inode *inode, struct file *file)
++{
++	if (inode->i_private)
++		file->private_data = inode->i_private;
++	return 0;
++}
++
++static const struct file_operations ocrdma_dbg_ops = {
++	.owner = THIS_MODULE,
++	.open = ocrdma_debugfs_open,
++	.read = ocrdma_dbgfs_ops_read,
++};
++
++void ocrdma_add_port_stats(struct ocrdma_dev *dev)
++{
++	if (!ocrdma_dbgfs_dir)
++		return;
++
++	/* Create post stats base dir */
++	dev->dir = debugfs_create_dir(dev->ibdev.name, ocrdma_dbgfs_dir);
++	if (!dev->dir)
++		goto err;
++
++	dev->rsrc_stats.type = OCRDMA_RSRC_STATS;
++	dev->rsrc_stats.dev = dev;
++	if (!debugfs_create_file("resource_stats", S_IRUSR, dev->dir,
++				 &dev->rsrc_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->rx_stats.type = OCRDMA_RXSTATS;
++	dev->rx_stats.dev = dev;
++	if (!debugfs_create_file("rx_stats", S_IRUSR, dev->dir,
++				 &dev->rx_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->wqe_stats.type = OCRDMA_WQESTATS;
++	dev->wqe_stats.dev = dev;
++	if (!debugfs_create_file("wqe_stats", S_IRUSR, dev->dir,
++				 &dev->wqe_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->tx_stats.type = OCRDMA_TXSTATS;
++	dev->tx_stats.dev = dev;
++	if (!debugfs_create_file("tx_stats", S_IRUSR, dev->dir,
++				 &dev->tx_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->db_err_stats.type = OCRDMA_DB_ERRSTATS;
++	dev->db_err_stats.dev = dev;
++	if (!debugfs_create_file("db_err_stats", S_IRUSR, dev->dir,
++				 &dev->db_err_stats, &ocrdma_dbg_ops))
++		goto err;
++
++
++	dev->tx_qp_err_stats.type = OCRDMA_TXQP_ERRSTATS;
++	dev->tx_qp_err_stats.dev = dev;
++	if (!debugfs_create_file("tx_qp_err_stats", S_IRUSR, dev->dir,
++				 &dev->tx_qp_err_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->rx_qp_err_stats.type = OCRDMA_RXQP_ERRSTATS;
++	dev->rx_qp_err_stats.dev = dev;
++	if (!debugfs_create_file("rx_qp_err_stats", S_IRUSR, dev->dir,
++				 &dev->rx_qp_err_stats, &ocrdma_dbg_ops))
++		goto err;
++
++
++	dev->tx_dbg_stats.type = OCRDMA_TX_DBG_STATS;
++	dev->tx_dbg_stats.dev = dev;
++	if (!debugfs_create_file("tx_dbg_stats", S_IRUSR, dev->dir,
++				 &dev->tx_dbg_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	dev->rx_dbg_stats.type = OCRDMA_RX_DBG_STATS;
++	dev->rx_dbg_stats.dev = dev;
++	if (!debugfs_create_file("rx_dbg_stats", S_IRUSR, dev->dir,
++				 &dev->rx_dbg_stats, &ocrdma_dbg_ops))
++		goto err;
++
++	/* Now create dma_mem for stats mbx command */
++	if (!ocrdma_alloc_stats_mem(dev))
++		goto err;
++
++	mutex_init(&dev->stats_lock);
++
++	return;
++err:
++	ocrdma_release_stats_mem(dev);
++	debugfs_remove_recursive(dev->dir);
++	dev->dir = NULL;
++}
++
++void ocrdma_rem_port_stats(struct ocrdma_dev *dev)
++{
++	if (!dev->dir)
++		return;
++	mutex_destroy(&dev->stats_lock);
++	ocrdma_release_stats_mem(dev);
++	debugfs_remove(dev->dir);
++}
++
++void ocrdma_init_debugfs(void)
++{
++	/* Create base dir in debugfs root dir */
++	ocrdma_dbgfs_dir = debugfs_create_dir("ocrdma", NULL);
++}
++
++void ocrdma_rem_debugfs(void)
++{
++	debugfs_remove_recursive(ocrdma_dbgfs_dir);
++}
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.h b/drivers/infiniband/hw/ocrdma/ocrdma_stats.h
+new file mode 100644
+index 0000000..5f5e20c
+--- /dev/null
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.h
+@@ -0,0 +1,54 @@
++/*******************************************************************
++ * This file is part of the Emulex RoCE Device Driver for          *
++ * RoCE (RDMA over Converged Ethernet) adapters.                   *
++ * Copyright (C) 2008-2014 Emulex. All rights reserved.            *
++ * EMULEX and SLI are trademarks of Emulex.                        *
++ * www.emulex.com                                                  *
++ *                                                                 *
++ * This program is free software; you can redistribute it and/or   *
++ * modify it under the terms of version 2 of the GNU General       *
++ * Public License as published by the Free Software Foundation.    *
++ * This program is distributed in the hope that it will be useful. *
++ * ALL EXPRESS OR IMPLIED CONDITIONS, REPRESENTATIONS AND          *
++ * WARRANTIES, INCLUDING ANY IMPLIED WARRANTY OF MERCHANTABILITY,  *
++ * FITNESS FOR A PARTICULAR PURPOSE, OR NON-INFRINGEMENT, ARE      *
++ * DISCLAIMED, EXCEPT TO THE EXTENT THAT SUCH DISCLAIMERS ARE HELD *
++ * TO BE LEGALLY INVALID.  See the GNU General Public License for  *
++ * more details, a copy of which can be found in the file COPYING  *
++ * included with this package.                                     *
++ *
++ * Contact Information:
++ * linux-drivers@emulex.com
++ *
++ * Emulex
++ * 3333 Susan Street
++ * Costa Mesa, CA 92626
++ *******************************************************************/
++
++#ifndef __OCRDMA_STATS_H__
++#define __OCRDMA_STATS_H__
++
++#include <linux/debugfs.h>
++#include "ocrdma.h"
++#include "ocrdma_hw.h"
++
++#define OCRDMA_MAX_DBGFS_MEM 4096
++
++enum OCRDMA_STATS_TYPE {
++	OCRDMA_RSRC_STATS,
++	OCRDMA_RXSTATS,
++	OCRDMA_WQESTATS,
++	OCRDMA_TXSTATS,
++	OCRDMA_DB_ERRSTATS,
++	OCRDMA_RXQP_ERRSTATS,
++	OCRDMA_TXQP_ERRSTATS,
++	OCRDMA_TX_DBG_STATS,
++	OCRDMA_RX_DBG_STATS
++};
++
++void ocrdma_rem_debugfs(void);
++void ocrdma_init_debugfs(void);
++void ocrdma_rem_port_stats(struct ocrdma_dev *dev);
++void ocrdma_add_port_stats(struct ocrdma_dev *dev);
++
++#endif	/* __OCRDMA_STATS_H__ */
+-- 
+1.7.1
+

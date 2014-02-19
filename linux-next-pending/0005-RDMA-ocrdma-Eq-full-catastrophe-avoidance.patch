@@ -1,0 +1,350 @@
+From bf24e5d575c684833685a514930770c719c5dbf7 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 30 Jan 2014 15:35:40 +0530
+Subject: [PATCH 01/16] RDMA/ocrdma: Eq full catastrophe avoidance
+
+Stale entries in the CQ being destroyed causes hardware to generate EQEs indefinetly for a given CQ.
+Thus causing uncontrolled execution of irq_handler. This patch fixes this using following sementics:
+
+    * irq_handler will ring EQ doorbell atleast once and implement budgeting scheme.
+    * cq_destroy will count number of valid entires during destroy and ring
+      cq-db so that hadrware does not generate uncontrolled EQE.
+    * cq_destroy will synchronize with last running irq_handler instance.
+    * arm_cq will always defer arming CQ till poll_cq, except for the first arm_cq call.
+    * poll_cq will always ring cq-db with arm=SET if arm_cq was called prior to enter poll_cq.
+    * poll_cq will always ring cq-db with arm=UNSET if arm_cq was not called prior to enter poll_cq.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma.h       |   18 +++++-
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c    |   53 ++++++++---------
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.h    |    1 +
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |   81 ++++++++++++++++++++-------
+ 4 files changed, 103 insertions(+), 50 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index adc11d1..a329de6 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -183,8 +183,8 @@ struct ocrdma_cq {
+ 			 */
+ 	u32 max_hw_cqe;
+ 	bool phase_change;
+-	bool armed, solicited;
+-	bool arm_needed;
++	bool deferred_arm, deferred_sol;
++	bool first_arm;
+ 
+ 	spinlock_t cq_lock ____cacheline_aligned; /* provide synchronization
+ 						   * to cq polling
+@@ -197,6 +197,7 @@ struct ocrdma_cq {
+ 	struct ocrdma_ucontext *ucontext;
+ 	dma_addr_t pa;
+ 	u32 len;
++	u32 cqe_cnt;
+ 
+ 	/* head of all qp's sq and rq for which cqes need to be flushed
+ 	 * by the software.
+@@ -423,4 +424,17 @@ static inline int is_cqe_wr_imm(struct ocrdma_cqe *cqe)
+ }
+ 
+ 
++static inline int ocrdma_get_eq_table_index(struct ocrdma_dev *dev,
++		int eqid)
++{
++	int indx;
++
++	for (indx = 0; indx < dev->eq_cnt; indx++) {
++		if (dev->eq_tbl[indx].q.id == eqid)
++			return indx;
++	}
++
++	return -EINVAL;
++}
++
+ #endif
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index 50219ab..135331d 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -444,7 +444,7 @@ mbx_err:
+ 	return status;
+ }
+ 
+-static int ocrdma_get_irq(struct ocrdma_dev *dev, struct ocrdma_eq *eq)
++int ocrdma_get_irq(struct ocrdma_dev *dev, struct ocrdma_eq *eq)
+ {
+ 	int irq;
+ 
+@@ -574,6 +574,7 @@ static int ocrdma_create_mq(struct ocrdma_dev *dev)
+ 	if (status)
+ 		goto alloc_err;
+ 
++	dev->eq_tbl[0].cq_cnt++;
+ 	status = ocrdma_mbx_mq_cq_create(dev, &dev->mq.cq, &dev->eq_tbl[0].q);
+ 	if (status)
+ 		goto mbx_cq_free;
+@@ -858,16 +859,8 @@ static void ocrdma_qp_cq_handler(struct ocrdma_dev *dev, u16 cq_idx)
+ 		BUG();
+ 
+ 	cq = dev->cq_tbl[cq_idx];
+-	if (cq == NULL) {
+-		pr_err("%s%d invalid id=0x%x\n", __func__, dev->id, cq_idx);
++	if (cq == NULL)
+ 		return;
+-	}
+-	spin_lock_irqsave(&cq->cq_lock, flags);
+-	cq->armed = false;
+-	cq->solicited = false;
+-	spin_unlock_irqrestore(&cq->cq_lock, flags);
+-
+-	ocrdma_ring_cq_db(dev, cq->id, false, false, 0);
+ 
+ 	if (cq->ibcq.comp_handler) {
+ 		spin_lock_irqsave(&cq->comp_handler_lock, flags);
+@@ -892,27 +885,35 @@ static irqreturn_t ocrdma_irq_handler(int irq, void *handle)
+ 	struct ocrdma_dev *dev = eq->dev;
+ 	struct ocrdma_eqe eqe;
+ 	struct ocrdma_eqe *ptr;
+-	u16 eqe_popped = 0;
+ 	u16 cq_id;
+-	while (1) {
++	int budget = eq->cq_cnt;
++
++	do {
+ 		ptr = ocrdma_get_eqe(eq);
+ 		eqe = *ptr;
+ 		ocrdma_le32_to_cpu(&eqe, sizeof(eqe));
+ 		if ((eqe.id_valid & OCRDMA_EQE_VALID_MASK) == 0)
+ 			break;
+-		eqe_popped += 1;
++
+ 		ptr->id_valid = 0;
++		/* ring eq doorbell as soon as its consumed. */
++		ocrdma_ring_eq_db(dev, eq->q.id, false, true, 1);
+ 		/* check whether its CQE or not. */
+ 		if ((eqe.id_valid & OCRDMA_EQE_FOR_CQE_MASK) == 0) {
+ 			cq_id = eqe.id_valid >> OCRDMA_EQE_RESOURCE_ID_SHIFT;
+ 			ocrdma_cq_handler(dev, cq_id);
+ 		}
+ 		ocrdma_eq_inc_tail(eq);
+-	}
+-	ocrdma_ring_eq_db(dev, eq->q.id, true, true, eqe_popped);
+-	/* Ring EQ doorbell with num_popped to 0 to enable interrupts again. */
+-	if (dev->nic_info.intr_mode == BE_INTERRUPT_MODE_INTX)
+-		ocrdma_ring_eq_db(dev, eq->q.id, true, true, 0);
++
++		/* There can be a stale EQE after the last bound CQ is
++		 * destroyed. EQE valid and budget == 0 implies this.
++		 */
++		if (budget)
++			budget--;
++
++	} while (budget);
++
++	ocrdma_ring_eq_db(dev, eq->q.id, true, true, 0);
+ 	return IRQ_HANDLED;
+ }
+ 
+@@ -1357,12 +1358,10 @@ static void ocrdma_unbind_eq(struct ocrdma_dev *dev, u16 eq_id)
+ 	int i;
+ 
+ 	mutex_lock(&dev->dev_lock);
+-	for (i = 0; i < dev->eq_cnt; i++) {
+-		if (dev->eq_tbl[i].q.id != eq_id)
+-			continue;
+-		dev->eq_tbl[i].cq_cnt -= 1;
+-		break;
+-	}
++	i = ocrdma_get_eq_table_index(dev, eq_id);
++	if (i == -EINVAL)
++		BUG();
++	dev->eq_tbl[i].cq_cnt -= 1;
+ 	mutex_unlock(&dev->dev_lock);
+ }
+ 
+@@ -1417,6 +1416,7 @@ int ocrdma_mbx_create_cq(struct ocrdma_dev *dev, struct ocrdma_cq *cq,
+ 	cq->eqn = ocrdma_bind_eq(dev);
+ 	cmd->cmd.req.rsvd_version = OCRDMA_CREATE_CQ_VER3;
+ 	cqe_count = cq->len / cqe_size;
++	cq->cqe_cnt = cqe_count;
+ 	if (cqe_count > 1024) {
+ 		/* Set cnt to 3 to indicate more than 1024 cq entries */
+ 		cmd->cmd.ev_cnt_flags |= (0x3 << OCRDMA_CREATE_CQ_CNT_SHIFT);
+@@ -1484,12 +1484,9 @@ int ocrdma_mbx_destroy_cq(struct ocrdma_dev *dev, struct ocrdma_cq *cq)
+ 	    (cq->id << OCRDMA_DESTROY_CQ_QID_SHIFT) &
+ 	    OCRDMA_DESTROY_CQ_QID_MASK;
+ 
+-	ocrdma_unbind_eq(dev, cq->eqn);
+ 	status = ocrdma_mbx_cmd(dev, (struct ocrdma_mqe *)cmd);
+-	if (status)
+-		goto mbx_err;
++	ocrdma_unbind_eq(dev, cq->eqn);
+ 	dma_free_coherent(&dev->nic_info.pdev->dev, cq->len, cq->va, cq->pa);
+-mbx_err:
+ 	kfree(cmd);
+ 	return status;
+ }
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.h b/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
+index f2a89d4..38102b3 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.h
+@@ -133,5 +133,6 @@ int ocrdma_qp_state_change(struct ocrdma_qp *, enum ib_qp_state new_state,
+ bool ocrdma_is_qp_in_sq_flushlist(struct ocrdma_cq *, struct ocrdma_qp *);
+ bool ocrdma_is_qp_in_rq_flushlist(struct ocrdma_cq *, struct ocrdma_qp *);
+ void ocrdma_flush_qp(struct ocrdma_qp *);
++int ocrdma_get_irq(struct ocrdma_dev *dev, struct ocrdma_eq *eq);
+ 
+ #endif				/* __OCRDMA_HW_H__ */
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index 86242ce..ae2b778 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -910,6 +910,7 @@ struct ib_cq *ocrdma_create_cq(struct ib_device *ibdev, int entries, int vector,
+ 	spin_lock_init(&cq->comp_handler_lock);
+ 	INIT_LIST_HEAD(&cq->sq_head);
+ 	INIT_LIST_HEAD(&cq->rq_head);
++	cq->first_arm = true;
+ 
+ 	if (ib_ctx) {
+ 		uctx = get_ocrdma_ucontext(ib_ctx);
+@@ -927,9 +928,7 @@ struct ib_cq *ocrdma_create_cq(struct ib_device *ibdev, int entries, int vector,
+ 			goto ctx_err;
+ 	}
+ 	cq->phase = OCRDMA_CQE_VALID;
+-	cq->arm_needed = true;
+ 	dev->cq_tbl[cq->id] = cq;
+-
+ 	return &cq->ibcq;
+ 
+ ctx_err:
+@@ -952,15 +951,52 @@ int ocrdma_resize_cq(struct ib_cq *ibcq, int new_cnt,
+ 	return status;
+ }
+ 
++void ocrdma_flush_cq(struct ocrdma_cq *cq)
++{
++	int cqe_cnt;
++	int valid_count = 0;
++	unsigned long flags;
++
++	struct ocrdma_dev *dev = get_ocrdma_dev(cq->ibcq.device);
++	struct ocrdma_cqe *cqe = NULL;
++
++	cqe = cq->va;
++	cqe_cnt = cq->cqe_cnt;
++
++	/* Last irq might have scheduled a polling thread
++	 * sync-up with it before hard flushing.
++	 */
++	spin_lock_irqsave(&cq->cq_lock, flags);
++	while (cqe_cnt) {
++		if (is_cqe_valid(cq, cqe))
++			valid_count++;
++		cqe++;
++		cqe_cnt--;
++	}
++	ocrdma_ring_cq_db(dev, cq->id, false, false, valid_count);
++	spin_unlock_irqrestore(&cq->cq_lock, flags);
++}
++
+ int ocrdma_destroy_cq(struct ib_cq *ibcq)
+ {
+ 	int status;
+ 	struct ocrdma_cq *cq = get_ocrdma_cq(ibcq);
++	struct ocrdma_eq *eq = NULL;
+ 	struct ocrdma_dev *dev = get_ocrdma_dev(ibcq->device);
+ 	int pdid = 0;
++	u32 irq, indx;
+ 
+-	status = ocrdma_mbx_destroy_cq(dev, cq);
++	dev->cq_tbl[cq->id] = NULL;
++	indx = ocrdma_get_eq_table_index(dev, cq->eqn);
++	if (indx == -EINVAL)
++		BUG();
+ 
++	eq = &dev->eq_tbl[indx];
++	irq = ocrdma_get_irq(dev, eq);
++	synchronize_irq(irq);
++	ocrdma_flush_cq(cq);
++
++	status = ocrdma_mbx_destroy_cq(dev, cq);
+ 	if (cq->ucontext) {
+ 		pdid = cq->ucontext->cntxt_pd->id;
+ 		ocrdma_del_mmap(cq->ucontext, (u64) cq->pa,
+@@ -969,7 +1005,6 @@ int ocrdma_destroy_cq(struct ib_cq *ibcq)
+ 				ocrdma_get_db_addr(dev, pdid),
+ 				dev->nic_info.db_page_size);
+ 	}
+-	dev->cq_tbl[cq->id] = NULL;
+ 
+ 	kfree(cq);
+ 	return status;
+@@ -2706,10 +2741,18 @@ expand_cqe:
+ 	}
+ stop_cqe:
+ 	cq->getp = cur_getp;
+-	if (polled_hw_cqes || expand || stop) {
+-		ocrdma_ring_cq_db(dev, cq->id, cq->armed, cq->solicited,
++	if (cq->deferred_arm) {
++		ocrdma_ring_cq_db(dev, cq->id, true, cq->deferred_sol,
++				  polled_hw_cqes);
++		cq->deferred_arm = false;
++		cq->deferred_sol = false;
++	} else {
++		/* We need to pop the CQE. No need to arm */
++		ocrdma_ring_cq_db(dev, cq->id, false, cq->deferred_sol,
+ 				  polled_hw_cqes);
++		cq->deferred_sol = false;
+ 	}
++
+ 	return i;
+ }
+ 
+@@ -2781,30 +2824,28 @@ int ocrdma_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags cq_flags)
+ 	struct ocrdma_cq *cq = get_ocrdma_cq(ibcq);
+ 	struct ocrdma_dev *dev = get_ocrdma_dev(ibcq->device);
+ 	u16 cq_id;
+-	u16 cur_getp;
+-	struct ocrdma_cqe *cqe;
+ 	unsigned long flags;
++	bool arm_needed = false, sol_needed = false;
+ 
+ 	cq_id = cq->id;
+ 
+ 	spin_lock_irqsave(&cq->cq_lock, flags);
+ 	if (cq_flags & IB_CQ_NEXT_COMP || cq_flags & IB_CQ_SOLICITED)
+-		cq->armed = true;
++		arm_needed = true;
+ 	if (cq_flags & IB_CQ_SOLICITED)
+-		cq->solicited = true;
+-
+-	cur_getp = cq->getp;
+-	cqe = cq->va + cur_getp;
++		sol_needed = true;
+ 
+-	/* check whether any valid cqe exist or not, if not then safe to
+-	 * arm. If cqe is not yet consumed, then let it get consumed and then
+-	 * we arm it to avoid false interrupts.
+-	 */
+-	if (!is_cqe_valid(cq, cqe) || cq->arm_needed) {
+-		cq->arm_needed = false;
+-		ocrdma_ring_cq_db(dev, cq_id, cq->armed, cq->solicited, 0);
++	if (cq->first_arm) {
++		ocrdma_ring_cq_db(dev, cq_id, arm_needed, sol_needed, 0);
++		cq->first_arm = false;
++		goto skip_defer;
+ 	}
++	cq->deferred_arm = true;
++
++skip_defer:
++	cq->deferred_sol = sol_needed;
+ 	spin_unlock_irqrestore(&cq->cq_lock, flags);
++
+ 	return 0;
+ }
+ 
+-- 
+1.7.1
+

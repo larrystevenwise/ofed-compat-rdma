@@ -1,0 +1,57 @@
+From 9b13a993e13fc662fd44130093cf116114bae539 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 30 Jan 2014 10:00:37 +0530
+Subject: [PATCH] be2net: adding abi version between be2net and ocrdma
+
+This patch adds abi versioning between be2net and ocrdma
+driver modules. This is to catch the functional incompatibilities
+in the two drivers.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/net/ethernet/emulex/benet/be_roce.c |    6 ++++++
+ drivers/net/ethernet/emulex/benet/be_roce.h |    3 +++
+ 2 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/net/ethernet/emulex/benet/be_roce.c b/drivers/net/ethernet/emulex/benet/be_roce.c
+index 9cd5415..aa7f943 100644
+--- a/drivers/net/ethernet/emulex/benet/be_roce.c
++++ b/drivers/net/ethernet/emulex/benet/be_roce.c
+@@ -35,6 +35,12 @@ static void _be_roce_dev_add(struct be_adapter *adapter)
+ 
+ 	if (!ocrdma_drv)
+ 		return;
++
++	if (ocrdma_drv->be_abi_version != BE_ROCE_ABI_VERSION) {
++		dev_warn(&pdev->dev, "Cannot initialize RoCE due to ocrdma ABI mismatch\n");
++		return;
++	}
++
+ 	if (pdev->device == OC_DEVICE_ID5) {
+ 		/* only msix is supported on these devices */
+ 		if (!msix_enabled(adapter))
+diff --git a/drivers/net/ethernet/emulex/benet/be_roce.h b/drivers/net/ethernet/emulex/benet/be_roce.h
+index 2cd1129..1bfb161 100644
+--- a/drivers/net/ethernet/emulex/benet/be_roce.h
++++ b/drivers/net/ethernet/emulex/benet/be_roce.h
+@@ -21,6 +21,8 @@
+ #include <linux/pci.h>
+ #include <linux/netdevice.h>
+ 
++#define BE_ROCE_ABI_VERSION	1
++
+ struct ocrdma_dev;
+ 
+ enum be_interrupt_mode {
+@@ -52,6 +54,7 @@ struct be_dev_info {
+ /* ocrdma driver register's the callback functions with nic driver. */
+ struct ocrdma_driver {
+ 	unsigned char name[32];
++	u32 be_abi_version;
+ 	struct ocrdma_dev *(*add) (struct be_dev_info *dev_info);
+ 	void (*remove) (struct ocrdma_dev *);
+ 	void (*state_change_handler) (struct ocrdma_dev *, u32 new_state);
+-- 
+1.7.1
+

@@ -1,0 +1,29 @@
+From 2e753c2d314295448b1822786feff345efc2e6b7 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 30 Jan 2014 11:13:22 +0530
+Subject: [PATCH 07/16] RDMA/ocrdma: increment abi version count
+
+Increment the ABI version count for driver/library interface.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_abi.h |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_abi.h b/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
+index 2a14d4a..5a82ce5 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
+@@ -28,7 +28,7 @@
+ #ifndef __OCRDMA_ABI_H__
+ #define __OCRDMA_ABI_H__
+ 
+-#define OCRDMA_ABI_VERSION 1
++#define OCRDMA_ABI_VERSION 2
+ #define OCRDMA_BE_ROCE_ABI_VERSION 1
+ /* user kernel communication data structures. */
+ 
+-- 
+1.7.1
+

@@ -1,0 +1,42 @@
+From 459a5fdb860295fdfd3f163b5deb462848f3092a Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 30 Jan 2014 09:57:37 +0530
+Subject: [PATCH 05/16] RDMA/ocrdma: ABI versioning between ocrdma and be2net
+
+While loading RoCE driver be2net driver should check for ABI version to catch
+functional incompatibilities.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_abi.h  |    1 +
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    1 +
+ 2 files changed, 2 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_abi.h b/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
+index fbac8eb..2a14d4a 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_abi.h
+@@ -29,6 +29,7 @@
+ #define __OCRDMA_ABI_H__
+ 
+ #define OCRDMA_ABI_VERSION 1
++#define OCRDMA_BE_ROCE_ABI_VERSION 1
+ /* user kernel communication data structures. */
+ 
+ struct ocrdma_alloc_ucontext_resp {
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index b21761b..8f4e97c 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -541,6 +541,7 @@ static struct ocrdma_driver ocrdma_drv = {
+ 	.add			= ocrdma_add,
+ 	.remove			= ocrdma_remove,
+ 	.state_change_handler	= ocrdma_event_handler,
++	.be_abi_version		= OCRDMA_BE_ROCE_ABI_VERSION,
+ };
+ 
+ static void ocrdma_unregister_inet6addr_notifier(void)
+-- 
+1.7.1
+

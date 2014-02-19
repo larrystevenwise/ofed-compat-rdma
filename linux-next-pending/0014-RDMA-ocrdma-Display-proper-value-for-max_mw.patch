@@ -1,0 +1,55 @@
+From f4969efbef7ed1205bbdc35c41b04666121e04ba Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Thu, 30 Jan 2014 13:35:13 +0530
+Subject: [PATCH 10/16] RDMA/ocrdma: Display proper value for max_mw
+
+Fixing the max_mw value
+
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma.h       |    1 +
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c    |    1 +
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |    2 +-
+ 3 files changed, 3 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index 2eb4d22..f486f3a 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -67,6 +67,7 @@ struct ocrdma_dev_attr {
+ 	int max_mr;
+ 	u64 max_mr_size;
+ 	u32 max_num_mr_pbl;
++	int max_mw;
+ 	int max_fmr;
+ 	int max_map_per_fmr;
+ 	int max_pages_per_frmr;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index dc72df9..69b4266 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -1016,6 +1016,7 @@ static void ocrdma_get_attr(struct ocrdma_dev *dev,
+ 	attr->local_ca_ack_delay = (rsp->max_pd_ca_ack_delay &
+ 				    OCRDMA_MBX_QUERY_CFG_CA_ACK_DELAY_MASK) >>
+ 	    OCRDMA_MBX_QUERY_CFG_CA_ACK_DELAY_SHIFT;
++	attr->max_mw = rsp->max_mw;
+ 	attr->max_mr = rsp->max_mr;
+ 	attr->max_mr_size = ~0ull;
+ 	attr->max_fmr = 0;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index 786ddfc..635a757 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -89,7 +89,7 @@ int ocrdma_query_device(struct ib_device *ibdev, struct ib_device_attr *attr)
+ 	attr->max_cq = dev->attr.max_cq;
+ 	attr->max_cqe = dev->attr.max_cqe;
+ 	attr->max_mr = dev->attr.max_mr;
+-	attr->max_mw = 0;
++	attr->max_mw = dev->attr.max_mw;
+ 	attr->max_pd = dev->attr.max_pd;
+ 	attr->atomic_cap = 0;
+ 	attr->max_fmr = 0;
+-- 
+1.7.1
+

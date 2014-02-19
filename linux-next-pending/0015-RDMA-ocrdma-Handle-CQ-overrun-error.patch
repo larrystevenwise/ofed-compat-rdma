@@ -1,0 +1,46 @@
+From 5601237f4362363cb35f97caa15db3f3ba40271e Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Thu, 30 Jan 2014 13:45:11 +0530
+Subject: [PATCH 11/16] RDMA/ocrdma: Handle CQ overrun error
+
+Update the variables to handle CQ overrun errors
+
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c |    5 ++++-
+ 1 files changed, 4 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index 69b4266..bd9c8b1 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -640,7 +640,7 @@ static void ocrdma_dispatch_ibevent(struct ocrdma_dev *dev,
+ {
+ 	struct ocrdma_qp *qp = NULL;
+ 	struct ocrdma_cq *cq = NULL;
+-	struct ib_event ib_evt;
++	struct ib_event ib_evt = { 0 };
+ 	int cq_event = 0;
+ 	int qp_event = 1;
+ 	int srq_event = 0;
+@@ -665,6 +665,8 @@ static void ocrdma_dispatch_ibevent(struct ocrdma_dev *dev,
+ 	case OCRDMA_CQ_OVERRUN_ERROR:
+ 		ib_evt.element.cq = &cq->ibcq;
+ 		ib_evt.event = IB_EVENT_CQ_ERR;
++		cq_event = 1;
++		qp_event = 0;
+ 		break;
+ 	case OCRDMA_CQ_QPCAT_ERROR:
+ 		ib_evt.element.qp = &qp->ibqp;
+@@ -726,6 +728,7 @@ static void ocrdma_dispatch_ibevent(struct ocrdma_dev *dev,
+ 						     qp->srq->ibsrq.
+ 						     srq_context);
+ 	} else if (dev_event) {
++		pr_err("%s: Fatal event received\n", dev->ibdev.name);
+ 		ib_dispatch_event(&ib_evt);
+ 	}
+ 
+-- 
+1.7.1
+

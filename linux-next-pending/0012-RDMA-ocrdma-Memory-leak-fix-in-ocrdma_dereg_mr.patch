@@ -1,0 +1,30 @@
+From 8452902d31f2da4cff07b8cc169437b891ca97cd Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Thu, 30 Jan 2014 12:17:52 +0530
+Subject: [PATCH 08/16] RDMA/ocrdma: Memory leak fix in ocrdma_dereg_mr
+
+Fix for memory leak in ocrdma_dereg_mr.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |    3 +--
+ 1 files changed, 1 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index 20ef4ba..9eabe27 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -840,8 +840,7 @@ int ocrdma_dereg_mr(struct ib_mr *ib_mr)
+ 
+ 	status = ocrdma_mbx_dealloc_lkey(dev, mr->hwmr.fr_mr, mr->hwmr.lkey);
+ 
+-	if (mr->hwmr.fr_mr == 0)
+-		ocrdma_free_mr_pbl_tbl(dev, &mr->hwmr);
++	ocrdma_free_mr_pbl_tbl(dev, &mr->hwmr);
+ 
+ 	/* it could be user registered memory. */
+ 	if (mr->umem)
+-- 
+1.7.1
+
