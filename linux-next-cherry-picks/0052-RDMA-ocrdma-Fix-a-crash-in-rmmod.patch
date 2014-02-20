@@ -1,0 +1,47 @@
+From fd60af834ce3bba30202d31acdf4fbb1f9559242 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Thu, 20 Feb 2014 16:00:14 +0530
+Subject: [PATCH 1/5] RDMA/ocrdma: Fix a crash in rmmod
+
+ocrdma_remove_free() is called from a call_rcu callback funtion
+context, which can be a bottom-half context. So the code in
+ocrdma_remove_free should not sleep.
+
+But ocrdma_cleanup_hw() can sleep, So move it ocrdma_remove()
+instead of ocrdma_remove_free.
+
+commit-ID:1852d1da3b4723d7db0d490f54c07442b3e1c452
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Naresh Gottumukkala <bgottumukkala@emulex.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    5 ++---
+ 1 files changed, 2 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 0ce7674..6e86e26 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -452,9 +452,6 @@ static void ocrdma_remove_free(struct rcu_head *rcu)
+ {
+ 	struct ocrdma_dev *dev = container_of(rcu, struct ocrdma_dev, rcu);
+ 
+-	ocrdma_free_resources(dev);
+-	ocrdma_cleanup_hw(dev);
+-
+ 	idr_remove(&ocrdma_dev_id, dev->id);
+ 	kfree(dev->mbx_cmd);
+ 	ib_dealloc_device(&dev->ibdev);
+@@ -470,6 +467,8 @@ static void ocrdma_remove(struct ocrdma_dev *dev)
+ 	spin_lock(&ocrdma_devlist_lock);
+ 	list_del_rcu(&dev->entry);
+ 	spin_unlock(&ocrdma_devlist_lock);
++	ocrdma_free_resources(dev);
++	ocrdma_cleanup_hw(dev);
+ 	call_rcu(&dev->rcu, ocrdma_remove_free);
+ }
+ 
+-- 
+1.7.1
+
