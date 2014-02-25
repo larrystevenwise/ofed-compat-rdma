@@ -1,0 +1,30 @@
+From 8ff7eff20329c749c1907ce71cef9fd593584554 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Tue, 25 Feb 2014 21:16:58 +0530
+Subject: [PATCH 23/23] RDMA/ocrdma: ROLLBACK dpp posting for RDMA-READ
+
+this patch is to rollback the feature to post RDMA-READ wqe through
+DPP QP.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c |    3 ++-
+ 1 files changed, 2 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index ef630b0..b305da6 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -2206,7 +2206,8 @@ int ocrdma_mbx_create_qp(struct ocrdma_qp *qp, struct ib_qp_init_attr *attrs,
+ 				OCRDMA_CREATE_QP_REQ_RQ_CQID_MASK;
+ 	qp->rq_cq = cq;
+ 
+-	if (pd->dpp_enabled && pd->num_dpp_qp) {
++	if (pd->dpp_enabled && attrs->cap.max_inline_data && pd->num_dpp_qp &&
++	    (attrs->cap.max_inline_data <= dev->attr.max_inline_data)) {
+ 		ocrdma_set_create_qp_dpp_cmd(cmd, pd, qp, enable_dpp_cq,
+ 					     dpp_cq_id);
+ 	}
+-- 
+1.7.1
+
