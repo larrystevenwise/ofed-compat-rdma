@@ -172,6 +172,8 @@ cd -
 
 %if %{build_kernel_ib}
 make install_kernel MODULES_DIR=%{LIB_MOD_DIR} INSTALL_MOD_PATH=$RPM_BUILD_ROOT INSTALL_MOD_DIR=updates KERNELRELEASE=%{KVERSION}
+cp -a compat.config $RPM_BUILD_ROOT/%{_prefix}/src/%{_name}
+cp -a include/linux/compat_autoconf.h $RPM_BUILD_ROOT/%{_prefix}/src/%{_name}/include/linux
 %endif
 
 %if %{build_kernel_ib_devel}
