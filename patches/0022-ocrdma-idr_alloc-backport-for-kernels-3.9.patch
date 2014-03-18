@@ -3,8 +3,8 @@ Subject: [PATCH] ocrdma: idr_alloc backport for kernels < 3.9
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/hw/ocrdma/ocrdma_main.c |   18 ++++++++++++++++++
- 1 files changed, 18 insertions(+), 0 deletions(-)
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c | 18 ++++++++++++++++++
+ 1 file changed, 18 insertions(+)
 
 diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
 index xxxxxxx..xxxxxxx xxxxxx

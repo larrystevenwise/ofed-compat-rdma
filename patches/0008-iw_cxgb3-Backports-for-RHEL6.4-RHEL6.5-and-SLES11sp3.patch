@@ -3,9 +3,9 @@ Subject: [PATCH] iw_cxgb3: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
 ---
- drivers/infiniband/hw/cxgb3/iwch.h    |   17 +++++++++++++-
- drivers/infiniband/hw/cxgb3/iwch_cm.c |   39 +++++++++++++++++++++++++++++++++
- 2 files changed, 55 insertions(+), 1 deletions(-)
+ drivers/infiniband/hw/cxgb3/iwch.h    | 17 ++++++++++++++-
+ drivers/infiniband/hw/cxgb3/iwch_cm.c | 39 +++++++++++++++++++++++++++++++++++
+ 2 files changed, 55 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/hw/cxgb3/iwch.h b/drivers/infiniband/hw/cxgb3/iwch.h
 index xxxxxxx..xxxxxxx xxxxxx

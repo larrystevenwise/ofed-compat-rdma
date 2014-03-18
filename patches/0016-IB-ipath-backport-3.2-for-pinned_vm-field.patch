@@ -3,8 +3,8 @@ Subject: [PATCH] IB/ipath: backport < 3.2 for pinned_vm field
 
 Signed-off-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 ---
- drivers/infiniband/hw/ipath/ipath_user_pages.c |   12 ++++++++++++
- 1 files changed, 12 insertions(+), 0 deletions(-)
+ drivers/infiniband/hw/ipath/ipath_user_pages.c | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/infiniband/hw/ipath/ipath_user_pages.c b/drivers/infiniband/hw/ipath/ipath_user_pages.c
 index xxxxxxx..xxxxxxx xxxxxx

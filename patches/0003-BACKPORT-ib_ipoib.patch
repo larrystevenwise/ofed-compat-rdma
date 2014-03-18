@@ -3,12 +3,12 @@ Subject: [PATCH] BACKPORT: ib_ipoib
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/ulp/ipoib/ipoib.h           |    3 ++
- drivers/infiniband/ulp/ipoib/ipoib_cm.c        |    8 +++++
- drivers/infiniband/ulp/ipoib/ipoib_main.c      |   37 ++++++++++++++++++++++++
- drivers/infiniband/ulp/ipoib/ipoib_multicast.c |   15 +++++++++
- drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |    8 +++++
- 5 files changed, 71 insertions(+), 0 deletions(-)
+ drivers/infiniband/ulp/ipoib/ipoib.h           |  3 +++
+ drivers/infiniband/ulp/ipoib/ipoib_cm.c        |  8 ++++++
+ drivers/infiniband/ulp/ipoib/ipoib_main.c      | 37 ++++++++++++++++++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_multicast.c | 15 +++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |  8 ++++++
+ 5 files changed, 71 insertions(+)
 
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib.h b/drivers/infiniband/ulp/ipoib/ipoib.h
 index xxxxxxx..xxxxxxx xxxxxx

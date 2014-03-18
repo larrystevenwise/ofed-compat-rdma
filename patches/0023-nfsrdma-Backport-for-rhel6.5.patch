@@ -1,5 +1,17 @@
+From: "Jeffrey C. Becker" <Jeffrey.C.Becker@nasa.gov>
+Subject: [PATCH] nfsrdma: Backport for rhel6.5
+
+Signed-off-by: Jeffrey C. Becker <Jeffrey.C.Becker@nasa.gov>
+---
+ net/sunrpc/xprtrdma/rpc_rdma.c           | 16 ++++++++++++++++
+ net/sunrpc/xprtrdma/svc_rdma_recvfrom.c  |  9 +++++++++
+ net/sunrpc/xprtrdma/svc_rdma_sendto.c    |  6 ++++++
+ net/sunrpc/xprtrdma/svc_rdma_transport.c |  4 ++++
+ net/sunrpc/xprtrdma/transport.c          |  4 ++++
+ 5 files changed, 39 insertions(+)
+
 diff --git a/net/sunrpc/xprtrdma/rpc_rdma.c b/net/sunrpc/xprtrdma/rpc_rdma.c
-index e03725b..410b551 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/rpc_rdma.c
 +++ b/net/sunrpc/xprtrdma/rpc_rdma.c
 @@ -338,9 +338,17 @@ rpcrdma_inline_pullup(struct rpc_rqst *rqst, int pad)
@@ -40,7 +52,7 @@ index e03725b..410b551 100644
  			copy_len -= curlen;
  			if (copy_len == 0)
 diff --git a/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c b/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
-index 0ce7552..afd46ee 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
 +++ b/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
 @@ -524,8 +524,13 @@ next_sge:
@@ -70,7 +82,7 @@ index 0ce7552..afd46ee 100644
  	/* Rebuild rq_arg head and tail. */
  	rqstp->rq_arg.head[0] = head->arg.head[0];
 diff --git a/net/sunrpc/xprtrdma/svc_rdma_sendto.c b/net/sunrpc/xprtrdma/svc_rdma_sendto.c
-index c1d124d..59d462d 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/svc_rdma_sendto.c
 +++ b/net/sunrpc/xprtrdma/svc_rdma_sendto.c
 @@ -548,7 +548,9 @@ static int send_reply(struct svcxprt_rdma *rdma,
@@ -97,7 +109,7 @@ index c1d124d..59d462d 100644
  		ctxt->count++;
  		rqstp->rq_respages[page_no] = NULL;
 diff --git a/net/sunrpc/xprtrdma/svc_rdma_transport.c b/net/sunrpc/xprtrdma/svc_rdma_transport.c
-index 62e4f9b..f4d65b1 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/svc_rdma_transport.c
 +++ b/net/sunrpc/xprtrdma/svc_rdma_transport.c
 @@ -445,7 +445,11 @@ static struct svcxprt_rdma *rdma_create_xprt(struct svc_serv *serv,
@@ -113,7 +125,7 @@ index 62e4f9b..f4d65b1 100644
  	INIT_LIST_HEAD(&cma_xprt->sc_dto_q);
  	INIT_LIST_HEAD(&cma_xprt->sc_rq_dto_q);
 diff --git a/net/sunrpc/xprtrdma/transport.c b/net/sunrpc/xprtrdma/transport.c
-index 285dc08..b53d9f3 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/transport.c
 +++ b/net/sunrpc/xprtrdma/transport.c
 @@ -51,7 +51,9 @@

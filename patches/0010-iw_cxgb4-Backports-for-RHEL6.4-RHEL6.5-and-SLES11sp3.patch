@@ -3,10 +3,10 @@ Subject: [PATCH] iw_cxgb4: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
 ---
- drivers/infiniband/hw/cxgb4/cm.c       |   79 ++++++++++++++++++++++++++++++++
- drivers/infiniband/hw/cxgb4/iw_cxgb4.h |   17 +++++++
- drivers/infiniband/hw/cxgb4/mem.c      |    1 +
- 3 files changed, 97 insertions(+), 0 deletions(-)
+ drivers/infiniband/hw/cxgb4/cm.c       | 79 ++++++++++++++++++++++++++++++++++
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h | 17 ++++++++
+ drivers/infiniband/hw/cxgb4/mem.c      |  1 +
+ 3 files changed, 97 insertions(+)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx

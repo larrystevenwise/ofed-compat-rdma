@@ -3,10 +3,10 @@ Subject: [PATCH] cxgb3/cxgb4: Fix pr_fmt warnings
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
 ---
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |    1 +
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |    1 +
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |    1 +
- 3 files changed, 3 insertions(+), 0 deletions(-)
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    | 1 +
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c | 1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    | 1 +
+ 3 files changed, 3 insertions(+)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
 index xxxxxxx..xxxxxxx xxxxxx

@@ -3,11 +3,11 @@ Subject: [PATCH] RDMA/nes: 3.12 backport patches
 
 Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
 ---
- drivers/infiniband/hw/nes/nes.c     |    4 ++
- drivers/infiniband/hw/nes/nes_cm.c  |   14 +++++-
- drivers/infiniband/hw/nes/nes_hw.c  |   28 +++++++++--
- drivers/infiniband/hw/nes/nes_hw.h  |    6 ++
- drivers/infiniband/hw/nes/nes_nic.c |   96 ++++++++++++++++++++++++++++++++--
+ drivers/infiniband/hw/nes/nes.c     |  4 ++
+ drivers/infiniband/hw/nes/nes_cm.c  | 14 +++++-
+ drivers/infiniband/hw/nes/nes_hw.c  | 28 +++++++++--
+ drivers/infiniband/hw/nes/nes_hw.h  |  6 +++
+ drivers/infiniband/hw/nes/nes_nic.c | 96 ++++++++++++++++++++++++++++++++++---
  5 files changed, 137 insertions(+), 11 deletions(-)
 
 diff --git a/drivers/infiniband/hw/nes/nes.c b/drivers/infiniband/hw/nes/nes.c

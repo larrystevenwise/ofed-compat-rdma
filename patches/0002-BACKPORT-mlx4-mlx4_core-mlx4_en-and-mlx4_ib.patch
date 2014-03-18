@@ -3,20 +3,20 @@ Subject: [PATCH] BACKPORT: mlx4 (mlx4_core, mlx4_en and mlx4_ib)
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/hw/mlx4/cm.c                 |   31 ++++
- drivers/infiniband/hw/mlx4/main.c               |   16 ++
- drivers/net/ethernet/mellanox/mlx4/cmd.c        |    6 +
- drivers/net/ethernet/mellanox/mlx4/en_cq.c      |   10 ++
- drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |   12 ++
- drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |   51 +++++++
- drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |  176 ++++++++++++++++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   29 ++++
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   36 +++++
- drivers/net/ethernet/mellanox/mlx4/eq.c         |    8 +
- drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   57 ++++++++
- include/linux/mlx4/cmd.h                        |    2 +
- include/linux/mlx4/device.h                     |    6 +
- 13 files changed, 439 insertions(+), 1 deletions(-)
+ drivers/infiniband/hw/mlx4/cm.c                 |  31 +++++
+ drivers/infiniband/hw/mlx4/main.c               |  16 +++
+ drivers/net/ethernet/mellanox/mlx4/cmd.c        |   6 +
+ drivers/net/ethernet/mellanox/mlx4/en_cq.c      |  10 ++
+ drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |  12 ++
+ drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |  51 +++++++
+ drivers/net/ethernet/mellanox/mlx4/en_netdev.c  | 176 +++++++++++++++++++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  29 ++++
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  36 +++++
+ drivers/net/ethernet/mellanox/mlx4/eq.c         |   8 ++
+ drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |  57 ++++++++
+ include/linux/mlx4/cmd.h                        |   2 +
+ include/linux/mlx4/device.h                     |   6 +
+ 13 files changed, 439 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx

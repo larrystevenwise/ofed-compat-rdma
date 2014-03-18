@@ -3,8 +3,8 @@ Subject: [PATCH] Deal with struct pci changes.
 
 Signed-off-by: Dennis Dalessandro <dennis.dalessandro@intel.com>
 ---
- drivers/infiniband/hw/qib/qib_pcie.c |   21 +++++++++++++++++++++
- 1 files changed, 21 insertions(+), 0 deletions(-)
+ drivers/infiniband/hw/qib/qib_pcie.c | 21 +++++++++++++++++++++
+ 1 file changed, 21 insertions(+)
 
 diff --git a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
 index xxxxxxx..xxxxxxx xxxxxx

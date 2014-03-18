@@ -1,8 +1,16 @@
+From: "Jeffrey C. Becker" <Jeffrey.C.Becker@nasa.gov>
+Subject: [PATCH] nfsrdma: Backport for sles11sp3
+
+Signed-off-by: Jeffrey C. Becker <Jeffrey.C.Becker@nasa.gov>
+---
+ net/sunrpc/xprtrdma/transport.c | 13 +++++++++++++
+ 1 file changed, 13 insertions(+)
+
 diff --git a/net/sunrpc/xprtrdma/transport.c b/net/sunrpc/xprtrdma/transport.c
-index 285dc08..ab74500 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/net/sunrpc/xprtrdma/transport.c
 +++ b/net/sunrpc/xprtrdma/transport.c
-@@ -279,7 +281,9 @@ xprt_setup_rdma(struct xprt_create *args)
+@@ -281,7 +281,9 @@ xprt_setup_rdma(struct xprt_create *args)
  	}
  
  	xprt = xprt_alloc(args->net, sizeof(struct rpcrdma_xprt),
@@ -12,7 +20,7 @@ index 285dc08..ab74500 100644
  			xprt_rdma_slot_table_entries);
  	if (xprt == NULL) {
  		dprintk("RPC:       %s: couldn't allocate rpcrdma_xprt\n",
-@@ -448,8 +452,15 @@ xprt_rdma_connect(struct rpc_xprt *xprt, struct rpc_task *task)
+@@ -450,8 +452,15 @@ xprt_rdma_connect(struct rpc_xprt *xprt, struct rpc_task *task)
  }
  
  static int
@@ -28,7 +36,7 @@ index 285dc08..ab74500 100644
  	struct rpcrdma_xprt *r_xprt = rpcx_to_rdmax(xprt);
  	int credits = atomic_read(&r_xprt->rx_buf.rb_credits);
  
-@@ -461,7 +472,11 @@ xprt_rdma_reserve_xprt(struct rpc_xprt *xprt, struct rpc_task *task)
+@@ -463,7 +472,11 @@ xprt_rdma_reserve_xprt(struct rpc_xprt *xprt, struct rpc_task *task)
  		BUG_ON(r_xprt->rx_buf.rb_cwndscale <= 0);
  	}
  	xprt->cwnd = credits * r_xprt->rx_buf.rb_cwndscale;

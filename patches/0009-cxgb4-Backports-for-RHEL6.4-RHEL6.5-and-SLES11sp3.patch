@@ -3,9 +3,9 @@ Subject: [PATCH] cxgb4: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
 ---
- drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |   17 ++
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  208 ++++++++++++++++++++---
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |  108 ++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  17 ++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 208 +++++++++++++++++++++---
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        | 108 ++++++++++++
  3 files changed, 308 insertions(+), 25 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h

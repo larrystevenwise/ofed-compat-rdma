@@ -27,6 +27,20 @@ function set_config {
 	eval "export $VAR=$VALUE"
 	echo "export $VAR=$VALUE"
 }
+function unset_config {
+	VAR=$1
+
+	eval "unset $VAR"
+	echo "unexport $VAR"
+}
+
+function check_autofconf {
+	VAR=$1
+	VALUE=$(tac ${KLIB_BUILD}/include/*/autoconf.h | grep -m1 ${VAR} | sed -ne 's/.*\([01]\)$/\1/gp')
+
+	eval "export $VAR=$VALUE"
+}
+
 # Note that this script will export all variables explicitly,
 # trying to export all with a blanket "export" statement at
 # the top of the generated file causes the build to slow down
@@ -251,4 +265,8 @@ fi
 
 if (grep -q virtqueue_add_buf_gfp ${KLIB_BUILD}/tools/include/virtio/linux/virtio.h > /dev/null 2>&1 || grep -q virtqueue_add_buf_gfp /lib/modules/${KVERSION}/source/include/linux/virtio.h > /dev/null 2>&1); then
         set_config CONFIG_COMPAT_VIRTQUEUE_ADD_BUF_GFP y
+fi
+
+if (grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/uapi/linux/if_link.h > /dev/null 2>&1 || grep -qw __IFLA_VF_LINK_STATE_MAX /lib/modules/${KVERSION}/source/include/uapi/linux/if_link.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_IFLA_VF_LINK_STATE_MAX y
 fi

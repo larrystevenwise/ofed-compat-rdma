@@ -3,15 +3,15 @@ Subject: [PATCH] cxgb3: Backports for RHEL6.4, RHEL6.5 and SLES11sp3
 
 Signed-off-by: Kumar Sanghvi <kumaras@chelsio.com>
 ---
- drivers/net/ethernet/chelsio/cxgb3/adapter.h       |   19 +++
- drivers/net/ethernet/chelsio/cxgb3/common.h        |    3 +
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  118 +++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |  107 ++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb3/l2t.c           |    9 ++
- drivers/net/ethernet/chelsio/cxgb3/l2t.h           |    5 +
- drivers/net/ethernet/chelsio/cxgb3/sge.c           |   46 ++++++++
- drivers/net/ethernet/chelsio/cxgb3/t3_hw.c         |    4 +
- drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |   17 +++-
+ drivers/net/ethernet/chelsio/cxgb3/adapter.h       |  19 ++++
+ drivers/net/ethernet/chelsio/cxgb3/common.h        |   3 +
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    | 118 ++++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c | 107 ++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb3/l2t.c           |   9 ++
+ drivers/net/ethernet/chelsio/cxgb3/l2t.h           |   5 +
+ drivers/net/ethernet/chelsio/cxgb3/sge.c           |  46 ++++++++
+ drivers/net/ethernet/chelsio/cxgb3/t3_hw.c         |   4 +
+ drivers/net/ethernet/chelsio/cxgb3/xgmac.c         |  17 ++-
  9 files changed, 325 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/net/ethernet/chelsio/cxgb3/adapter.h b/drivers/net/ethernet/chelsio/cxgb3/adapter.h
