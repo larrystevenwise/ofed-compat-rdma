@@ -24,13 +24,13 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static int
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0))
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)) || defined (CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS)
  xprt_rdma_reserve_xprt(struct rpc_xprt *xprt, struct rpc_task *task)
 +#else
 +xprt_rdma_reserve_xprt(struct rpc_task *task)
 +#endif
  {
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0))
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)) && !defined (CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS)
 +	struct rpc_xprt *xprt = task->tk_xprt;
 +#endif
  	struct rpcrdma_xprt *r_xprt = rpcx_to_rdmax(xprt);
