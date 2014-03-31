@@ -1,0 +1,66 @@
+Fix regression in NFSRDMA server
+
+From: Tom Tucker <tom@ogc.us>
+
+The server regression was caused by the addition of rq_next_page
+(afc59400d6c65bad66d4ad0b2daf879cbff8e23e). There were a few places that
+were missed with the update of the rq_respages array.
+
+NOTE: Patch modified to apply against OFED.
+
+Signed-off-by: Tom Tucker <tom@ogc.us>
+Tested-by: Steve Wise <swise@ogc.us>
+
+---
+
+--- a/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c	2014-03-31 15:31:05.214903226 -0500
++++ a/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c	2014-03-31 15:34:40.042047141 -0500
+@@ -90,6 +90,9 @@ static void rdma_build_arg_xdr(struct sv
+ 		sge_no++;
+ 	}
+ 	rqstp->rq_respages = &rqstp->rq_pages[sge_no];
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
++	rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 
+ 	/* We should never run out of SGE because the limit is defined to
+ 	 * support the max allowed RPC data length
+@@ -169,6 +172,9 @@ static int map_read_chunks(struct svcxpr
+ 		 */
+ 		head->arg.pages[page_no] = rqstp->rq_arg.pages[page_no];
+ 		rqstp->rq_respages = &rqstp->rq_arg.pages[page_no+1];
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
++		rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 
+ 		byte_count -= sge_bytes;
+ 		ch_bytes -= sge_bytes;
+@@ -276,6 +282,9 @@ static int fast_reg_read_chunks(struct s
+ 
+ 	/* rq_respages points one past arg pages */
+ 	rqstp->rq_respages = &rqstp->rq_arg.pages[page_no];
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,8,0))
++	rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 
+ 	/* Create the reply and chunk maps */
+ 	offset = 0;
+@@ -527,9 +536,6 @@ next_sge:
+ #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
+         while (rqstp->rq_resused)
+                 rqstp->rq_respages[--rqstp->rq_resused] = NULL;
+-#else
+-	while (rqstp->rq_next_page != rqstp->rq_respages)
+-		*(--rqstp->rq_next_page) = NULL;
+ #endif
+ 
+ 	return err;
+@@ -558,7 +564,7 @@ static int rdma_read_complete(struct svc
+ #if (LINUX_VERSION_CODE < KERNEL_VERSION(3,8,0))
+         rqstp->rq_resused = 0;
+ #else
+-	rqstp->rq_next_page = &rqstp->rq_arg.pages[page_no];
++	rqstp->rq_next_page = rqstp->rq_respages + 1;
+ #endif
+ 
+ 	/* Rebuild rq_arg head and tail. */
