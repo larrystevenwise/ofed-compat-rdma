@@ -1,0 +1,981 @@
+commit 05eb23893c2cf9502a9cec0c32e7f1d1ed2895c8
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Fri Mar 14 21:52:08 2014 +0530
+
+    cxgb4/iw_cxgb4: Doorbell Drop Avoidance Bug Fixes
+    
+    The current logic suffers from a slow response time to disable user DB
+    usage, and also fails to avoid DB FIFO drops under heavy load. This commit
+    fixes these deficiencies and makes the avoidance logic more optimal.
+    This is done by more efficiently notifying the ULDs of potential DB
+    problems, and implements a smoother flow control algorithm in iw_cxgb4,
+    which is the ULD that puts the most load on the DB fifo.
+    
+    Design:
+    
+    cxgb4:
+    
+    Direct ULD callback from the DB FULL/DROP interrupt handler.  This allows
+    the ULD to stop doing user DB writes as quickly as possible.
+    
+    While user DB usage is disabled, the LLD will accumulate DB write events
+    for its queues.  Then once DB usage is reenabled, a single DB write is
+    done for each queue with its accumulated write count.  This reduces the
+    load put on the DB fifo when reenabling.
+    
+    iw_cxgb4:
+    
+    Instead of marking each qp to indicate DB writes are disabled, we create
+    a device-global status page that each user process maps.  This allows
+    iw_cxgb4 to only set this single bit to disable all DB writes for all
+    user QPs vs traversing the idr of all the active QPs.  If the libcxgb4
+    doesn't support this, then we fall back to the old approach of marking
+    each QP.  Thus we allow the new driver to work with an older libcxgb4.
+    
+    When the LLD upcalls iw_cxgb4 indicating DB FULL, we disable all DB writes
+    via the status page and transition the DB state to STOPPED.  As user
+    processes see that DB writes are disabled, they call into iw_cxgb4
+    to submit their DB write events.  Since the DB state is in STOPPED,
+    the QP trying to write gets enqueued on a new DB "flow control" list.
+    As subsequent DB writes are submitted for this flow controlled QP, the
+    amount of writes are accumulated for each QP on the flow control list.
+    So all the user QPs that are actively ringing the DB get put on this
+    list and the number of writes they request are accumulated.
+    
+    When the LLD upcalls iw_cxgb4 indicating DB EMPTY, which is in a workq
+    context, we change the DB state to FLOW_CONTROL, and begin resuming all
+    the QPs that are on the flow control list.  This logic runs on until
+    the flow control list is empty or we exit FLOW_CONTROL mode (due to
+    a DB DROP upcall, for example).  QPs are removed from this list, and
+    their accumulated DB write counts written to the DB FIFO.  Sets of QPs,
+    called chunks in the code, are removed at one time. The chunk size is 64.
+    So 64 QPs are resumed at a time, and before the next chunk is resumed, the
+    logic waits (blocks) for the DB FIFO to drain.  This prevents resuming to
+    quickly and overflowing the FIFO.  Once the flow control list is empty,
+    the db state transitions back to NORMAL and user QPs are again allowed
+    to write directly to the user DB register.
+    
+    The algorithm is designed such that if the DB write load is high enough,
+    then all the DB writes get submitted by the kernel using this flow
+    controlled approach to avoid DB drops.  As the load lightens though, we
+    resume to normal DB writes directly by user applications.
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 4a03385..ba7335f 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -64,6 +64,10 @@ struct uld_ctx {
+ static LIST_HEAD(uld_ctx_list);
+ static DEFINE_MUTEX(dev_mutex);
+ 
++#define DB_FC_RESUME_SIZE 64
++#define DB_FC_RESUME_DELAY 1
++#define DB_FC_DRAIN_THRESH 0
++
+ static struct dentry *c4iw_debugfs_root;
+ 
+ struct c4iw_debugfs_data {
+@@ -282,7 +286,7 @@ static const struct file_operations stag_debugfs_fops = {
+ 	.llseek  = default_llseek,
+ };
+ 
+-static char *db_state_str[] = {"NORMAL", "FLOW_CONTROL", "RECOVERY"};
++static char *db_state_str[] = {"NORMAL", "FLOW_CONTROL", "RECOVERY", "STOPPED"};
+ 
+ static int stats_show(struct seq_file *seq, void *v)
+ {
+@@ -311,9 +315,10 @@ static int stats_show(struct seq_file *seq, void *v)
+ 	seq_printf(seq, "  DB FULL: %10llu\n", dev->rdev.stats.db_full);
+ 	seq_printf(seq, " DB EMPTY: %10llu\n", dev->rdev.stats.db_empty);
+ 	seq_printf(seq, "  DB DROP: %10llu\n", dev->rdev.stats.db_drop);
+-	seq_printf(seq, " DB State: %s Transitions %llu\n",
++	seq_printf(seq, " DB State: %s Transitions %llu FC Interruptions %llu\n",
+ 		   db_state_str[dev->db_state],
+-		   dev->rdev.stats.db_state_transitions);
++		   dev->rdev.stats.db_state_transitions,
++		   dev->rdev.stats.db_fc_interruptions);
+ 	seq_printf(seq, "TCAM_FULL: %10llu\n", dev->rdev.stats.tcam_full);
+ 	seq_printf(seq, "ACT_OFLD_CONN_FAILS: %10llu\n",
+ 		   dev->rdev.stats.act_ofld_conn_fails);
+@@ -643,6 +648,12 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
+ 		printk(KERN_ERR MOD "error %d initializing ocqp pool\n", err);
+ 		goto err4;
+ 	}
++	rdev->status_page = (struct t4_dev_status_page *)
++			    __get_free_page(GFP_KERNEL);
++	if (!rdev->status_page) {
++		pr_err(MOD "error allocating status page\n");
++		goto err4;
++	}
+ 	return 0;
+ err4:
+ 	c4iw_rqtpool_destroy(rdev);
+@@ -656,6 +667,7 @@ err1:
+ 
+ static void c4iw_rdev_close(struct c4iw_rdev *rdev)
+ {
++	free_page((unsigned long)rdev->status_page);
+ 	c4iw_pblpool_destroy(rdev);
+ 	c4iw_rqtpool_destroy(rdev);
+ 	c4iw_destroy_resource(&rdev->resource);
+@@ -703,18 +715,6 @@ static struct c4iw_dev *c4iw_alloc(const struct cxgb4_lld_info *infop)
+ 		pr_info("%s: On-Chip Queues not supported on this device.\n",
+ 			pci_name(infop->pdev));
+ 
+-	if (!is_t4(infop->adapter_type)) {
+-		if (!allow_db_fc_on_t5) {
+-			db_fc_threshold = 100000;
+-			pr_info("DB Flow Control Disabled.\n");
+-		}
+-
+-		if (!allow_db_coalescing_on_t5) {
+-			db_coalescing_threshold = -1;
+-			pr_info("DB Coalescing Disabled.\n");
+-		}
+-	}
+-
+ 	devp = (struct c4iw_dev *)ib_alloc_device(sizeof(*devp));
+ 	if (!devp) {
+ 		printk(KERN_ERR MOD "Cannot allocate ib device\n");
+@@ -749,6 +749,7 @@ static struct c4iw_dev *c4iw_alloc(const struct cxgb4_lld_info *infop)
+ 	spin_lock_init(&devp->lock);
+ 	mutex_init(&devp->rdev.stats.lock);
+ 	mutex_init(&devp->db_mutex);
++	INIT_LIST_HEAD(&devp->db_fc_list);
+ 
+ 	if (c4iw_debugfs_root) {
+ 		devp->debugfs_root = debugfs_create_dir(
+@@ -977,13 +978,16 @@ static int disable_qp_db(int id, void *p, void *data)
+ 
+ static void stop_queues(struct uld_ctx *ctx)
+ {
+-	spin_lock_irq(&ctx->dev->lock);
+-	if (ctx->dev->db_state == NORMAL) {
+-		ctx->dev->rdev.stats.db_state_transitions++;
+-		ctx->dev->db_state = FLOW_CONTROL;
++	unsigned long flags;
++
++	spin_lock_irqsave(&ctx->dev->lock, flags);
++	ctx->dev->rdev.stats.db_state_transitions++;
++	ctx->dev->db_state = STOPPED;
++	if (ctx->dev->rdev.flags & T4_STATUS_PAGE_DISABLED)
+ 		idr_for_each(&ctx->dev->qpidr, disable_qp_db, NULL);
+-	}
+-	spin_unlock_irq(&ctx->dev->lock);
++	else
++		ctx->dev->rdev.status_page->db_off = 1;
++	spin_unlock_irqrestore(&ctx->dev->lock, flags);
+ }
+ 
+ static int enable_qp_db(int id, void *p, void *data)
+@@ -994,15 +998,70 @@ static int enable_qp_db(int id, void *p, void *data)
+ 	return 0;
+ }
+ 
++static void resume_rc_qp(struct c4iw_qp *qp)
++{
++	spin_lock(&qp->lock);
++	t4_ring_sq_db(&qp->wq, qp->wq.sq.wq_pidx_inc);
++	qp->wq.sq.wq_pidx_inc = 0;
++	t4_ring_rq_db(&qp->wq, qp->wq.rq.wq_pidx_inc);
++	qp->wq.rq.wq_pidx_inc = 0;
++	spin_unlock(&qp->lock);
++}
++
++static void resume_a_chunk(struct uld_ctx *ctx)
++{
++	int i;
++	struct c4iw_qp *qp;
++
++	for (i = 0; i < DB_FC_RESUME_SIZE; i++) {
++		qp = list_first_entry(&ctx->dev->db_fc_list, struct c4iw_qp,
++				      db_fc_entry);
++		list_del_init(&qp->db_fc_entry);
++		resume_rc_qp(qp);
++		if (list_empty(&ctx->dev->db_fc_list))
++			break;
++	}
++}
++
+ static void resume_queues(struct uld_ctx *ctx)
+ {
+ 	spin_lock_irq(&ctx->dev->lock);
+-	if (ctx->dev->qpcnt <= db_fc_threshold &&
+-	    ctx->dev->db_state == FLOW_CONTROL) {
+-		ctx->dev->db_state = NORMAL;
+-		ctx->dev->rdev.stats.db_state_transitions++;
+-		idr_for_each(&ctx->dev->qpidr, enable_qp_db, NULL);
++	if (ctx->dev->db_state != STOPPED)
++		goto out;
++	ctx->dev->db_state = FLOW_CONTROL;
++	while (1) {
++		if (list_empty(&ctx->dev->db_fc_list)) {
++			WARN_ON(ctx->dev->db_state != FLOW_CONTROL);
++			ctx->dev->db_state = NORMAL;
++			ctx->dev->rdev.stats.db_state_transitions++;
++			if (ctx->dev->rdev.flags & T4_STATUS_PAGE_DISABLED) {
++				idr_for_each(&ctx->dev->qpidr, enable_qp_db,
++					     NULL);
++			} else {
++				ctx->dev->rdev.status_page->db_off = 0;
++			}
++			break;
++		} else {
++			if (cxgb4_dbfifo_count(ctx->dev->rdev.lldi.ports[0], 1)
++			    < (ctx->dev->rdev.lldi.dbfifo_int_thresh <<
++			       DB_FC_DRAIN_THRESH)) {
++				resume_a_chunk(ctx);
++			}
++			if (!list_empty(&ctx->dev->db_fc_list)) {
++				spin_unlock_irq(&ctx->dev->lock);
++				if (DB_FC_RESUME_DELAY) {
++					set_current_state(TASK_UNINTERRUPTIBLE);
++					schedule_timeout(DB_FC_RESUME_DELAY);
++				}
++				spin_lock_irq(&ctx->dev->lock);
++				if (ctx->dev->db_state != FLOW_CONTROL)
++					break;
++			}
++		}
+ 	}
++out:
++	if (ctx->dev->db_state != NORMAL)
++		ctx->dev->rdev.stats.db_fc_interruptions++;
+ 	spin_unlock_irq(&ctx->dev->lock);
+ }
+ 
+@@ -1028,12 +1087,12 @@ static int count_qps(int id, void *p, void *data)
+ 	return 0;
+ }
+ 
+-static void deref_qps(struct qp_list qp_list)
++static void deref_qps(struct qp_list *qp_list)
+ {
+ 	int idx;
+ 
+-	for (idx = 0; idx < qp_list.idx; idx++)
+-		c4iw_qp_rem_ref(&qp_list.qps[idx]->ibqp);
++	for (idx = 0; idx < qp_list->idx; idx++)
++		c4iw_qp_rem_ref(&qp_list->qps[idx]->ibqp);
+ }
+ 
+ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
+@@ -1044,17 +1103,22 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
+ 	for (idx = 0; idx < qp_list->idx; idx++) {
+ 		struct c4iw_qp *qp = qp_list->qps[idx];
+ 
++		spin_lock_irq(&qp->rhp->lock);
++		spin_lock(&qp->lock);
+ 		ret = cxgb4_sync_txq_pidx(qp->rhp->rdev.lldi.ports[0],
+ 					  qp->wq.sq.qid,
+ 					  t4_sq_host_wq_pidx(&qp->wq),
+ 					  t4_sq_wq_size(&qp->wq));
+ 		if (ret) {
+-			printk(KERN_ERR MOD "%s: Fatal error - "
++			pr_err(KERN_ERR MOD "%s: Fatal error - "
+ 			       "DB overflow recovery failed - "
+ 			       "error syncing SQ qid %u\n",
+ 			       pci_name(ctx->lldi.pdev), qp->wq.sq.qid);
++			spin_unlock(&qp->lock);
++			spin_unlock_irq(&qp->rhp->lock);
+ 			return;
+ 		}
++		qp->wq.sq.wq_pidx_inc = 0;
+ 
+ 		ret = cxgb4_sync_txq_pidx(qp->rhp->rdev.lldi.ports[0],
+ 					  qp->wq.rq.qid,
+@@ -1062,12 +1126,17 @@ static void recover_lost_dbs(struct uld_ctx *ctx, struct qp_list *qp_list)
+ 					  t4_rq_wq_size(&qp->wq));
+ 
+ 		if (ret) {
+-			printk(KERN_ERR MOD "%s: Fatal error - "
++			pr_err(KERN_ERR MOD "%s: Fatal error - "
+ 			       "DB overflow recovery failed - "
+ 			       "error syncing RQ qid %u\n",
+ 			       pci_name(ctx->lldi.pdev), qp->wq.rq.qid);
++			spin_unlock(&qp->lock);
++			spin_unlock_irq(&qp->rhp->lock);
+ 			return;
+ 		}
++		qp->wq.rq.wq_pidx_inc = 0;
++		spin_unlock(&qp->lock);
++		spin_unlock_irq(&qp->rhp->lock);
+ 
+ 		/* Wait for the dbfifo to drain */
+ 		while (cxgb4_dbfifo_count(qp->rhp->rdev.lldi.ports[0], 1) > 0) {
+@@ -1083,36 +1152,22 @@ static void recover_queues(struct uld_ctx *ctx)
+ 	struct qp_list qp_list;
+ 	int ret;
+ 
+-	/* lock out kernel db ringers */
+-	mutex_lock(&ctx->dev->db_mutex);
+-
+-	/* put all queues in to recovery mode */
+-	spin_lock_irq(&ctx->dev->lock);
+-	ctx->dev->db_state = RECOVERY;
+-	ctx->dev->rdev.stats.db_state_transitions++;
+-	idr_for_each(&ctx->dev->qpidr, disable_qp_db, NULL);
+-	spin_unlock_irq(&ctx->dev->lock);
+-
+ 	/* slow everybody down */
+ 	set_current_state(TASK_UNINTERRUPTIBLE);
+ 	schedule_timeout(usecs_to_jiffies(1000));
+ 
+-	/* Wait for the dbfifo to completely drain. */
+-	while (cxgb4_dbfifo_count(ctx->dev->rdev.lldi.ports[0], 1) > 0) {
+-		set_current_state(TASK_UNINTERRUPTIBLE);
+-		schedule_timeout(usecs_to_jiffies(10));
+-	}
+-
+ 	/* flush the SGE contexts */
+ 	ret = cxgb4_flush_eq_cache(ctx->dev->rdev.lldi.ports[0]);
+ 	if (ret) {
+ 		printk(KERN_ERR MOD "%s: Fatal error - DB overflow recovery failed\n",
+ 		       pci_name(ctx->lldi.pdev));
+-		goto out;
++		return;
+ 	}
+ 
+ 	/* Count active queues so we can build a list of queues to recover */
+ 	spin_lock_irq(&ctx->dev->lock);
++	WARN_ON(ctx->dev->db_state != STOPPED);
++	ctx->dev->db_state = RECOVERY;
+ 	idr_for_each(&ctx->dev->qpidr, count_qps, &count);
+ 
+ 	qp_list.qps = kzalloc(count * sizeof *qp_list.qps, GFP_ATOMIC);
+@@ -1120,7 +1175,7 @@ static void recover_queues(struct uld_ctx *ctx)
+ 		printk(KERN_ERR MOD "%s: Fatal error - DB overflow recovery failed\n",
+ 		       pci_name(ctx->lldi.pdev));
+ 		spin_unlock_irq(&ctx->dev->lock);
+-		goto out;
++		return;
+ 	}
+ 	qp_list.idx = 0;
+ 
+@@ -1133,29 +1188,13 @@ static void recover_queues(struct uld_ctx *ctx)
+ 	recover_lost_dbs(ctx, &qp_list);
+ 
+ 	/* we're almost done!  deref the qps and clean up */
+-	deref_qps(qp_list);
++	deref_qps(&qp_list);
+ 	kfree(qp_list.qps);
+ 
+-	/* Wait for the dbfifo to completely drain again */
+-	while (cxgb4_dbfifo_count(ctx->dev->rdev.lldi.ports[0], 1) > 0) {
+-		set_current_state(TASK_UNINTERRUPTIBLE);
+-		schedule_timeout(usecs_to_jiffies(10));
+-	}
+-
+-	/* resume the queues */
+ 	spin_lock_irq(&ctx->dev->lock);
+-	if (ctx->dev->qpcnt > db_fc_threshold)
+-		ctx->dev->db_state = FLOW_CONTROL;
+-	else {
+-		ctx->dev->db_state = NORMAL;
+-		idr_for_each(&ctx->dev->qpidr, enable_qp_db, NULL);
+-	}
+-	ctx->dev->rdev.stats.db_state_transitions++;
++	WARN_ON(ctx->dev->db_state != RECOVERY);
++	ctx->dev->db_state = STOPPED;
+ 	spin_unlock_irq(&ctx->dev->lock);
+-
+-out:
+-	/* start up kernel db ringers again */
+-	mutex_unlock(&ctx->dev->db_mutex);
+ }
+ 
+ static int c4iw_uld_control(void *handle, enum cxgb4_control control, ...)
+@@ -1165,9 +1204,7 @@ static int c4iw_uld_control(void *handle, enum cxgb4_control control, ...)
+ 	switch (control) {
+ 	case CXGB4_CONTROL_DB_FULL:
+ 		stop_queues(ctx);
+-		mutex_lock(&ctx->dev->rdev.stats.lock);
+ 		ctx->dev->rdev.stats.db_full++;
+-		mutex_unlock(&ctx->dev->rdev.stats.lock);
+ 		break;
+ 	case CXGB4_CONTROL_DB_EMPTY:
+ 		resume_queues(ctx);
+diff --git a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+index 23eaeab..eb18f9b 100644
+--- a/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
++++ b/drivers/infiniband/hw/cxgb4/iw_cxgb4.h
+@@ -109,6 +109,7 @@ struct c4iw_dev_ucontext {
+ 
+ enum c4iw_rdev_flags {
+ 	T4_FATAL_ERROR = (1<<0),
++	T4_STATUS_PAGE_DISABLED = (1<<1),
+ };
+ 
+ struct c4iw_stat {
+@@ -130,6 +131,7 @@ struct c4iw_stats {
+ 	u64  db_empty;
+ 	u64  db_drop;
+ 	u64  db_state_transitions;
++	u64  db_fc_interruptions;
+ 	u64  tcam_full;
+ 	u64  act_ofld_conn_fails;
+ 	u64  pas_ofld_conn_fails;
+@@ -150,6 +152,7 @@ struct c4iw_rdev {
+ 	unsigned long oc_mw_pa;
+ 	void __iomem *oc_mw_kva;
+ 	struct c4iw_stats stats;
++	struct t4_dev_status_page *status_page;
+ };
+ 
+ static inline int c4iw_fatal_error(struct c4iw_rdev *rdev)
+@@ -211,7 +214,8 @@ static inline int c4iw_wait_for_reply(struct c4iw_rdev *rdev,
+ enum db_state {
+ 	NORMAL = 0,
+ 	FLOW_CONTROL = 1,
+-	RECOVERY = 2
++	RECOVERY = 2,
++	STOPPED = 3
+ };
+ 
+ struct c4iw_dev {
+@@ -225,10 +229,10 @@ struct c4iw_dev {
+ 	struct mutex db_mutex;
+ 	struct dentry *debugfs_root;
+ 	enum db_state db_state;
+-	int qpcnt;
+ 	struct idr hwtid_idr;
+ 	struct idr atid_idr;
+ 	struct idr stid_idr;
++	struct list_head db_fc_list;
+ };
+ 
+ static inline struct c4iw_dev *to_c4iw_dev(struct ib_device *ibdev)
+@@ -432,6 +436,7 @@ struct c4iw_qp_attributes {
+ 
+ struct c4iw_qp {
+ 	struct ib_qp ibqp;
++	struct list_head db_fc_entry;
+ 	struct c4iw_dev *rhp;
+ 	struct c4iw_ep *ep;
+ 	struct c4iw_qp_attributes attr;
+diff --git a/drivers/infiniband/hw/cxgb4/provider.c b/drivers/infiniband/hw/cxgb4/provider.c
+index 7e94c9a..e36d2a2 100644
+--- a/drivers/infiniband/hw/cxgb4/provider.c
++++ b/drivers/infiniband/hw/cxgb4/provider.c
+@@ -106,15 +106,54 @@ static struct ib_ucontext *c4iw_alloc_ucontext(struct ib_device *ibdev,
+ {
+ 	struct c4iw_ucontext *context;
+ 	struct c4iw_dev *rhp = to_c4iw_dev(ibdev);
++	static int warned;
++	struct c4iw_alloc_ucontext_resp uresp;
++	int ret = 0;
++	struct c4iw_mm_entry *mm = NULL;
+ 
+ 	PDBG("%s ibdev %p\n", __func__, ibdev);
+ 	context = kzalloc(sizeof(*context), GFP_KERNEL);
+-	if (!context)
+-		return ERR_PTR(-ENOMEM);
++	if (!context) {
++		ret = -ENOMEM;
++		goto err;
++	}
++
+ 	c4iw_init_dev_ucontext(&rhp->rdev, &context->uctx);
+ 	INIT_LIST_HEAD(&context->mmaps);
+ 	spin_lock_init(&context->mmap_lock);
++
++	if (udata->outlen < sizeof(uresp)) {
++		if (!warned++)
++			pr_err(MOD "Warning - downlevel libcxgb4 (non-fatal), device status page disabled.");
++		rhp->rdev.flags |= T4_STATUS_PAGE_DISABLED;
++	} else {
++		mm = kmalloc(sizeof(*mm), GFP_KERNEL);
++		if (!mm)
++			goto err_free;
++
++		uresp.status_page_size = PAGE_SIZE;
++
++		spin_lock(&context->mmap_lock);
++		uresp.status_page_key = context->key;
++		context->key += PAGE_SIZE;
++		spin_unlock(&context->mmap_lock);
++
++		ret = ib_copy_to_udata(udata, &uresp, sizeof(uresp));
++		if (ret)
++			goto err_mm;
++
++		mm->key = uresp.status_page_key;
++		mm->addr = virt_to_phys(rhp->rdev.status_page);
++		mm->len = PAGE_SIZE;
++		insert_mmap(context, mm);
++	}
+ 	return &context->ibucontext;
++err_mm:
++	kfree(mm);
++err_free:
++	kfree(context);
++err:
++	return ERR_PTR(ret);
+ }
+ 
+ static int c4iw_mmap(struct ib_ucontext *context, struct vm_area_struct *vma)
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 5829367..3b62eb5 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -638,6 +638,46 @@ void c4iw_qp_rem_ref(struct ib_qp *qp)
+ 		wake_up(&(to_c4iw_qp(qp)->wait));
+ }
+ 
++static void add_to_fc_list(struct list_head *head, struct list_head *entry)
++{
++	if (list_empty(entry))
++		list_add_tail(entry, head);
++}
++
++static int ring_kernel_sq_db(struct c4iw_qp *qhp, u16 inc)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&qhp->rhp->lock, flags);
++	spin_lock(&qhp->lock);
++	if (qhp->rhp->db_state == NORMAL) {
++		t4_ring_sq_db(&qhp->wq, inc);
++	} else {
++		add_to_fc_list(&qhp->rhp->db_fc_list, &qhp->db_fc_entry);
++		qhp->wq.sq.wq_pidx_inc += inc;
++	}
++	spin_unlock(&qhp->lock);
++	spin_unlock_irqrestore(&qhp->rhp->lock, flags);
++	return 0;
++}
++
++static int ring_kernel_rq_db(struct c4iw_qp *qhp, u16 inc)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&qhp->rhp->lock, flags);
++	spin_lock(&qhp->lock);
++	if (qhp->rhp->db_state == NORMAL) {
++		t4_ring_rq_db(&qhp->wq, inc);
++	} else {
++		add_to_fc_list(&qhp->rhp->db_fc_list, &qhp->db_fc_entry);
++		qhp->wq.rq.wq_pidx_inc += inc;
++	}
++	spin_unlock(&qhp->lock);
++	spin_unlock_irqrestore(&qhp->rhp->lock, flags);
++	return 0;
++}
++
+ int c4iw_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 		   struct ib_send_wr **bad_wr)
+ {
+@@ -750,9 +790,13 @@ int c4iw_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 		t4_sq_produce(&qhp->wq, len16);
+ 		idx += DIV_ROUND_UP(len16*16, T4_EQ_ENTRY_SIZE);
+ 	}
+-	if (t4_wq_db_enabled(&qhp->wq))
++	if (!qhp->rhp->rdev.status_page->db_off) {
+ 		t4_ring_sq_db(&qhp->wq, idx);
+-	spin_unlock_irqrestore(&qhp->lock, flag);
++		spin_unlock_irqrestore(&qhp->lock, flag);
++	} else {
++		spin_unlock_irqrestore(&qhp->lock, flag);
++		ring_kernel_sq_db(qhp, idx);
++	}
+ 	return err;
+ }
+ 
+@@ -812,9 +856,13 @@ int c4iw_post_receive(struct ib_qp *ibqp, struct ib_recv_wr *wr,
+ 		wr = wr->next;
+ 		num_wrs--;
+ 	}
+-	if (t4_wq_db_enabled(&qhp->wq))
++	if (!qhp->rhp->rdev.status_page->db_off) {
+ 		t4_ring_rq_db(&qhp->wq, idx);
+-	spin_unlock_irqrestore(&qhp->lock, flag);
++		spin_unlock_irqrestore(&qhp->lock, flag);
++	} else {
++		spin_unlock_irqrestore(&qhp->lock, flag);
++		ring_kernel_rq_db(qhp, idx);
++	}
+ 	return err;
+ }
+ 
+@@ -1200,35 +1248,6 @@ out:
+ 	return ret;
+ }
+ 
+-/*
+- * Called by the library when the qp has user dbs disabled due to
+- * a DB_FULL condition.  This function will single-thread all user
+- * DB rings to avoid overflowing the hw db-fifo.
+- */
+-static int ring_kernel_db(struct c4iw_qp *qhp, u32 qid, u16 inc)
+-{
+-	int delay = db_delay_usecs;
+-
+-	mutex_lock(&qhp->rhp->db_mutex);
+-	do {
+-
+-		/*
+-		 * The interrupt threshold is dbfifo_int_thresh << 6. So
+-		 * make sure we don't cross that and generate an interrupt.
+-		 */
+-		if (cxgb4_dbfifo_count(qhp->rhp->rdev.lldi.ports[0], 1) <
+-		    (qhp->rhp->rdev.lldi.dbfifo_int_thresh << 5)) {
+-			writel(QID(qid) | PIDX(inc), qhp->wq.db);
+-			break;
+-		}
+-		set_current_state(TASK_UNINTERRUPTIBLE);
+-		schedule_timeout(usecs_to_jiffies(delay));
+-		delay = min(delay << 1, 2000);
+-	} while (1);
+-	mutex_unlock(&qhp->rhp->db_mutex);
+-	return 0;
+-}
+-
+ int c4iw_modify_qp(struct c4iw_dev *rhp, struct c4iw_qp *qhp,
+ 		   enum c4iw_qp_attr_mask mask,
+ 		   struct c4iw_qp_attributes *attrs,
+@@ -1278,11 +1297,11 @@ int c4iw_modify_qp(struct c4iw_dev *rhp, struct c4iw_qp *qhp,
+ 	}
+ 
+ 	if (mask & C4IW_QP_ATTR_SQ_DB) {
+-		ret = ring_kernel_db(qhp, qhp->wq.sq.qid, attrs->sq_db_inc);
++		ret = ring_kernel_sq_db(qhp, attrs->sq_db_inc);
+ 		goto out;
+ 	}
+ 	if (mask & C4IW_QP_ATTR_RQ_DB) {
+-		ret = ring_kernel_db(qhp, qhp->wq.rq.qid, attrs->rq_db_inc);
++		ret = ring_kernel_rq_db(qhp, attrs->rq_db_inc);
+ 		goto out;
+ 	}
+ 
+@@ -1465,14 +1484,6 @@ out:
+ 	return ret;
+ }
+ 
+-static int enable_qp_db(int id, void *p, void *data)
+-{
+-	struct c4iw_qp *qp = p;
+-
+-	t4_enable_wq_db(&qp->wq);
+-	return 0;
+-}
+-
+ int c4iw_destroy_qp(struct ib_qp *ib_qp)
+ {
+ 	struct c4iw_dev *rhp;
+@@ -1490,22 +1501,15 @@ int c4iw_destroy_qp(struct ib_qp *ib_qp)
+ 		c4iw_modify_qp(rhp, qhp, C4IW_QP_ATTR_NEXT_STATE, &attrs, 0);
+ 	wait_event(qhp->wait, !qhp->ep);
+ 
+-	spin_lock_irq(&rhp->lock);
+-	remove_handle_nolock(rhp, &rhp->qpidr, qhp->wq.sq.qid);
+-	rhp->qpcnt--;
+-	BUG_ON(rhp->qpcnt < 0);
+-	if (rhp->qpcnt <= db_fc_threshold && rhp->db_state == FLOW_CONTROL) {
+-		rhp->rdev.stats.db_state_transitions++;
+-		rhp->db_state = NORMAL;
+-		idr_for_each(&rhp->qpidr, enable_qp_db, NULL);
+-	}
+-	if (db_coalescing_threshold >= 0)
+-		if (rhp->qpcnt <= db_coalescing_threshold)
+-			cxgb4_enable_db_coalescing(rhp->rdev.lldi.ports[0]);
+-	spin_unlock_irq(&rhp->lock);
++	remove_handle(rhp, &rhp->qpidr, qhp->wq.sq.qid);
+ 	atomic_dec(&qhp->refcnt);
+ 	wait_event(qhp->wait, !atomic_read(&qhp->refcnt));
+ 
++	spin_lock_irq(&rhp->lock);
++	if (!list_empty(&qhp->db_fc_entry))
++		list_del_init(&qhp->db_fc_entry);
++	spin_unlock_irq(&rhp->lock);
++
+ 	ucontext = ib_qp->uobject ?
+ 		   to_c4iw_ucontext(ib_qp->uobject->context) : NULL;
+ 	destroy_qp(&rhp->rdev, &qhp->wq,
+@@ -1516,14 +1520,6 @@ int c4iw_destroy_qp(struct ib_qp *ib_qp)
+ 	return 0;
+ }
+ 
+-static int disable_qp_db(int id, void *p, void *data)
+-{
+-	struct c4iw_qp *qp = p;
+-
+-	t4_disable_wq_db(&qp->wq);
+-	return 0;
+-}
+-
+ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
+ 			     struct ib_udata *udata)
+ {
+@@ -1610,20 +1606,7 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
+ 	init_waitqueue_head(&qhp->wait);
+ 	atomic_set(&qhp->refcnt, 1);
+ 
+-	spin_lock_irq(&rhp->lock);
+-	if (rhp->db_state != NORMAL)
+-		t4_disable_wq_db(&qhp->wq);
+-	rhp->qpcnt++;
+-	if (rhp->qpcnt > db_fc_threshold && rhp->db_state == NORMAL) {
+-		rhp->rdev.stats.db_state_transitions++;
+-		rhp->db_state = FLOW_CONTROL;
+-		idr_for_each(&rhp->qpidr, disable_qp_db, NULL);
+-	}
+-	if (db_coalescing_threshold >= 0)
+-		if (rhp->qpcnt > db_coalescing_threshold)
+-			cxgb4_disable_db_coalescing(rhp->rdev.lldi.ports[0]);
+-	ret = insert_handle_nolock(rhp, &rhp->qpidr, qhp, qhp->wq.sq.qid);
+-	spin_unlock_irq(&rhp->lock);
++	ret = insert_handle(rhp, &rhp->qpidr, qhp, qhp->wq.sq.qid);
+ 	if (ret)
+ 		goto err2;
+ 
+@@ -1709,6 +1692,7 @@ struct ib_qp *c4iw_create_qp(struct ib_pd *pd, struct ib_qp_init_attr *attrs,
+ 	}
+ 	qhp->ibqp.qp_num = qhp->wq.sq.qid;
+ 	init_timer(&(qhp->timer));
++	INIT_LIST_HEAD(&qhp->db_fc_entry);
+ 	PDBG("%s qhp %p sq_num_entries %d, rq_num_entries %d qpid 0x%0x\n",
+ 	     __func__, qhp, qhp->attr.sq_num_entries, qhp->attr.rq_num_entries,
+ 	     qhp->wq.sq.qid);
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index e73ace7..eeca8b1 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -300,6 +300,7 @@ struct t4_sq {
+ 	u16 cidx;
+ 	u16 pidx;
+ 	u16 wq_pidx;
++	u16 wq_pidx_inc;
+ 	u16 flags;
+ 	short flush_cidx;
+ };
+@@ -324,6 +325,7 @@ struct t4_rq {
+ 	u16 cidx;
+ 	u16 pidx;
+ 	u16 wq_pidx;
++	u16 wq_pidx_inc;
+ };
+ 
+ struct t4_wq {
+@@ -609,3 +611,7 @@ static inline void t4_set_cq_in_error(struct t4_cq *cq)
+ 	((struct t4_status_page *)&cq->queue[cq->size])->qp_err = 1;
+ }
+ #endif
++
++struct t4_dev_status_page {
++	u8 db_off;
++};
+diff --git a/drivers/infiniband/hw/cxgb4/user.h b/drivers/infiniband/hw/cxgb4/user.h
+index 32b754c..11ccd27 100644
+--- a/drivers/infiniband/hw/cxgb4/user.h
++++ b/drivers/infiniband/hw/cxgb4/user.h
+@@ -70,4 +70,9 @@ struct c4iw_create_qp_resp {
+ 	__u32 qid_mask;
+ 	__u32 flags;
+ };
++
++struct c4iw_alloc_ucontext_resp {
++	__u64 status_page_key;
++	__u32 status_page_size;
++};
+ #endif
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index 50abe1d..32db377 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -500,6 +500,7 @@ struct sge_txq {
+ 	spinlock_t db_lock;
+ 	int db_disabled;
+ 	unsigned short db_pidx;
++	unsigned short db_pidx_inc;
+ 	u64 udb;
+ };
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 0ac53dd..cc04d09 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -3578,14 +3578,25 @@ static void drain_db_fifo(struct adapter *adap, int usecs)
+ 
+ static void disable_txq_db(struct sge_txq *q)
+ {
+-	spin_lock_irq(&q->db_lock);
++	unsigned long flags;
++
++	spin_lock_irqsave(&q->db_lock, flags);
+ 	q->db_disabled = 1;
+-	spin_unlock_irq(&q->db_lock);
++	spin_unlock_irqrestore(&q->db_lock, flags);
+ }
+ 
+-static void enable_txq_db(struct sge_txq *q)
++static void enable_txq_db(struct adapter *adap, struct sge_txq *q)
+ {
+ 	spin_lock_irq(&q->db_lock);
++	if (q->db_pidx_inc) {
++		/* Make sure that all writes to the TX descriptors
++		 * are committed before we tell HW about them.
++		 */
++		wmb();
++		t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL),
++			     QID(q->cntxt_id) | PIDX(q->db_pidx_inc));
++		q->db_pidx_inc = 0;
++	}
+ 	q->db_disabled = 0;
+ 	spin_unlock_irq(&q->db_lock);
+ }
+@@ -3607,11 +3618,32 @@ static void enable_dbs(struct adapter *adap)
+ 	int i;
+ 
+ 	for_each_ethrxq(&adap->sge, i)
+-		enable_txq_db(&adap->sge.ethtxq[i].q);
++		enable_txq_db(adap, &adap->sge.ethtxq[i].q);
+ 	for_each_ofldrxq(&adap->sge, i)
+-		enable_txq_db(&adap->sge.ofldtxq[i].q);
++		enable_txq_db(adap, &adap->sge.ofldtxq[i].q);
+ 	for_each_port(adap, i)
+-		enable_txq_db(&adap->sge.ctrlq[i].q);
++		enable_txq_db(adap, &adap->sge.ctrlq[i].q);
++}
++
++static void notify_rdma_uld(struct adapter *adap, enum cxgb4_control cmd)
++{
++	if (adap->uld_handle[CXGB4_ULD_RDMA])
++		ulds[CXGB4_ULD_RDMA].control(adap->uld_handle[CXGB4_ULD_RDMA],
++				cmd);
++}
++
++static void process_db_full(struct work_struct *work)
++{
++	struct adapter *adap;
++
++	adap = container_of(work, struct adapter, db_full_task);
++
++	drain_db_fifo(adap, dbfifo_drain_delay);
++	enable_dbs(adap);
++	notify_rdma_uld(adap, CXGB4_CONTROL_DB_EMPTY);
++	t4_set_reg_field(adap, SGE_INT_ENABLE3,
++			 DBFIFO_HP_INT | DBFIFO_LP_INT,
++			 DBFIFO_HP_INT | DBFIFO_LP_INT);
+ }
+ 
+ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
+@@ -3619,7 +3651,7 @@ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
+ 	u16 hw_pidx, hw_cidx;
+ 	int ret;
+ 
+-	spin_lock_bh(&q->db_lock);
++	spin_lock_irq(&q->db_lock);
+ 	ret = read_eq_indices(adap, (u16)q->cntxt_id, &hw_pidx, &hw_cidx);
+ 	if (ret)
+ 		goto out;
+@@ -3636,7 +3668,8 @@ static void sync_txq_pidx(struct adapter *adap, struct sge_txq *q)
+ 	}
+ out:
+ 	q->db_disabled = 0;
+-	spin_unlock_bh(&q->db_lock);
++	q->db_pidx_inc = 0;
++	spin_unlock_irq(&q->db_lock);
+ 	if (ret)
+ 		CH_WARN(adap, "DB drop recovery failed.\n");
+ }
+@@ -3652,29 +3685,6 @@ static void recover_all_queues(struct adapter *adap)
+ 		sync_txq_pidx(adap, &adap->sge.ctrlq[i].q);
+ }
+ 
+-static void notify_rdma_uld(struct adapter *adap, enum cxgb4_control cmd)
+-{
+-	mutex_lock(&uld_mutex);
+-	if (adap->uld_handle[CXGB4_ULD_RDMA])
+-		ulds[CXGB4_ULD_RDMA].control(adap->uld_handle[CXGB4_ULD_RDMA],
+-				cmd);
+-	mutex_unlock(&uld_mutex);
+-}
+-
+-static void process_db_full(struct work_struct *work)
+-{
+-	struct adapter *adap;
+-
+-	adap = container_of(work, struct adapter, db_full_task);
+-
+-	notify_rdma_uld(adap, CXGB4_CONTROL_DB_FULL);
+-	drain_db_fifo(adap, dbfifo_drain_delay);
+-	t4_set_reg_field(adap, SGE_INT_ENABLE3,
+-			 DBFIFO_HP_INT | DBFIFO_LP_INT,
+-			 DBFIFO_HP_INT | DBFIFO_LP_INT);
+-	notify_rdma_uld(adap, CXGB4_CONTROL_DB_EMPTY);
+-}
+-
+ static void process_db_drop(struct work_struct *work)
+ {
+ 	struct adapter *adap;
+@@ -3682,11 +3692,13 @@ static void process_db_drop(struct work_struct *work)
+ 	adap = container_of(work, struct adapter, db_drop_task);
+ 
+ 	if (is_t4(adap->params.chip)) {
+-		disable_dbs(adap);
++		drain_db_fifo(adap, dbfifo_drain_delay);
+ 		notify_rdma_uld(adap, CXGB4_CONTROL_DB_DROP);
+-		drain_db_fifo(adap, 1);
++		drain_db_fifo(adap, dbfifo_drain_delay);
+ 		recover_all_queues(adap);
++		drain_db_fifo(adap, dbfifo_drain_delay);
+ 		enable_dbs(adap);
++		notify_rdma_uld(adap, CXGB4_CONTROL_DB_EMPTY);
+ 	} else {
+ 		u32 dropped_db = t4_read_reg(adap, 0x010ac);
+ 		u16 qid = (dropped_db >> 15) & 0x1ffff;
+@@ -3727,6 +3739,8 @@ static void process_db_drop(struct work_struct *work)
+ void t4_db_full(struct adapter *adap)
+ {
+ 	if (is_t4(adap->params.chip)) {
++		disable_dbs(adap);
++		notify_rdma_uld(adap, CXGB4_CONTROL_DB_FULL);
+ 		t4_set_reg_field(adap, SGE_INT_ENABLE3,
+ 				 DBFIFO_HP_INT | DBFIFO_LP_INT, 0);
+ 		queue_work(workq, &adap->db_full_task);
+@@ -3735,8 +3749,11 @@ void t4_db_full(struct adapter *adap)
+ 
+ void t4_db_dropped(struct adapter *adap)
+ {
+-	if (is_t4(adap->params.chip))
+-		queue_work(workq, &adap->db_drop_task);
++	if (is_t4(adap->params.chip)) {
++		disable_dbs(adap);
++		notify_rdma_uld(adap, CXGB4_CONTROL_DB_FULL);
++	}
++	queue_work(workq, &adap->db_drop_task);
+ }
+ 
+ static void uld_attach(struct adapter *adap, unsigned int uld)
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index 46429f9..d4db382 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -860,9 +860,10 @@ static void cxgb_pio_copy(u64 __iomem *dst, u64 *src)
+ static inline void ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
+ {
+ 	unsigned int *wr, index;
++	unsigned long flags;
+ 
+ 	wmb();            /* write descriptors before telling HW */
+-	spin_lock(&q->db_lock);
++	spin_lock_irqsave(&q->db_lock, flags);
+ 	if (!q->db_disabled) {
+ 		if (is_t4(adap->params.chip)) {
+ 			t4_write_reg(adap, MYPF_REG(SGE_PF_KDOORBELL),
+@@ -878,9 +879,10 @@ static inline void ring_tx_db(struct adapter *adap, struct sge_txq *q, int n)
+ 				writel(n,  adap->bar2 + q->udb + 8);
+ 			wmb();
+ 		}
+-	}
++	} else
++		q->db_pidx_inc += n;
+ 	q->db_pidx = q->pidx;
+-	spin_unlock(&q->db_lock);
++	spin_unlock_irqrestore(&q->db_lock, flags);
+ }
+ 
+ /**

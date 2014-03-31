@@ -1,0 +1,39 @@
+commit 0183aa626f467dad278050f0918a243164ae5916
+Author: Hariprasad Shenai <hariprasad@chelsio.com>
+Date:   Thu Mar 27 18:17:09 2014 +0530
+
+    cxgb4: Adds device ID for few more Chelsio Adapters
+    
+    Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index a7a41e0..6fe5891 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -256,6 +256,12 @@ static DEFINE_PCI_DEVICE_TABLE(cxgb4_pci_tbl) = {
+ 	CH_DEVICE(0x5013, 4),
+ 	CH_DEVICE(0x5014, 4),
+ 	CH_DEVICE(0x5015, 4),
++	CH_DEVICE(0x5080, 4),
++	CH_DEVICE(0x5081, 4),
++	CH_DEVICE(0x5082, 4),
++	CH_DEVICE(0x5083, 4),
++	CH_DEVICE(0x5084, 4),
++	CH_DEVICE(0x5085, 4),
+ 	CH_DEVICE(0x5401, 4),
+ 	CH_DEVICE(0x5402, 4),
+ 	CH_DEVICE(0x5403, 4),
+@@ -277,6 +283,12 @@ static DEFINE_PCI_DEVICE_TABLE(cxgb4_pci_tbl) = {
+ 	CH_DEVICE(0x5413, 4),
+ 	CH_DEVICE(0x5414, 4),
+ 	CH_DEVICE(0x5415, 4),
++	CH_DEVICE(0x5480, 4),
++	CH_DEVICE(0x5481, 4),
++	CH_DEVICE(0x5482, 4),
++	CH_DEVICE(0x5483, 4),
++	CH_DEVICE(0x5484, 4),
++	CH_DEVICE(0x5485, 4),
+ 	{ 0, }
+ };
+ 
