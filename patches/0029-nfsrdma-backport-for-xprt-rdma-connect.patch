@@ -1,0 +1,18 @@
+--- a/net/sunrpc/xprtrdma/transport.c	2014-04-02 14:59:56.833964877 -0500
++++ b/net/sunrpc/xprtrdma/transport.c	2014-04-02 14:58:40.177170944 -0500
+@@ -431,8 +431,15 @@ xprt_rdma_set_port(struct rpc_xprt *xprt
+ }
+ 
+ static void
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0))
++xprt_rdma_connect(struct rpc_task *task)
++#else
+ xprt_rdma_connect(struct rpc_xprt *xprt, struct rpc_task *task)
++#endif
+ {
++#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0))
++	struct rpc_xprt *xprt = task->tk_xprt;
++#endif
+ 	struct rpcrdma_xprt *r_xprt = rpcx_to_rdmax(xprt);
+ 
+ 	if (r_xprt->rx_ep.rep_connected != 0) {
