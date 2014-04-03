@@ -1,0 +1,29 @@
+commit dbb084cc5f52152f53b5fd22fa76b9bf69904594
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Fri Mar 21 20:40:30 2014 +0530
+
+    RDMA/cxgb4: Don't leak skb in c4iw_uld_rx_handler()
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Roland Dreier <roland@purestorage.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index 4a03385..982f815 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -897,11 +897,13 @@ static int c4iw_uld_rx_handler(void *handle, const __be64 *rsp,
+ 	}
+ 
+ 	opcode = *(u8 *)rsp;
+-	if (c4iw_handlers[opcode])
++	if (c4iw_handlers[opcode]) {
+ 		c4iw_handlers[opcode](dev, skb);
+-	else
++	} else {
+ 		pr_info("%s no handler opcode 0x%x...\n", __func__,
+ 		       opcode);
++		kfree_skb(skb);
++	}
+ 
+ 	return 0;
+ nomem:

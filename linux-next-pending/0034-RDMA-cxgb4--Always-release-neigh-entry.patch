@@ -1,0 +1,38 @@
+commit ebf00060c33b9d0946384fa6f440df7ea35a569e
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Wed Mar 19 17:44:40 2014 +0530
+
+    RDMA/cxgb4: Always release neigh entry
+    
+    Always release the neigh entry in rx_pkt().
+    
+    Based on original work by Santosh Rastapur <santosh@chelsio.com>.
+
+    NOTE: patch modified to apply to OFED backports.
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Roland Dreier <roland@purestorage.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 360807e..2b2af96 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -3426,15 +3426,15 @@ static int rx_pkt(struct c4iw_dev *dev,
+ 		pi = (struct port_info *)netdev_priv(pdev);
+ 		tx_chan = cxgb4_port_chan(pdev);
+ 	}
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
++	neigh_release(neigh);
++#endif
+ 	if (!e) {
+ 		pr_err("%s - failed to allocate l2t entry!\n",
+ 		       __func__);
+ 		goto free_dst;
+ 	}
+ 
+-#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+-	neigh_release(neigh);
+-#endif
+ 	step = dev->rdev.lldi.nrxq / dev->rdev.lldi.nchan;
+ 	rss_qid = dev->rdev.lldi.rxq_ids[pi->port_id * step];
+ 	window = (__force u16) htons((__force u16)tcph->window);

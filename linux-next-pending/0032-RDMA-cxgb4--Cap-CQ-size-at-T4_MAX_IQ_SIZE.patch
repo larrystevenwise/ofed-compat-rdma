@@ -1,0 +1,22 @@
+commit ffd435924c86de055d33fe59941841819eef9f6a
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Wed Mar 19 17:44:38 2014 +0530
+
+    RDMA/cxgb4: Cap CQ size at T4_MAX_IQ_SIZE
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Roland Dreier <roland@purestorage.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index e436ead..906119f 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -881,7 +881,7 @@ struct ib_cq *c4iw_create_cq(struct ib_device *ibdev, int entries,
+ 	/*
+ 	 * Make actual HW queue 2x to avoid cdix_inc overflows.
+ 	 */
+-	hwentries = entries * 2;
++	hwentries = min(entries * 2, T4_MAX_IQ_SIZE);
+ 
+ 	/*
+ 	 * Make HW queue at least 64 entries so GTS updates aren't too
