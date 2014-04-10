@@ -1,0 +1,21 @@
+commit ce77b41daa0acdb7258b0462a48399c9924d6226
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Wed Apr 9 09:38:28 2014 -0500
+
+    iw_cxgb4: Use uninitialized_var()
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index e17b155..cfaa56a 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -672,7 +672,7 @@ skip_cqe:
+ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
+ {
+ 	struct c4iw_qp *qhp = NULL;
+-	struct t4_cqe cqe = {0, 0}, *rd_cqe;
++	struct t4_cqe uninitialized_var(cqe), *rd_cqe;
+ 	struct t4_wq *wq;
+ 	u32 credit = 0;
+ 	u8 cqe_flushed;
