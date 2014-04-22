@@ -47,22 +47,25 @@ index xxxxxxx..xxxxxxx xxxxxx
  	struct flowi4 fl4;
  	struct neighbour *n;
  
-@@ -397,7 +411,12 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
+@@ -397,15 +411,49 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
  				   tos, 0);
  	if (IS_ERR(rt))
  		return NULL;
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
  	n = dst_neigh_lookup(&rt->dst, &peer_ip);
-+#endif
-+#if LINUX_VERSION_CODE < KERNEL_VERSION(3,3,0)
++#else
 +        n = dst_get_neighbour(&rt->dst);
 +#endif
  	if (!n)
  		return NULL;
  	if (!our_interface(dev, n->dev)) {
-@@ -406,6 +425,33 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
+ 		dst_release(&rt->dst);
+ 		return NULL;
  	}
++
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
  	neigh_release(n);
++#endif
  	return &rt->dst;
 +#else
 +	struct flowi fl = {
@@ -94,40 +97,37 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static void arp_failure_discard(void *handle, struct sk_buff *skb)
-@@ -1696,11 +1742,22 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
+@@ -1696,11 +1744,16 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
  	int err, step;
  	struct net_device *pdev;
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
++	rcu_read_lock();
  	n = dst_neigh_lookup(dst, peer_ip);
- 	if (!n)
- 		return -ENODEV;
- 
+-	if (!n)
+-		return -ENODEV;
+-
++#else
  	rcu_read_lock();
-+#else
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
-+	n = dst_get_neighbour_noref(dst);
-+#else
 +	n = dst_get_neighbour(dst);
 +#endif
 +	err = -ENODEV;
 +	if (!n)
 +		goto out;
-+#endif
  	err = -ENOMEM;
  	if (n->dev->flags & IFF_LOOPBACK) {
  		if (iptype == 4)
-@@ -1762,7 +1819,9 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
+@@ -1762,7 +1815,9 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
  out:
  	rcu_read_unlock();
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
  	neigh_release(n);
 +#endif
  
  	return err;
  }
-@@ -2688,7 +2747,11 @@ static int get_lladdr(struct net_device *dev, struct in6_addr *addr,
+@@ -2688,7 +2743,11 @@ static int get_lladdr(struct net_device *dev, struct in6_addr *addr,
  		struct inet6_ifaddr *ifp;
  
  		read_lock_bh(&idev->lock);
@@ -139,7 +139,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			if (ifp->scope == IFA_LINK &&
  			    !(ifp->flags & banned_flags)) {
  				memcpy(addr, &ifp->addr, 16);
-@@ -3200,7 +3263,15 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
+@@ -3200,7 +3259,15 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
  	 */
  	memset(&tmp_opt, 0, sizeof(tmp_opt));
  	tcp_clear_options(&tmp_opt);
@@ -155,7 +155,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	req = (struct cpl_pass_accept_req *)__skb_push(skb, sizeof(*req));
  	memset(req, 0, sizeof(*req));
-@@ -3364,7 +3435,15 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+@@ -3364,7 +3431,15 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
  		       __func__);
  		goto reject;
  	}
