@@ -1,0 +1,60 @@
+commit 92e5011ab0e073ab8fbb726c11529021e5e63973
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Thu Apr 24 14:31:59 2014 -0500
+
+    RDMA/cxgb4: Force T5 connections to use TAHOE congestion control
+    
+    This is required to work around a T5 HW issue.
+    
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Roland Dreier <roland@purestorage.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index f9b04bc..1f863a9 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -587,6 +587,10 @@ static int send_connect(struct c4iw_ep *ep)
+ 		opt2 |= SACK_EN(1);
+ 	if (wscale && enable_tcp_window_scaling)
+ 		opt2 |= WND_SCALE_EN(1);
++	if (is_t5(ep->com.dev->rdev.lldi.adapter_type)) {
++		opt2 |= T5_OPT_2_VALID;
++		opt2 |= V_CONG_CNTRL(CONG_ALG_TAHOE);
++	}
+ 	t4_set_arp_err_handler(skb, NULL, act_open_req_arp_failure);
+ 
+ 	if (is_t4(ep->com.dev->rdev.lldi.adapter_type)) {
+@@ -2018,6 +2022,10 @@ static void accept_cr(struct c4iw_ep *ep, struct sk_buff *skb,
+ 		if (tcph->ece && tcph->cwr)
+ 			opt2 |= CCTRL_ECN(1);
+ 	}
++	if (is_t5(ep->com.dev->rdev.lldi.adapter_type)) {
++		opt2 |= T5_OPT_2_VALID;
++		opt2 |= V_CONG_CNTRL(CONG_ALG_TAHOE);
++	}
+ 
+ 	rpl = cplhdr(skb);
+ 	INIT_TP_WR(rpl, ep->hwtid);
+diff --git a/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h b/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
+index dc193c2..6121ca0 100644
+--- a/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
++++ b/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
+@@ -836,4 +836,18 @@ struct ulptx_idata {
+ #define V_RX_DACK_CHANGE(x) ((x) << S_RX_DACK_CHANGE)
+ #define F_RX_DACK_CHANGE    V_RX_DACK_CHANGE(1U)
+ 
++enum {                     /* TCP congestion control algorithms */
++	CONG_ALG_RENO,
++	CONG_ALG_TAHOE,
++	CONG_ALG_NEWRENO,
++	CONG_ALG_HIGHSPEED
++};
++
++#define S_CONG_CNTRL    14
++#define M_CONG_CNTRL    0x3
++#define V_CONG_CNTRL(x) ((x) << S_CONG_CNTRL)
++#define G_CONG_CNTRL(x) (((x) >> S_CONG_CNTRL) & M_CONG_CNTRL)
++
++#define T5_OPT_2_VALID       (1 << 31)
++
+ #endif /* _T4FW_RI_API_H_ */
