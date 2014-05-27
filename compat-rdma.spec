@@ -457,9 +457,9 @@ fi
 %endif
 
 %if %{build_mlx5}
-       echo >> %{IB_CONF_DIR}/openib.conf
-       echo "# Load MLX5 modules" >> %{IB_CONF_DIR}/openib.conf
-       echo "MLX5_LOAD=yes" >> %{IB_CONF_DIR}/openib.conf
+       echo >> %{RDMA_CONF_DIR}/openib.conf
+       echo "# Load MLX5 modules" >> %{RDMA_CONF_DIR}/openib.conf
+       echo "MLX5_LOAD=yes" >> %{RDMA_CONF_DIR}/openib.conf
 %endif
 
 %if %{build_mlx4_en}
