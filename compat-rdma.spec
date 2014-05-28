@@ -31,11 +31,6 @@
 %{!?KVERSION: %define KVERSION %(uname -r)}
 %define krelver %(echo -n %{KVERSION} | sed -e 's/-/_/g')
 
-# Set default to use scif.h and scif symvers from MPSS installation
-# Use the release-3.x paths
-%{!?scif_h: %define scif_h %(echo -n '/usr/src/kernels/%{KVERSION}/include/modules/scif.h')}
-%{!?scif_symvers: %define scif_symvers %(echo -n '/lib/modules/%{KVERSION}/scif.symvers')}
-
 # Select packages to build
 # Kernel module packages to be included into compat-rdma
 
@@ -138,10 +133,10 @@ cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/config.mk  $RPM_BUILD_DIR/src/%{_name}
 sed -i -e "s@\${CWD}@%{_prefix}/src/%{_name}@g" $RPM_BUILD_DIR/src/%{_name}/config.mk
 
 %if %{build_ibp_server} || %{build_ibscif} || %{build_qib}
-test ! -d ./include/modules && mkdir ./include/modules
-test -f %{scif_h} && cp %{scif_h} ./include/modules
-test -f %{scif_symvers} && cat %{scif_symvers} >> ./Module.symvers
+  %{!?scif_symvers: %define scif_symvers %(echo -n '/lib/modules/%{KVERSION}/scif.symvers')}
+  test -f %{scif_symvers} && cat %{scif_symvers} >> ./Module.symvers
 %endif
+
 %if %{build_srpt}
 if [ -f /usr/local/include/scst/Module.symvers ]; then
 	cat /usr/local/include/scst/Module.symvers >> ./Module.symvers
@@ -202,12 +197,6 @@ install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openibd.service
 install -d $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openib.conf $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 cat $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openib.conf.tmp >> $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}/openib.conf
-
-%if %{build_ibp_server} || %{build_ibscif}
-# install overlay files and config
-install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ofed.conf $RPM_BUILD_ROOT/etc/mpss/conf.d/ofed.conf
-install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ofed.filelist $RPM_BUILD_ROOT/opt/intel/mic/ofed/ofed.filelist
-%endif
 
 # Install openib service script
 install -d $RPM_BUILD_ROOT/etc/init.d
@@ -412,9 +401,6 @@ fi
 %config(noreplace) %{RDMA_CONF_DIR}/openib.conf
 %if %{build_ibp_server} || %{build_ibscif}
 %config %{_sysconfdir}/init.d/ofed-mic
-%config %{_sysconfdir}/mpss/conf.d/ofed.conf
-%dir /opt/intel/mic/ofed
-/opt/intel/mic/ofed/*
 %endif
 %{RDMA_CONF_DIR}/info
 /etc/init.d/openibd
