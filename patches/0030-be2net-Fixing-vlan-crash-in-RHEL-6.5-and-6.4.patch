@@ -1,16 +1,14 @@
-From de2cba89e1b6c3325259691964ea2dd3d7fd0bc7 Mon Sep 17 00:00:00 2001
 From: Selvin Xavier <selvin.xavier@emulex.com>
-Date: Mon, 10 Mar 2014 17:06:44 +0530
 Subject: [PATCH] be2net: Fixing vlan crash in RHEL 6.5 and 6.4
 
 Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
 ---
- drivers/net/ethernet/emulex/benet/be_compat.h |    7 +++++
- drivers/net/ethernet/emulex/benet/be_main.c   |   32 ++++++++++++++++++-------
+ drivers/net/ethernet/emulex/benet/be_compat.h |  7 ++++++
+ drivers/net/ethernet/emulex/benet/be_main.c   | 32 +++++++++++++++++++--------
  2 files changed, 30 insertions(+), 9 deletions(-)
 
 diff --git a/drivers/net/ethernet/emulex/benet/be_compat.h b/drivers/net/ethernet/emulex/benet/be_compat.h
-index 3daa68a..d30267e 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be_compat.h
 +++ b/drivers/net/ethernet/emulex/benet/be_compat.h
 @@ -11,6 +11,13 @@
@@ -28,7 +26,7 @@ index 3daa68a..d30267e 100644
  						__be16 vlan_proto,
  						ushort vlan_tag)
 diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
-index 2ff0d29..6f12546 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be_main.c
 +++ b/drivers/net/ethernet/emulex/benet/be_main.c
 @@ -1135,17 +1135,18 @@ static void be_vlan_add_vid(struct net_device *netdev,  u16 vid)
@@ -113,6 +111,3 @@ index 2ff0d29..6f12546 100644
  			be_rx_compl_process_gro(rxo, napi, rxcp);
  		else
  			be_rx_compl_process(rxo, rxcp);
--- 
-1.7.1
-
