@@ -157,6 +157,7 @@ kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 		-Iinclude \
 		-I$$(srctree)/arch/$$(SRCARCH)/include/uapi \
 		-Iarch/$$(SRCARCH)/include/generated/uapi \
+		-I$$(srctree)/include \
 		-I$$(srctree)/include/uapi \
 		-Iinclude/generated/uapi \
 		$$(if $$(KBUILD_SRC),-Iinclude2 -I$$(srctree)/include) \
