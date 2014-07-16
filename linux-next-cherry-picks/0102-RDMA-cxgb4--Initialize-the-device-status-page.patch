@@ -1,0 +1,29 @@
+commit 6b54d54dea82ae214e4a45a503c4ef755a8ecee8
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Tue Jul 8 10:20:35 2014 -0500
+
+    RDMA/cxgb4: Initialize the device status page
+    
+    The status page is mapped to user processes and allows sharing the
+    device state between the kernel and user processes.  This state isn't
+    getting initialized and thus intermittently causes problems.  Namely,
+    the user process can mistakenly think the user doorbell writes are
+    disabled which causes SQ work requests to never get fetched by HW.
+    
+    Fixes: 05eb23893c2c ("cxgb4/iw_cxgb4: Doorbell Drop Avoidance Bug Fixes").
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Cc: <stable@vger.kernel.org> # v3.15
+    Signed-off-by: Roland Dreier <roland@purestorage.com>
+
+diff --git a/drivers/infiniband/hw/cxgb4/device.c b/drivers/infiniband/hw/cxgb4/device.c
+index dd93aad..16b75de 100644
+--- a/drivers/infiniband/hw/cxgb4/device.c
++++ b/drivers/infiniband/hw/cxgb4/device.c
+@@ -696,6 +696,7 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
+ 		pr_err(MOD "error allocating status page\n");
+ 		goto err4;
+ 	}
++	rdev->status_page->db_off = 0;
+ 	return 0;
+ err4:
+ 	c4iw_rqtpool_destroy(rdev);
