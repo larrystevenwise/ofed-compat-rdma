@@ -35,11 +35,23 @@
 # sourced from the /etc/init.d/openibd script after the ib_qib module
 # is loaded, and before it is unloaded, and is passed the corresponding
 # start and stop arguments.  It isn't intended for standalone use.
+IS_SLES=0
+if grep -i 'SuSE Linux' /etc/issue >/dev/null 2>&1; then
+    IS_SLES=1
+fi
+
+# Source function library
+[ ${IS_SLES} -eq 1 ] && . /etc/rc.status || . /etc/rc.d/init.d/functions
 
 # base name in /sys/class
 qb=/sys/class/infiniband/qib
 ir=/proc/irq
 serdes_parm=txselect
+
+psmd=/usr/sbin/psmd
+psmdprog=psmd
+psmdpidfile=${PIDFILE-/var/run/psmd.pid}
+
 irqbalance_conf=/etc/sysconfig/irqbalance
 irqbalance_bin=/usr/sbin/irqbalance
 if [ -f $irqbalance_bin ]; then
@@ -60,6 +72,46 @@ warn_and_log()
 {
     echo "$0: $@"
     logger -t infinipath "$@"
+}
+
+start_psmd() {
+    # Is a Xeon Phi board present and is the PSM daemon installed?
+    if [ -n "$(lspci -n | grep '8086:225')" -a -x ${psmd} ]; then
+	if [ ${IS_SLES} -eq 1 ]; then
+	    echo -n "Starting $psmdprog: "
+	    startproc -f -p ${psmdpidfile} $psmd
+	    rc_status -v
+	    RETVAL=${?}
+	    [ $RETVAL = 0 ] && pidof ${psmd} > ${psmdpidfile}
+	else
+	    echo -n $"Starting $psmdprog: "
+	    daemon --pidfile=${psmdpidfile} $psmd
+	    RETVAL=$?
+	    [ $RETVAL = 0 ] && pidofproc ${psmd} > ${psmdpidfile}
+	    echo
+	fi
+	return $RETVAL
+    fi
+    return 0
+}
+
+stop_psmd() {
+    # Only stop the PSM daemon if it's running
+    if [ ${IS_SLES} -eq 1 ]; then
+	if checkproc ${psmd} 2>&1 > /dev/null ; then
+	    echo -n "Stopping $psmdprog: "
+	    killproc -G -TERM $psmd
+	    rc_status -v
+	fi
+    else
+	if pidofproc ${psmd} 2>&1 > /dev/null ; then
+	    echo -n $"Stopping $psmdprog: "
+	    killproc -p ${psmdpidfile} -d 10 $psmd
+	    RETVAL=$?
+	    echo
+	    [ $RETVAL = 0 ] && rm -f ${psmdpidfile}
+	fi
+    fi
 }
 
 setup_qmh()
@@ -468,6 +520,46 @@ clean_irq_affinity()
     fi
 }
 
+start_psmd() {
+    # Is a Xeon Phi board present and is the PSM daemon installed?
+    if [ -n "$(lspci -n | grep '8086:225')" -a -x ${psmd} ]; then
+	if [ ${IS_SLES} -eq 1 ]; then
+	    echo -n "Starting $psmdprog: "
+	    startproc -f -p ${psmdpidfile} $psmd
+	    rc_status -v
+	    RETVAL=${?}
+	    [ $RETVAL = 0 ] && pidof ${psmd} > ${psmdpidfile}
+	else
+	    echo -n $"Starting $psmdprog: "
+	    daemon --pidfile=${psmdpidfile} $psmd
+	    RETVAL=$?
+	    [ $RETVAL = 0 ] && pidofproc ${psmd} > ${psmdpidfile}
+	    echo
+	fi
+	return $RETVAL
+    fi
+    return 0
+}
+
+stop_psmd() {
+    # Only stop the PSM daemon if it's running
+    if [ ${IS_SLES} -eq 1 ]; then
+	if checkproc ${psmd} 2>&1 > /dev/null ; then
+	    echo -n "Stopping $psmdprog: "
+	    killproc -G -TERM $psmd
+	    rc_status -v
+	fi
+    else
+	if pidofproc ${psmd} 2>&1 > /dev/null ; then
+	    echo -n $"Stopping $psmdprog: "
+	    killproc -p ${psmdpidfile} -d 10 $psmd
+	    RETVAL=$?
+	    echo
+	    [ $RETVAL = 0 ] && rm -f ${psmdpidfile}
+	fi
+    fi
+}
+
 PATH=/sbin:/bin:/usr/sbin:/usr/bin:$PATH
 has_qib=$(lspci -n 2>/dev/null | grep -i "1077\|1fc1")
 
@@ -503,10 +595,12 @@ start)
 	    fi
 	    
 	    set_irq_affinity
+	    start_psmd
 	fi
 	;;
 stop)
 	if [ "${has_qib}" ]; then
+	    stop_psmd
 	    clean_irq_affinity
 	    if [ -d /ipathfs ]; then
 		umount /ipathfs

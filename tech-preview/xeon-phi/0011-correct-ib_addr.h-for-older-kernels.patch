@@ -1,0 +1,53 @@
+From 536a8d5b5c68ecd2ca73446f25443fe8bb234a46 Mon Sep 17 00:00:00 2001
+From: Phil Cayton <phil.cayton@intel.com>
+Date: Thu, 29 May 2014 14:35:13 -0700
+Subject: [PATCH 11/12] correct ib_addr.h for older kernels
+
+Signed-off-by: Phil Cayton <phil.cayton@intel.com>
+---
+ include/rdma/ib_addr.h | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
+
+diff --git a/include/rdma/ib_addr.h b/include/rdma/ib_addr.h
+index f3ac0f2..f29e2ef 100644
+--- a/include/rdma/ib_addr.h
++++ b/include/rdma/ib_addr.h
+@@ -210,6 +210,27 @@ static inline enum ib_mtu iboe_get_mtu(int mtu)
+ 		return 0;
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3,2,0)
++static inline int iboe_get_rate(struct net_device *dev)
++{
++	struct ethtool_cmd cmd;
++
++	if (!dev->ethtool_ops || !dev->ethtool_ops->get_settings ||
++	    dev->ethtool_ops->get_settings(dev, &cmd))
++		return IB_RATE_PORT_CURRENT;
++
++	if (cmd.speed >= 40000)
++		return IB_RATE_40_GBPS;
++	else if (cmd.speed >= 30000)
++		return IB_RATE_30_GBPS;
++	else if (cmd.speed >= 20000)
++		return IB_RATE_20_GBPS;
++	else if (cmd.speed >= 10000)
++		return IB_RATE_10_GBPS;
++	else
++		return IB_RATE_PORT_CURRENT;
++}
++#else
+ static inline int iboe_get_rate(struct net_device *dev)
+ {
+ 	struct ethtool_cmd cmd;
+@@ -234,6 +255,7 @@ static inline int iboe_get_rate(struct net_device *dev)
+ 	else
+ 		return IB_RATE_PORT_CURRENT;
+ }
++#endif
+ 
+ static inline int rdma_link_local_addr(struct in6_addr *addr)
+ {
+-- 
+1.8.3.1
+

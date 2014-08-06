@@ -238,7 +238,7 @@ else
 fi
 
 # Define kernel version prefix
-KPREFIX=`uname -r | cut -c -3 | tr -d '.' | tr -d '[:space:]'`
+KPREFIX=`uname -r | cut -d '.' -s -f 1,2 | tr -d '.' | tr -d '[:space:]'`
 
 # Setting OpenIB start parameters
 POST_LOAD_MODULES=""
@@ -707,6 +707,24 @@ bring_up()
 start()
 {
     local RC=0
+
+    # On first start unload any existing modules (possibly from initramfs image)
+    mkdir /var/lock/openibd > /dev/null 2>&1
+    my_rc=$?
+    if [ $my_rc -eq 0 ]; then
+        for mod in $UNLOAD_MODULES
+        do
+            if is_module $mod; then
+                echo
+                echo "Found Infiniband modules loaded."
+                echo "Trying to unload them first..."
+                echo
+
+                stop
+                break
+            fi
+        done
+    fi
 
     # Stop Gen1 modules if they are UP after uninstall
     if is_module ib_tavor; then

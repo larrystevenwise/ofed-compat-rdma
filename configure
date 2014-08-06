@@ -115,6 +115,12 @@ Usage:  `basename $0` [options]
     --with-mlx5_debug-mod         make CONFIG_MLX5_DEBUG=y [yes]
     --without-mlx5_debug-mod      [no]
 
+    --with-xeon-phi-mod    make CONFIG_IBP_SERVER=m CONFIG_INFINIBAND_SCIF=m [no]
+    --without-xeon-phi-mod    [yes]
+
+    --with-xeon-phi-debug-mod    make CONFIG_IBP_DEBUG=y [no]
+    --without-xeon-phi-debug-mod    [yes]
+
     --with-ipath_inf-mod    make CONFIG_INFINIBAND_IPATH=m [no]
     --without-ipath_inf-mod    [yes]
 
@@ -488,6 +494,15 @@ main()
                         --without-mlx5_debug-mod)
                             CONFIG_MLX5_DEBUG=
                         ;;
+                        --with-ibscif-mod)
+                            CONFIG_INFINIBAND_SCIF="m"
+                        ;;
+                        --with-ibp-server-mod)
+                            CONFIG_IBP_SERVER="m"
+                        ;;
+                        --with-ibp=server-debug-mod)
+                            CONFIG_IBP_DEBUG="y"
+                        ;;
                         --with-ipath_inf-mod)
                             CONFIG_INFINIBAND_IPATH="m"
                         ;;
@@ -697,6 +712,11 @@ CONFIG_MLX5_INFINIBAND=${CONFIG_MLX5_INFINIBAND:-''}
 CONFIG_MLX4_DEBUG=${CONFIG_MLX4_DEBUG:-''}
 CONFIG_MLX5_DEBUG=${CONFIG_MLX4_DEBUG:-''}
 
+CONFIG_IBP_SERVER=${CONFIG_IBP_SERVER:-''}
+CONFIG_IBP_DEBUG=${CONFIG_IBP_DEBUG:-''}
+
+CONFIG_INFINIBAND_SCIF=${CONFIG_INFINIBAND_SCIF:-''}
+
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG:-''}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER:-''}
 CONFIG_SCSI_ISCSI_ATTRS=${CONFIG_SCSI_ISCSI_ATTRS:-''}
@@ -774,6 +794,12 @@ fi
 		ex ${CWD}/ofed_scripts/ofed_patch.sh ${ofed_patch_params}
 	fi
 
+	if [[ ! -e .xeon_phi_applied && "X$CONFIG_IBP_SERVER" == "Xm" ]]; then
+		echo ".xeon_phi_applied does not exist. running ofed-patch.sh for xeon-phi"
+		ex ${CWD}/ofed_scripts/ofed_patch.sh --with-patchdir=tech-preview/xeon-phi
+		touch .xeon_phi_applied
+	fi
+
         # Create configure.mk
         /bin/rm -f ${CWD}/${CONFIG}
         cat >> ${CWD}/${CONFIG} << EOFCONFIG
@@ -815,6 +841,12 @@ CONFIG_MLX4_INFINIBAND=${CONFIG_MLX4_INFINIBAND}
 CONFIG_MLX5_INFINIBAND=${CONFIG_MLX5_INFINIBAND}
 CONFIG_MLX4_DEBUG=${CONFIG_MLX4_DEBUG}
 CONFIG_MLX5_DEBUG=${CONFIG_MLX5_DEBUG}
+
+CONFIG_IBP_SERVER=${CONFIG_IBP_SERVER}
+CONFIG_IBP_DEBUG=${CONFIG_IBP_DEBUG}
+
+CONFIG_INFINIBAND_SCIF=${CONFIG_INFINIBAND_SCIF}
+
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER}
 CONFIG_SCSI_ISCSI_ATTRS=${CONFIG_SCSI_ISCSI_ATTRS}
@@ -988,6 +1020,21 @@ if [ "X${CONFIG_MLX5_DEBUG}" == "Xy" ]; then
         DEFINE_MLX5_DEBUG="#undef CONFIG_MLX5_DEBUG\n#define CONFIG_MLX5_DEBUG 1"
 else
         DEFINE_MLX5_DEBUG="#undef CONFIG_MLX5_DEBUG"
+fi
+if [ "X${CONFIG_IBP_SERVER}" == "Xm" ]; then
+        DEFINE_IBP_SERVER="#undef CONFIG_IBP_SERVER\n#define CONFIG_IBP_SERVER 1"
+else
+        DEFINE_IBP_SERVER="#undef CONFIG_IBP_SERVER"
+fi
+if [ "X${CONFIG_IBP_DRV_DEBUG}" == "Xy" ]; then
+        DEFINE_IBP_DEBUG="#undef CONFIG_IBP_DEBUG\n#define CONFIG_IBP_DEBUG 1"
+else
+        DEFINE_IBP_DEBUG="#undef CONFIG_IBP_DEBUG"
+fi
+if [ "X${CONFIG_INFINIBAND_SCIF}" == "Xm" ]; then
+        DEFINE_INFINIBAND_SCIF="#undef CONFIG_INFINIBAND_SCIF\n#define CONFIG_INFINIBAND_SCIF 1"
+else
+        DEFINE_INFINIBAND_SCIF="#undef CONFIG_INFINIBAND_SCIF"
 fi
 if [ "X${CONFIG_INFINIBAND_IPOIB_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_IPOIB_DEBUG="#undef CONFIG_INFINIBAND_IPOIB_DEBUG\n#define CONFIG_INFINIBAND_IPOIB_DEBUG 1"
@@ -1258,6 +1305,11 @@ $(echo -e "${DEFINE_MLX4_ETHERNET}" | grep -v undef)
 $(echo -e "${DEFINE_MLX4_DEBUG}" | grep -v undef)
 $(echo -e "${DEFINE_MLX5_DEBUG}" | grep -v undef)
 
+$(echo -e "${DEFINE_IBP_SERVER}" | grep -v undef)
+$(echo -e "${DEFINE_IBP_DEBUG}" | grep -v undef)
+
+$(echo -e "${DEFINE_INFINIBAND_SCIF}" | grep -v undef)
+
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG_DATA}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_SDP_SEND_ZCOPY}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_SDP_RECV_ZCOPY}" | grep -v undef)
@@ -1293,6 +1345,11 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_MLX4_EN_DCB
 #undef CONFIG_MLX4_INFINIBAND
 #undef CONFIG_MLX5_INFINIBAND
+
+#undef CONFIG_IBP_SERVER
+#undef CONFIG_IBP_DEBUG
+
+#undef CONFIG_INFINIBAND_SCIF
 
 #undef CONFIG_INFINIBAND_IPOIB_DEBUG
 #undef CONFIG_INFINIBAND_ISER
@@ -1413,6 +1470,11 @@ $(echo -e "${DEFINE_MLX5_INFINIBAND}")
 $(echo -e "${DEFINE_MLX4_ETHERNET}")
 $(echo -e "${DEFINE_MLX4_DEBUG}")
 $(echo -e "${DEFINE_MLX5_DEBUG}")
+
+$(echo -e "${DEFINE_IBP_SERVER}")
+$(echo -e "${DEFINE_IBP_DEBUG}")
+
+$(echo -e "${DEFINE_INFINIBAND_SCIF}")
 
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG_DATA}")
 $(echo -e "${DEFINE_INFINIBAND_SDP_SEND_ZCOPY}")

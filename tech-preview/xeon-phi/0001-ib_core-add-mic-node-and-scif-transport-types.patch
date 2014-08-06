@@ -1,0 +1,92 @@
+From c01faf2a8053f8968b9bac84a4cbd54a9952d472 Mon Sep 17 00:00:00 2001
+From: Phil Cayton <phil.cayton@intel.com>
+Date: Tue, 21 Jan 2014 08:59:29 -0800
+Subject: [PATCH 01/12] ib_core add mic node and scif transport types
+
+The OFED SCIF driver implements a software-emulated RDMA device to allow OFED
+based applications, such as Intel MPI, to run on Intel(R) MIC Architecture
+without the presence of a physical HCA.  OFED SCIF is only targeted for inter-
+node communication within a single platform, where a node is a coprocessor
+or the host processor.  This patch adds new node and transport types to the
+ib_core kernel module to distinguish this new RDMA interface type.
+---
+ drivers/infiniband/core/sysfs.c | 3 +++
+ drivers/infiniband/core/verbs.c | 4 ++++
+ include/rdma/ib_verbs.h         | 7 +++++--
+ 3 files changed, 12 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/core/sysfs.c b/drivers/infiniband/core/sysfs.c
+index cde1e7b..b186325 100644
+--- a/drivers/infiniband/core/sysfs.c
++++ b/drivers/infiniband/core/sysfs.c
+@@ -253,6 +253,8 @@ static ssize_t link_layer_show(struct ib_port *p, struct port_attribute *unused,
+ 		return sprintf(buf, "%s\n", "InfiniBand");
+ 	case IB_LINK_LAYER_ETHERNET:
+ 		return sprintf(buf, "%s\n", "Ethernet");
++	case IB_LINK_LAYER_SCIF:
++		return sprintf(buf, "%s\n", "SCIF");
+ 	default:
+ 		return sprintf(buf, "%s\n", "Unknown");
+ 	}
+@@ -614,6 +616,7 @@ static ssize_t show_node_type(struct device *device,
+ 	case RDMA_NODE_RNIC:	  return sprintf(buf, "%d: RNIC\n", dev->node_type);
+ 	case RDMA_NODE_IB_SWITCH: return sprintf(buf, "%d: switch\n", dev->node_type);
+ 	case RDMA_NODE_IB_ROUTER: return sprintf(buf, "%d: router\n", dev->node_type);
++	case RDMA_NODE_MIC:	  return sprintf(buf, "%d: MIC\n", dev->node_type);
+ 	default:		  return sprintf(buf, "%d: <unknown>\n", dev->node_type);
+ 	}
+ }
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index a321df2..0519ca2 100644
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -114,6 +114,8 @@ rdma_node_get_transport(enum rdma_node_type node_type)
+ 		return RDMA_TRANSPORT_IB;
+ 	case RDMA_NODE_RNIC:
+ 		return RDMA_TRANSPORT_IWARP;
++	case RDMA_NODE_MIC:
++		return RDMA_TRANSPORT_SCIF;
+ 	default:
+ 		BUG();
+ 		return 0;
+@@ -131,6 +133,8 @@ enum rdma_link_layer rdma_port_get_link_layer(struct ib_device *device, u8 port_
+ 		return IB_LINK_LAYER_INFINIBAND;
+ 	case RDMA_TRANSPORT_IWARP:
+ 		return IB_LINK_LAYER_ETHERNET;
++	case RDMA_TRANSPORT_SCIF:
++		return IB_LINK_LAYER_SCIF;
+ 	default:
+ 		return IB_LINK_LAYER_UNSPECIFIED;
+ 	}
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index e393171..9945370 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -67,12 +67,14 @@ enum rdma_node_type {
+ 	RDMA_NODE_IB_CA 	= 1,
+ 	RDMA_NODE_IB_SWITCH,
+ 	RDMA_NODE_IB_ROUTER,
+-	RDMA_NODE_RNIC
++	RDMA_NODE_RNIC,
++	RDMA_NODE_MIC
+ };
+ 
+ enum rdma_transport_type {
+ 	RDMA_TRANSPORT_IB,
+-	RDMA_TRANSPORT_IWARP
++	RDMA_TRANSPORT_IWARP,
++	RDMA_TRANSPORT_SCIF
+ };
+ 
+ enum rdma_transport_type
+@@ -82,6 +84,7 @@ enum rdma_link_layer {
+ 	IB_LINK_LAYER_UNSPECIFIED,
+ 	IB_LINK_LAYER_INFINIBAND,
+ 	IB_LINK_LAYER_ETHERNET,
++	IB_LINK_LAYER_SCIF
+ };
+ 
+ enum ib_device_cap_flags {
+-- 
+1.8.3.1
+

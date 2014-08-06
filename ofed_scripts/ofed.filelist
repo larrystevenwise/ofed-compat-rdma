@@ -1,0 +1,5 @@
+# hack for broken pam/limits
+dir /etc/default 755 0 0
+
+# MPI fix
+slink /usr/lib64/libibverbs.so libibverbs.so.1.0.0 777 0 0

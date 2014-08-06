@@ -1,0 +1,145 @@
+#!/bin/bash
+######################################################################
+#
+#	ibscif-opt
+#
+#	Read or set the options of the ibscif kernel module.
+#	The operation is applied to the host as well as all the
+#	active MIC cards.
+#
+#	To read the options, run without any argument.
+#	To set the options, run with a list of <option>=<value> pairs.
+#	If set correctly, the new value is read back as a confirmation.
+#
+#	Usually root privilege is required to set the options. Please
+#	Make sure the system is configured properly for ssh access
+#	to the root account of the MIC cards.
+#
+#	by Jianxin Xiong (jianxin.xiong@intel.com)
+#	Apr. 27, 2012
+#
+######################################################################
+
+read_opt()
+{
+	sysfs=`mount | sed -ne 's/.* on \(.*\) type sysfs.*/\1/p'`
+	if [ ! -d "$sysfs" ] ; then
+		echo sysfs not found.
+		exit 1
+	fi
+
+	[ -z "$cards" ] && cards=`cd $sysfs/class/mic && echo mic[0-7]`
+	for card in `echo $cards | tr ' ' '\n' | sort -u`; do
+		# Test card access
+		if ssh $card "echo -n > /dev/null" >/dev/null 2>&1 ; then
+			echo "$card:"
+			ssh $card "if [ -d /sys/module/ibscif ]; then \
+					  cd /sys/module/ibscif/parameters && grep . * | sed -e 's/^/  /' -e 's/:/ = /'; \
+				      else \
+					  echo module ibscif is not loaded. ; \
+				      fi"
+			echo
+		fi
+	done
+
+	echo "host:"
+	if [ -d $sysfs/module/ibscif ] ; then
+		cd $sysfs/module/ibscif/parameters && grep . * | sed -e 's/^/  /' -e 's/:/ = /'
+	else
+		echo module ibscif is not loaded.
+	fi
+}
+
+write_opt()
+{
+	sysfs=`mount | sed -ne 's/.* on \(.*\) type sysfs.*/\1/p'`
+	if [ ! -d "$sysfs" ] ; then
+		echo sysfs not found.
+		exit 1
+	fi
+
+	options="$*"
+
+	[ -z "$cards" ] && cards=`cd $sysfs/class/mic && echo mic[0-7]`
+	for card in `echo $cards | tr ' ' '\n' | sort -u`; do
+		# Test card access
+		if ssh root@$card "echo -n > /dev/null" >/dev/null 2>&1 ; then
+			echo "$card:"
+			set $options
+			while [ $# -ge 2 ]; do
+				name=$1
+				value=$2
+				shift 2
+				ssh root@$card "if [ -d /sys/module/ibscif ]; then \
+						    if [ -f /sys/module/ibscif/parameters/$name ]; then \
+							if [ -w /sys/module/ibscif/parameters/$name ]; then \
+							    echo $value >/sys/module/ibscif/parameters/$name ; \
+							    echo '  '$name = \`cat /sys/module/ibscif/parameters/$name\` \
+							else \
+							    echo option \\\"$name\\\" is read only ; \
+							fi \
+						    else \
+							echo option \\\"$name\\\" does not exist ; \
+						    fi \
+						else \
+						    echo module \\\"ibscif\\\" is not loaded ; \
+						fi"
+				done
+			echo
+		fi
+	done
+
+	echo "host:"
+	set $options
+	while [ $# -ge 2 ]; do
+		name=$1
+		value=$2
+		shift 2
+		if [ -d /$sysfs/module/ibscif ]; then
+		    if [ -f $sysfs/module/ibscif/parameters/$name ]; then
+			if [ -w $sysfs/module/ibscif/parameters/$name ]; then
+			    echo $value >$sysfs/module/ibscif/parameters/$name
+			    echo '  '$name = `cat $sysfs/module/ibscif/parameters/$name`
+			else
+			    echo option \"$name\" is read only.
+			fi
+		    else
+			echo option \"$name\" does not exist.
+		    fi
+		else
+		    echo module \"$name\" is not loaded.
+		fi
+	done
+}
+
+if [ $# -eq 0 ]; then
+	read_opt
+else
+	if [ "$1" = "-h" ]; then
+		echo
+		echo 'Usage: ibscif-opt [-h] [<option>=<value>] ...'
+		echo
+		echo 'Description:'
+		echo '    Read or set the options for the ibscif module on the host and all the active MIC cards.'
+		echo
+		echo 'Eaxmples:'
+		echo '    ibscif-opt                               # read the current setting of all the options'
+		echo '    ibscif-opt -h                            # show this help message'
+		echo '    ibscif-opt fast_fence=1                  # set the fast_fence option to 1'
+		echo '    ibscif-opt fast_fence=1 scif_loopback=1  # set multiple options'
+		echo
+		exit 1
+	fi
+	arg_list=
+	for i in $* ; do
+		name=`grep '^[[:alpha:]_][[:alnum:]_]*$' <<<${i%%=*}`
+		value=`grep '^[[:digit:]]\+$' <<<${i##*=}`
+		if [ "$name=$value" != "$i" ]; then
+			echo $i: invalid format for option assignment
+			continue
+		fi
+		arg_list="$arg_list $name $value"
+	done
+	write_opt $arg_list
+fi
+

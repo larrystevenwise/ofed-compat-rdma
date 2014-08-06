@@ -1,0 +1,124 @@
+From faf3b3f931806d4f044068c4e9b2ca4482a9177a Mon Sep 17 00:00:00 2001
+From: Phil Cayton <phil.cayton@intel.com>
+Date: Tue, 3 Jun 2014 09:50:57 -0700
+Subject: [PATCH 02/12] rdma_cm add mic node and scif transport types
+
+The OFED SCIF driver can leverage the iWARP cm calls to establish connections.
+This patch utilizes the new node and transport types in the rdma cm to call
+the underlying driver as needed.
+---
+ drivers/infiniband/core/cma.c | 34 ++++++++++++++++++++++++++++++++--
+ 1 file changed, 32 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+index dab4b41..3bab5a1 100644
+--- a/drivers/infiniband/core/cma.c
++++ b/drivers/infiniband/core/cma.c
+@@ -728,6 +728,7 @@ int rdma_init_qp_attr(struct rdma_cm_id *id, struct ib_qp_attr *qp_attr,
+ 			qp_attr->rq_psn = id_priv->seq_num;
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		if (!id_priv->cm_id.iw) {
+ 			qp_attr->qp_access_flags = 0;
+ 			*qp_attr_mask = IB_QP_STATE | IB_QP_ACCESS_FLAGS;
+@@ -1024,6 +1025,7 @@ void rdma_destroy_id(struct rdma_cm_id *id)
+ 				ib_destroy_cm_id(id_priv->cm_id.ib);
+ 			break;
+ 		case RDMA_TRANSPORT_IWARP:
++		case RDMA_TRANSPORT_SCIF:
+ 			if (id_priv->cm_id.iw)
+ 				iw_destroy_cm_id(id_priv->cm_id.iw);
+ 			break;
+@@ -1945,6 +1947,7 @@ int rdma_resolve_route(struct rdma_cm_id *id, int timeout_ms)
+ 		}
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		ret = cma_resolve_iw_route(id_priv, timeout_ms);
+ 		break;
+ 	default:
+@@ -2136,6 +2139,25 @@ err:
+ 	return ret;
+ }
+ 
++static int cma_resolve_scif(struct rdma_id_private *id_priv)
++{
++	struct cma_work *work;
++
++	work = kzalloc(sizeof *work, GFP_KERNEL);
++	if (!work)
++		return -ENOMEM;
++
++	/* we probably can leave it empty here */
++
++	work->id = id_priv;
++	INIT_WORK(&work->work, cma_work_handler);
++	work->old_state = RDMA_CM_ADDR_QUERY;
++	work->new_state = RDMA_CM_ADDR_RESOLVED;
++	work->event.event = RDMA_CM_EVENT_ADDR_RESOLVED;
++	queue_work(cma_wq, &work->work);
++	return 0;
++}
++
+ static int cma_bind_addr(struct rdma_cm_id *id, struct sockaddr *src_addr,
+ 			 struct sockaddr *dst_addr)
+ {
+@@ -2177,9 +2199,12 @@ int rdma_resolve_addr(struct rdma_cm_id *id, struct sockaddr *src_addr,
+ 	if (cma_any_addr(dst_addr)) {
+ 		ret = cma_resolve_loopback(id_priv);
+ 	} else {
+-		if (dst_addr->sa_family == AF_IB) {
++		if (dst_addr->sa_family == AF_IB)
+ 			ret = cma_resolve_ib_addr(id_priv);
+-		} else {
++		else if ((id_priv->id.device != NULL) &&
++			 (rdma_node_get_transport(id_priv->id.device->node_type) == RDMA_TRANSPORT_SCIF))
++			ret = cma_resolve_scif(id_priv);
++		else {
+ 			ret = rdma_resolve_ip(&addr_client, cma_src_addr(id_priv),
+ 					      dst_addr, &id->route.addr.dev_addr,
+ 					      timeout_ms, addr_handler, id_priv);
+@@ -2506,6 +2531,7 @@ int rdma_listen(struct rdma_cm_id *id, int backlog)
+ 				goto err;
+ 			break;
+ 		case RDMA_TRANSPORT_IWARP:
++		case RDMA_TRANSPORT_SCIF:
+ 			ret = cma_iw_listen(id_priv, backlog);
+ 			if (ret)
+ 				goto err;
+@@ -2854,6 +2880,7 @@ int rdma_connect(struct rdma_cm_id *id, struct rdma_conn_param *conn_param)
+ 			ret = cma_connect_ib(id_priv, conn_param);
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		ret = cma_connect_iw(id_priv, conn_param);
+ 		break;
+ 	default:
+@@ -2981,6 +3008,7 @@ int rdma_accept(struct rdma_cm_id *id, struct rdma_conn_param *conn_param)
+ 		}
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		ret = cma_accept_iw(id_priv, conn_param);
+ 		break;
+ 	default:
+@@ -3041,6 +3069,7 @@ int rdma_reject(struct rdma_cm_id *id, const void *private_data,
+ 					     0, private_data, private_data_len);
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		ret = iw_cm_reject(id_priv->cm_id.iw,
+ 				   private_data, private_data_len);
+ 		break;
+@@ -3071,6 +3100,7 @@ int rdma_disconnect(struct rdma_cm_id *id)
+ 			ib_send_cm_drep(id_priv->cm_id.ib, NULL, 0);
+ 		break;
+ 	case RDMA_TRANSPORT_IWARP:
++	case RDMA_TRANSPORT_SCIF:
+ 		ret = iw_cm_disconnect(id_priv->cm_id.iw, 0);
+ 		break;
+ 	default:
+-- 
+1.8.3.1
+

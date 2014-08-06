@@ -38,6 +38,11 @@
 %{!?build_kernel_ib: %define build_kernel_ib 0}
 %{!?build_kernel_ib_devel: %define build_kernel_ib_devel 0}
 
+# Set default to use scif.h and scif symvers from MPSS installation
+# Use the release-3.x paths
+%{!?scif_h: %define scif_h %(echo -n '/usr/src/kernels/%{KVERSION}/include/modules/scif.h')}
+%{!?scif_symvers: %define scif_symvers %(echo -n '/lib/modules/%{KVERSION}/scif.symvers')}
+
 # Select packages to build
 %{!?modprobe_update: %define modprobe_update %(if ( echo %{configure_options} | grep "without-modprobe" > /dev/null ); then echo -n '0'; else echo -n '1'; fi)}
 
@@ -62,6 +67,8 @@
 %define build_qlgc_vnic %(if ( echo %{configure_options} | grep "with-qlgc_vnic-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_nfsrdma %(if ( echo %{configure_options} | grep "with-nfsrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_ocrdma %(if ( echo %{configure_options} | grep "with-ocrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_ibp_server %(if ( echo %{configure_options} | grep "with-ibp-server-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_ibscif %(if ( echo %{configure_options} | grep "with-ibscif-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 
 %{!?LIB_MOD_DIR: %define LIB_MOD_DIR /lib/modules/%{KVERSION}/updates}
 
@@ -147,7 +154,13 @@ cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/config.mk  $RPM_BUILD_DIR/src/%{_name}
 sed -i -e "s@\${CWD}@%{_prefix}/src/%{_name}@g" $RPM_BUILD_DIR/src/%{_name}/config.mk
 %endif
 
+
 %if %{build_kernel_ib}
+%if %{build_ibp_server} || %{build_ibscif} || %{build_qib}
+test ! -d ./include/modules && mkdir ./include/modules
+test -f %{scif_h} && cp %{scif_h} ./include/modules
+test -f %{scif_symvers} && cat %{scif_symvers} >> ./Module.symvers
+%endif
 %if %{build_srpt}
 if [ -f /usr/local/include/scst/Module.symvers ]; then
 	cat /usr/local/include/scst/Module.symvers >> ./Module.symvers
@@ -210,9 +223,21 @@ chmod +x ${INFO} > /dev/null 2>&1
 install -d $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openib.conf $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 
+%if %{build_ibp_server} || %{build_ibscif}
+# install overlay files and config
+install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ofed.conf $RPM_BUILD_ROOT/etc/mpss/conf.d/ofed.conf
+install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ofed.filelist $RPM_BUILD_ROOT/opt/intel/mic/ofed/ofed.filelist
+%endif
+
 # Install openib service script
 install -d $RPM_BUILD_ROOT/etc/init.d
 install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openibd $RPM_BUILD_ROOT/etc/init.d
+
+%if %{build_ibp_server} || %{build_ibscif}
+# Also install ofed-mic script in init.d
+install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ofed-mic $RPM_BUILD_ROOT/etc/init.d
+%endif
+
 install -d $RPM_BUILD_ROOT/sbin
 install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/sysctl_perf_tuning $RPM_BUILD_ROOT/sbin
 
@@ -227,6 +252,13 @@ install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/connectx_port_c
 touch $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}/connectx.conf
 %endif
 
+%if %{build_ibp_server} || %{build_ibscif}
+install -d $RPM_BUILD_ROOT/etc/modprobe.d
+install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ibscif.conf $RPM_BUILD_ROOT/etc/modprobe.d/
+install -d $RPM_BUILD_ROOT/usr/sbin
+install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ibscif-opt $RPM_BUILD_ROOT/usr/sbin
+%endif
+
 %if %{build_qib}
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/truescale.cmds $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 %endif
@@ -235,6 +267,11 @@ install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/truescale.cmds 
 %if %{modprobe_update}
 install -d $RPM_BUILD_ROOT/etc/modprobe.d
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ib_ipoib.conf $RPM_BUILD_ROOT/etc/modprobe.d
+%endif
+%if %{build_ibp_server} || %{build_ibscif}
+install -d $RPM_BUILD_ROOT/etc/sysconfig/mic
+install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ipoib.conf $RPM_BUILD_ROOT/etc/mpss/ipoib.conf
+install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/docs/lustre-phi.txt $RPM_BUILD_ROOT/usr/share/doc/%{_name}-%{_version}/lustre-phi.txt
 %endif
 %endif
 
@@ -349,6 +386,15 @@ perl -i -ne 'if (m@^#!/bin/bash@) {
         fi
         if ! ( /sbin/chkconfig --add openibd > /dev/null 2>&1 ); then
                 true
+        fi
+
+        if [ -x /etc/init.d/ofed-mic ]; then
+            if ! ( /sbin/chkconfig --del ofed-mic > /dev/null 2>&1 ); then
+                    true
+            fi
+            if ! ( /sbin/chkconfig --add ofed-mic && /sbin/chkconfig ofed-mic off > /dev/null 2>&1 ); then
+                    true
+            fi
         fi
 fi
 
@@ -548,10 +594,20 @@ if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
                 if ! ( /sbin/chkconfig --del openibd  > /dev/null 2>&1 ); then
                         true
                 fi
+		if [ -x /etc/init.d/ofed-mic ]; then
+                    if ! ( /sbin/chkconfig --del ofed-mic  > /dev/null 2>&1 ); then
+                        true
+                    fi
+		fi
           fi
           if [ -f /etc/SuSE-release ]; then
                 if ! ( /sbin/insserv -r openibd > /dev/null 2>&1 ); then
                         true
+                fi
+		if [ -x /etc/init.d/ofed-mic ]; then
+                    if ! ( /sbin/insserv -r ofed-mic > /dev/null 2>&1 ); then
+                        true
+                    fi
                 fi
           fi
           if [ -f /etc/debian_version ]; then
@@ -587,6 +643,12 @@ fi
 %defattr(-,root,root,-)
 %dir %{RDMA_CONF_DIR}
 %config(noreplace) %{RDMA_CONF_DIR}/openib.conf
+%if %{build_ibp_server} || %{build_ibscif}
+%config %{_sysconfdir}/init.d/ofed-mic
+%config %{_sysconfdir}/mpss/conf.d/ofed.conf
+%dir /opt/intel/mic/ofed
+/opt/intel/mic/ofed/*
+%endif
 %{RDMA_CONF_DIR}/info
 /etc/init.d/openibd
 /sbin/sysctl_perf_tuning
@@ -597,9 +659,18 @@ fi
 %if %{build_qib}
 %config(noreplace) %{RDMA_CONF_DIR}/truescale.cmds
 %endif
+%if %{build_ibp_server} || %{build_ibscif}
+%if %{modprobe_update}
+%config(noreplace) %{_sysconfdir}/modprobe.d/ibscif.conf
+%endif
+%endif
 %if %{build_ipoib}
 %if %{modprobe_update}
 /etc/modprobe.d/ib_ipoib.conf
+%endif
+%if %{build_ibp_server} || %{build_ibscif}
+%config(noreplace) %{_sysconfdir}/mpss/ipoib.conf
+/usr/share/doc/%{_name}-%{_version}/lustre-phi.txt
 %endif
 %endif
 %if %{build_sdp}
@@ -623,6 +694,8 @@ fi
 %{_prefix}/src/openib
 
 %changelog
+* Wed Jul 06 2014  Jay Sternberg <jay.e.sternberg@intel.com>, Phil Cayton <phil.cayton@intel.com>
+- Add Tech Preview for Xeon-Phi 
+
 * Thu Feb 16 2012 Vladimir Sokolovsky <vlad@mellanox.com>
 - Created spec file for compat-rdma
-r compat-rdma

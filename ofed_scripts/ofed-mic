@@ -1,0 +1,297 @@
+#!/bin/bash
+#
+# chkconfig: 235 96 04
+# description: Start ofed layer on top of mpss
+#
+### BEGIN INIT INFO
+# Provides: ofed-mic
+# Required-Start: mpss openibd
+# Required-Stop:
+# Default-Start: 2 3 5
+# Default-Stop: 0 1 6
+# Short-Description: Start ofed layer on top of mpss
+# Description: Load host and card side kernel modules needed for OFED/scif and IB proxy devices
+### END INIT INFO
+
+# Source function library.
+if [ -f /etc/init.d/functions ]; then
+	# RHEL
+	. /etc/init.d/functions
+	_success='success; echo'
+	_failure='failure; echo'
+elif [ -f /etc/rc.status ]; then
+	# SLES
+	. /etc/rc.status
+	_success=rc_status\ -v
+	_failure=rc_status\ -v
+else
+	# other
+	_success=echo\ success
+	_failure=echo\ failure
+fi
+
+# global defs and config files
+declare -r mapfile=/etc/ofed-mic.map
+declare -r sysfs=/sys
+declare -i nohost=0
+declare -i retval=0
+
+declare -r ssh="ssh -o ConnectTimeout=5 -o StrictHostKeyChecking=no"
+declare -r scp="scp -o ConnectTimeout=5 -o StrictHostKeyChecking=no"
+
+# For each card on the system run the given bash function ($1), passing
+# the card's hostname and micN name as $1 and $2 respectively.
+# Returns 0 if all cards ran all given functions successfully,
+# non-zero otherwise (or if there are no cards).
+foreach_card()
+{
+	declare -i errors=0
+
+	[ -d "$sysfs" ] || return $?
+
+	cards=`cd $sysfs/class/mic && echo mic* | tr ' ' '\n' | sort -u`
+	host=`hostname -s`
+	domn=`hostname -d`
+
+	for card in $cards; do
+		echo -n "$card "
+
+		if [ "`cat /sys/class/mic/$card/state`" == "online" ] ; then 
+			names=(${host}-${card} ${card} ${host}-${card}.${domn})
+		else
+			eval $_failure
+			continue
+		fi
+
+		# Try host-cardN, cardN, host-cardN.domain, in order:
+		for card_hostname in ${names[@]} ; do
+			for cmd in $@; do
+				$cmd $card_hostname $card
+			done
+
+			[ $? == 0 ] && break
+		done
+
+		[ $? == 0 ] && eval $_success || eval $_failure
+		errors+=$?
+	done
+
+	return $errors
+}
+
+start_mic()
+{
+	declare -i errors=0
+
+	conf=/etc/modprobe.d/ibscif.conf
+	if [ -f "$conf" ]; then
+		ibscif_opt=`grep '^options ibscif' $conf | sed -e 's/^options ibscif *//' -e 's/ *$//'`
+	fi
+
+	# load ibscif first with any options:
+	$ssh $1 /sbin/modprobe ibscif $ibscif_opt &&
+	$ssh $1 /etc/init.d/ibmodules start &> /dev/null
+
+	errors+=$?
+
+	conf=/etc/mpss/ipoib.conf
+	if [ -f "$conf" ]; then
+		source "$conf"
+		if [ "${ipoib_enabled}" == "yes" ] ; then
+			once=0
+			echo -n -\  
+			$ssh $1 modprobe ib_ipoib ${ipoib_parms}
+			sleep 2
+			ipoib_list=`ls $sysfs/class/net | grep ib`
+			for i in $ipoib_list ; do
+				card_if=$2_$i
+				IP=${!card_if}
+				if [ ! -z "$IP" ] ; then
+					once=1
+					echo -n $i\ 
+					mode=`cat $sysfs/class/net/$i/mode`
+					$ssh $1 echo $mode \> /sys/class/net/$i/mode
+					$ssh $1 ifconfig $i $IP
+					errors+=$?
+				fi
+			done
+			if [ $once -eq 1 ] ; then echo -n -\ ; fi
+		fi
+	fi
+
+	return $errors
+}
+
+stop_mic()
+{
+	$ssh $1 /etc/init.d/ibmodules stop &> /dev/null
+}
+
+status_mic()
+{
+	$ssh $1 /etc/init.d/ibmodules status &> /dev/null
+}
+
+get_numa_map()
+{
+	[ -d "$sysfs" ] || return 0
+
+	NODE_LIST=
+	nodes=`cd $sysfs/devices/system/node && echo node*`
+	for i in $nodes ; do
+		distance=`cat $sysfs/devices/system/node/$i/distance 2>/dev/null | sed 's/ /,/g'`
+		NODE_LIST="$NODE_LIST $i:distance=($distance)"
+	done
+ 
+	MIC_LIST=
+	mics=`cd $sysfs/class/mic && echo mic*`
+	for i in $mics ; do
+		numa_node=`cat $sysfs/class/mic/$i/device/numa_node 2>/dev/null`
+		MIC_LIST="$MIC_LIST $i:node=$numa_node"
+	done
+ 
+	HCA_LIST=
+	hcas=`cd $sysfs/class/infiniband && echo *`
+	for i in $hcas ; do
+		numa_node=`cat $sysfs/class/infiniband/$i/device/numa_node 2>/dev/null`
+		HCA_LIST="$HCA_LIST $i:node=$numa_node"
+	done
+ 
+	echo '[NODE]' $NODE_LIST >$mapfile
+	echo '[MIC] ' $MIC_LIST >>$mapfile
+	echo '[HCA] ' $HCA_LIST >>$mapfile
+}
+
+copy_numa_map()
+{
+	if [ -f $mapfile ]; then
+		$scp $mapfile $1:$mapfile &> /dev/null
+		$ssh $1 "echo '[SELF]' $2 >>$mapfile"
+	fi
+
+	return 0
+}
+
+start()
+{
+	echo $"Starting OFED Stack:"
+
+	if [ "$nohost" -eq 0 ]; then
+		echo -n "host"
+		modprobe ib_uverbs &&
+		modprobe ibp_server &&
+		modprobe ibp_cm_server &&
+		modprobe ibp_sa_server &&
+		modprobe ibscif
+
+		retval=$?
+		[ $retval -eq 0 ] && eval $_success || eval $_failure
+	fi
+
+	get_numa_map
+	foreach_card copy_numa_map start_mic
+	retval+=$?
+
+	# set up the special address "mic0:ib" for supporting RDMA CM over
+	# the emulated IB interface (ibscif). this is used for address
+	# resolution only. there is no need to set up "mic1:ib" even if
+	# more than one cards are installed.
+	ip address add 192.0.2.100/24 dev mic0 label mic0:ib
+
+	return $retval
+}
+
+stop_module()
+{
+	#if needed to return proper status
+	if [ `grep -c $1 /proc/modules` -ne 0 ] ; then
+		rmmod $1 &> /dev/null
+	fi
+}
+
+stop()
+{
+	echo $"Stopping OFED Stack:"
+
+	ip address del 192.0.2.100/24 dev mic0 2>/dev/null
+
+	foreach_card stop_mic
+	micret=$?
+
+	if [ "$nohost" -eq 0 ]; then
+		echo -n "host"
+		stop_module ibscif
+		retval=$?
+
+		stop_module ibp_sa_server
+		stop_module ibp_cm_server
+		retval+=$?
+
+		kill $(pidof /usr/sbin/ibpd) &>/dev/null
+		stop_module ibp_server
+		retval+=$?
+
+		[ $retval -eq 0 ] && eval $_success || eval $_failure
+	fi
+
+	retval+=$micret
+
+	return $retval
+}
+
+restart()
+{
+	stop
+	start
+
+	return $retval
+}
+
+status()
+{
+	echo $"Status of OFED Stack:"
+
+	if [ "$nohost" -eq 0 ]; then
+		echo -n "host"
+		grep -qw ibp_server /proc/modules &&
+		grep -qw ibp_cm_server /proc/modules &&
+		grep -qw ibp_sa_server /proc/modules &&
+		grep -qw ibscif /proc/modules
+
+		retval=$?
+
+		[ $retval -eq 0 ] && eval $_success || eval $_failure
+	fi
+
+	# card side
+	foreach_card status_mic
+	retval+=$?
+
+	return $retval
+}
+
+if [ "$1" = "mic" ]; then
+	# MICs only, no host
+	let "nohost = 1"
+	shift
+fi
+
+case $1 in
+	start)
+		start
+		;;
+	stop)
+		stop
+		;;
+	restart)
+		restart
+		;;
+	status)
+		status
+		;;
+	*)
+		echo $"Usage: $0 [mic] {start|stop|restart|status}"
+		exit 2
+esac
+
+exit $?
