@@ -178,6 +178,7 @@ start()
 
 	if [ "$nohost" -eq 0 ]; then
 		echo -n "host"
+		(/usr/sbin/ibpd &) &&
 		modprobe ib_uverbs &&
 		modprobe ibp_server &&
 		modprobe ibp_cm_server &&
@@ -192,10 +193,6 @@ start()
 	foreach_card copy_numa_map start_mic
 	retval+=$?
 
-	# set up the special address "mic0:ib" for supporting RDMA CM over
-	# the emulated IB interface (ibscif). this is used for address
-	# resolution only. there is no need to set up "mic1:ib" even if
-	# more than one cards are installed.
 	ip address add 192.0.2.100/24 dev mic0 label mic0:ib
 
 	return $retval
@@ -227,7 +224,7 @@ stop()
 		stop_module ibp_cm_server
 		retval+=$?
 
-		kill $(pidof /usr/sbin/ibpd) &>/dev/null
+		killall -q /usr/sbin/ibpd
 		stop_module ibp_server
 		retval+=$?
 
