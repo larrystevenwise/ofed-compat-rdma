@@ -1,0 +1,50 @@
+From 7f23f6f6e388d2003c4ecf5d558f3c2191e12530 Mon Sep 17 00:00:00 2001
+From: Chuck Lever <chuck.lever@oracle.com>
+Date: Wed, 28 May 2014 10:33:34 -0400
+Subject: [PATCH 119/132] xprtrmda: Reduce lock contention in completion handlers
+
+Skip the ib_poll_cq() after re-arming, if the provider knows there
+are no additional items waiting. (Have a look at commit ed23a727 for
+more details).
+
+Signed-off-by: Chuck Lever <chuck.lever@oracle.com>
+Signed-off-by: Anna Schumaker <Anna.Schumaker@Netapp.com>
+---
+ net/sunrpc/xprtrdma/verbs.c |   14 ++++++++++----
+ 1 files changed, 10 insertions(+), 4 deletions(-)
+
+diff --git a/net/sunrpc/xprtrdma/verbs.c b/net/sunrpc/xprtrdma/verbs.c
+index af2d097..c7d5281 100644
+--- a/net/sunrpc/xprtrdma/verbs.c
++++ b/net/sunrpc/xprtrdma/verbs.c
+@@ -192,8 +192,11 @@ rpcrdma_sendcq_upcall(struct ib_cq *cq, void *cq_context)
+ 		return;
+ 	}
+ 
+-	rc = ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
+-	if (rc) {
++	rc = ib_req_notify_cq(cq,
++			IB_CQ_NEXT_COMP | IB_CQ_REPORT_MISSED_EVENTS);
++	if (rc == 0)
++		return;
++	if (rc < 0) {
+ 		dprintk("RPC:       %s: ib_req_notify_cq failed: %i\n",
+ 			__func__, rc);
+ 		return;
+@@ -272,8 +275,11 @@ rpcrdma_recvcq_upcall(struct ib_cq *cq, void *cq_context)
+ 		return;
+ 	}
+ 
+-	rc = ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
+-	if (rc) {
++	rc = ib_req_notify_cq(cq,
++			IB_CQ_NEXT_COMP | IB_CQ_REPORT_MISSED_EVENTS);
++	if (rc == 0)
++		return;
++	if (rc < 0) {
+ 		dprintk("RPC:       %s: ib_req_notify_cq failed: %i\n",
+ 			__func__, rc);
+ 		return;
+-- 
+1.7.1
+

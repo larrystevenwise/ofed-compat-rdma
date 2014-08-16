@@ -1,0 +1,55 @@
+From 5bc4bc729275a0bfc2bfd04466e8ab7c85af2f6e Mon Sep 17 00:00:00 2001
+From: Chuck Lever <chuck.lever@oracle.com>
+Date: Wed, 28 May 2014 10:34:16 -0400
+Subject: [PATCH 124/132] xprtrdma: Remove Tavor MTU setting
+
+Clean up.  Remove HCA-specific clutter in xprtrdma, which is
+supposed to be device-independent.
+
+Hal Rosenstock <hal@dev.mellanox.co.il> observes:
+> Note that there is OpenSM option (enable_quirks) to return 1K MTU
+> in SA PathRecord responses for Tavor so that can be used for this.
+> The default setting for enable_quirks is FALSE so that would need
+> changing.
+
+Signed-off-by: Chuck Lever <chuck.lever@oracle.com>
+Signed-off-by: Anna Schumaker <Anna.Schumaker@Netapp.com>
+---
+ net/sunrpc/xprtrdma/verbs.c |   14 --------------
+ 1 files changed, 0 insertions(+), 14 deletions(-)
+
+diff --git a/net/sunrpc/xprtrdma/verbs.c b/net/sunrpc/xprtrdma/verbs.c
+index 54edf2a..515dfc1 100644
+--- a/net/sunrpc/xprtrdma/verbs.c
++++ b/net/sunrpc/xprtrdma/verbs.c
+@@ -48,7 +48,6 @@
+  */
+ 
+ #include <linux/interrupt.h>
+-#include <linux/pci.h>	/* for Tavor hack below */
+ #include <linux/slab.h>
+ #include <asm/bitops.h>
+ 
+@@ -920,19 +919,6 @@ retry:
+ 		}
+ 	}
+ 
+-/* XXX Tavor device performs badly with 2K MTU! */
+-if (strnicmp(ia->ri_id->device->dma_device->bus->name, "pci", 3) == 0) {
+-	struct pci_dev *pcid = to_pci_dev(ia->ri_id->device->dma_device);
+-	if (pcid->device == PCI_DEVICE_ID_MELLANOX_TAVOR &&
+-	    (pcid->vendor == PCI_VENDOR_ID_MELLANOX ||
+-	     pcid->vendor == PCI_VENDOR_ID_TOPSPIN)) {
+-		struct ib_qp_attr attr = {
+-			.path_mtu = IB_MTU_1024
+-		};
+-		rc = ib_modify_qp(ia->ri_id->qp, &attr, IB_QP_PATH_MTU);
+-	}
+-}
+-
+ 	ep->rep_connected = 0;
+ 
+ 	rc = rdma_connect(ia->ri_id, &ep->rep_remote_cma);
+-- 
+1.7.1
+
