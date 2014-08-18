@@ -20,31 +20,3 @@ index xxxxxxx..xxxxxxx xxxxxx
  			xprt_rdma_slot_table_entries);
  	if (xprt == NULL) {
  		dprintk("RPC:       %s: couldn't allocate rpcrdma_xprt\n",
-@@ -450,8 +452,15 @@ xprt_rdma_connect(struct rpc_xprt *xprt, struct rpc_task *task)
- }
- 
- static int
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)) || defined (CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS)
- xprt_rdma_reserve_xprt(struct rpc_xprt *xprt, struct rpc_task *task)
-+#else
-+xprt_rdma_reserve_xprt(struct rpc_task *task)
-+#endif
- {
-+#if (LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)) && !defined (CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS)
-+	struct rpc_xprt *xprt = task->tk_xprt;
-+#endif
- 	struct rpcrdma_xprt *r_xprt = rpcx_to_rdmax(xprt);
- 	int credits = atomic_read(&r_xprt->rx_buf.rb_credits);
- 
-@@ -463,7 +472,11 @@ xprt_rdma_reserve_xprt(struct rpc_xprt *xprt, struct rpc_task *task)
- 		BUG_ON(r_xprt->rx_buf.rb_cwndscale <= 0);
- 	}
- 	xprt->cwnd = credits * r_xprt->rx_buf.rb_cwndscale;
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,1,0)) || defined (CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS)
- 	return xprt_reserve_xprt_cong(xprt, task);
-+#else
-+	return xprt_reserve_xprt_cong(task);
-+#endif
- }
- 
- /*

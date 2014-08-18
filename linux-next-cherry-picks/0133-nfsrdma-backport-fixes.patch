@@ -1,0 +1,48 @@
+Index: compat-rdma/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
+===================================================================
+--- compat-rdma.orig/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
++++ compat-rdma/net/sunrpc/xprtrdma/svc_rdma_recvfrom.c
+@@ -92,7 +92,9 @@ static void rdma_build_arg_xdr(struct sv
+ 		sge_no++;
+ 	}
+ 	rqstp->rq_respages = &rqstp->rq_pages[sge_no];
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,7,0))
+ 	rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 
+ 	/* We should never run out of SGE because the limit is defined to
+ 	 * support the max allowed RPC data length
+@@ -167,7 +169,9 @@ static int rdma_read_chunk_lcl(struct sv
+ 		if (!pg_off)
+ 			head->count++;
+ 		rqstp->rq_respages = &rqstp->rq_arg.pages[pg_no+1];
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,7,0))
+ 		rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 		ctxt->sge[pno].addr =
+ 			ib_dma_map_page(xprt->sc_cm_id->device,
+ 					head->arg.pages[pg_no], pg_off,
+@@ -272,7 +276,9 @@ static int rdma_read_chunk_frmr(struct s
+ 		if (!pg_off)
+ 			head->count++;
+ 		rqstp->rq_respages = &rqstp->rq_arg.pages[pg_no+1];
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,7,0))
+ 		rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 		frmr->page_list->page_list[pno] =
+ 			ib_dma_map_page(xprt->sc_cm_id->device,
+ 					head->arg.pages[pg_no], 0,
+Index: compat-rdma/net/sunrpc/xprtrdma/svc_rdma_sendto.c
+===================================================================
+--- compat-rdma.orig/net/sunrpc/xprtrdma/svc_rdma_sendto.c
++++ compat-rdma/net/sunrpc/xprtrdma/svc_rdma_sendto.c
+@@ -446,7 +446,9 @@ static int send_reply(struct svcxprt_rdm
+ 		if (page_no+1 >= sge_no)
+ 			ctxt->sge[page_no+1].length = 0;
+ 	}
++#if (LINUX_VERSION_CODE > KERNEL_VERSION(3,7,0))
+ 	rqstp->rq_next_page = rqstp->rq_respages + 1;
++#endif
+ 
+ 	BUG_ON(sge_no > rdma->sc_max_sge);
+ 	memset(&send_wr, 0, sizeof send_wr);
