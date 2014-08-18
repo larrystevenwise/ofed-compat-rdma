@@ -267,6 +267,7 @@ if (grep -q virtqueue_add_buf_gfp ${KLIB_BUILD}/tools/include/virtio/linux/virti
         set_config CONFIG_COMPAT_VIRTQUEUE_ADD_BUF_GFP y
 fi
 
-if (grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/uapi/linux/if_link.h > /dev/null 2>&1 || grep -qw __IFLA_VF_LINK_STATE_MAX /lib/modules/${KVERSION}/source/include/uapi/linux/if_link.h > /dev/null 2>&1); then
+if (grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/uapi/linux/if_link.h > /dev/null 2>&1 || grep -qw __IFLA_VF_LINK_STATE_MAX /lib/modules/${KVERSION}/source/include/uapi/linux/if_link.h > /dev/null 2>&1 ||
+    grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/linux/if_link.h > /dev/null 2>&1 || grep -qw __IFLA_VF_LINK_STATE_MAX /lib/modules/${KVERSION}/source/include/linux/if_link.h > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_IFLA_VF_LINK_STATE_MAX y
 fi
