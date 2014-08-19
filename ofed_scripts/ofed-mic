@@ -91,31 +91,39 @@ start_mic()
 	# load ibscif first with any options:
 	$ssh $1 /sbin/modprobe ibscif $ibscif_opt &&
 	$ssh $1 /etc/init.d/ibmodules start &> /dev/null
-
-	errors+=$?
+	[ $? != 0 ] && return 1
 
 	conf=/etc/mpss/ipoib.conf
 	if [ -f "$conf" ]; then
 		source "$conf"
 		if [ "${ipoib_enabled}" == "yes" ] ; then
-			once=0
-			echo -n -\  
 			$ssh $1 modprobe ib_ipoib ${ipoib_parms}
+			[ $? != 0 ] && return 1
 			sleep 2
 			ipoib_list=`ls $sysfs/class/net | grep ib`
 			for i in $ipoib_list ; do
 				card_if=$2_$i
 				IP=${!card_if}
 				if [ ! -z "$IP" ] ; then
+					# print once after "micN"
+					[ -z "$once" ] && echo -ne ": "
 					once=1
-					echo -n $i\ 
-					mode=`cat $sysfs/class/net/$i/mode`
-					$ssh $1 echo $mode \> /sys/class/net/$i/mode
+
 					$ssh $1 ifconfig $i $IP
+					# if fail to bring up IF, log and keep trying others
+					if [ $? != 0 ] ; then
+						errors+=1
+						echo $card_if failed
+						continue
+					else
+						echo -ne "$i "
+					fi
+
+					mode=`cat $sysfs/class/net/$i/mode` &&
+					$ssh $1 echo $mode \> /sys/class/net/$i/mode
 					errors+=$?
 				fi
 			done
-			if [ $once -eq 1 ] ; then echo -n -\ ; fi
 		fi
 	fi
 
