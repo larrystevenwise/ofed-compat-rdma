@@ -178,14 +178,17 @@ start()
 
 	if [ "$nohost" -eq 0 ]; then
 		echo -n "host"
-		(/usr/sbin/ibpd &) &&
+		if [ ! "$(pidof /usr/sbin/ibpd)" ]; then
+			(/usr/sbin/ibpd &)
+			retval=$?
+		fi
 		modprobe ib_uverbs &&
 		modprobe ibp_server &&
 		modprobe ibp_cm_server &&
 		modprobe ibp_sa_server &&
 		modprobe ibscif
 
-		retval=$?
+		retval+=$?
 		[ $retval -eq 0 ] && eval $_success || eval $_failure
 	fi
 
