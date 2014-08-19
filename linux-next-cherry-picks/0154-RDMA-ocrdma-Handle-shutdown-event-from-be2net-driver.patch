@@ -1,0 +1,46 @@
+From 491006261a6661df25c0923e19dd995ab56c2e9d Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Tue, 27 May 2014 14:05:16 +0530
+Subject: [PATCH 31/45] RDMA/ocrdma: Handle shutdown event from be2net driver
+
+be2net driver sends shutdown event to ocrdma during shutdown/reboot.
+As part of event processing, ocrdma calls close() and remove() to
+free all the resources associated with ocrdma. This also frees
+irqs used by ocrdma
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    9 +++++++++
+ 1 files changed, 9 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 55f2dc2..f0bbe72 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -599,6 +599,12 @@ static int ocrdma_close(struct ocrdma_dev *dev)
+ 	return 0;
+ }
+ 
++static void ocrdma_shutdown(struct ocrdma_dev *dev)
++{
++	ocrdma_close(dev);
++	ocrdma_remove(dev);
++}
++
+ /* event handling via NIC driver ensures that all the NIC specific
+  * initialization done before RoCE driver notifies
+  * event to stack.
+@@ -612,6 +618,9 @@ static void ocrdma_event_handler(struct ocrdma_dev *dev, u32 event)
+ 	case BE_DEV_DOWN:
+ 		ocrdma_close(dev);
+ 		break;
++	case BE_DEV_SHUTDOWN:
++		ocrdma_shutdown(dev);
++		break;
+ 	}
+ }
+ 
+-- 
+1.7.1
+

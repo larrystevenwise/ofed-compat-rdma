@@ -1,0 +1,70 @@
+From 6fbddaf8eb06d8e865771d858ba75f59c388f446 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Thu, 29 May 2014 09:25:55 +0530
+Subject: [PATCH 39/45] RDMA/ocrdma: Increase the size of STAG array in dev structure to 16K
+
+HW can support 16K STAG entries. Changing this max limit.
+Also, moving this array out of ocrdma_dev to reduce
+the size of this structure
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma.h      |    2 +-
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |    6 ++++++
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h  |    2 +-
+ 3 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index 1a261aa..2cbc26e 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -210,7 +210,7 @@ struct ocrdma_dev {
+ 	struct list_head entry;
+ 	struct rcu_head rcu;
+ 	int id;
+-	u64 stag_arr[OCRDMA_MAX_STAG];
++	u64 *stag_arr;
+ 	u8 sl; /* service level */
+ 	bool pfc_state;
+ 	atomic_t update_sl;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index f0bbe72..7b8137d 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -398,6 +398,11 @@ static int ocrdma_alloc_resources(struct ocrdma_dev *dev)
+ 		if (!dev->qp_tbl)
+ 			goto alloc_err;
+ 	}
++
++	dev->stag_arr = kzalloc(sizeof(u64) * OCRDMA_MAX_STAG, GFP_KERNEL);
++	if (dev->stag_arr == NULL)
++		goto alloc_err;
++
+ 	spin_lock_init(&dev->av_tbl.lock);
+ 	spin_lock_init(&dev->flush_q_lock);
+ 	return 0;
+@@ -408,6 +413,7 @@ alloc_err:
+ 
+ static void ocrdma_free_resources(struct ocrdma_dev *dev)
+ {
++	kfree(dev->stag_arr);
+ 	kfree(dev->qp_tbl);
+ 	kfree(dev->cq_tbl);
+ 	kfree(dev->sgid_tbl);
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+index a20d348..3d08e66 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+@@ -107,7 +107,7 @@ enum {
+ 
+ #define OCRDMA_MAX_QP    2048
+ #define OCRDMA_MAX_CQ    2048
+-#define OCRDMA_MAX_STAG  8192
++#define OCRDMA_MAX_STAG 16384
+ 
+ enum {
+ 	OCRDMA_DB_RQ_OFFSET		= 0xE0,
+-- 
+1.7.1
+

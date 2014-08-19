@@ -1,0 +1,31 @@
+From bc42b246b1cb9a2230739f251ff0b2d42e85c644 Mon Sep 17 00:00:00 2001
+From: Mitesh Ahuja <mitesh.ahuja@emulex.com>
+Date: Tue, 1 Jul 2014 14:41:19 +0530
+Subject: [PATCH 44/45] RDMA/ocrdma: report asic-id in query device
+
+Ocrdma does not report hw_ver when query_device is issued.
+This patch is adding meaningful value to this field.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Mitesh Ahuja <mitesh.ahuja@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index 1e20ebd..e9e7220 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -73,7 +73,7 @@ int ocrdma_query_device(struct ib_device *ibdev, struct ib_device_attr *attr)
+ 	attr->page_size_cap = 0xffff000;
+ 	attr->vendor_id = dev->nic_info.pdev->vendor;
+ 	attr->vendor_part_id = dev->nic_info.pdev->device;
+-	attr->hw_ver = 0;
++	attr->hw_ver = dev->asic_id;
+ 	attr->max_qp = dev->attr.max_qp;
+ 	attr->max_ah = OCRDMA_MAX_AH;
+ 	attr->max_qp_wr = dev->attr.max_wqe;
+-- 
+1.7.1
+

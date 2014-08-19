@@ -1,0 +1,40 @@
+From b28db068f62c5af0ce3e3af91bd9326b4b570c58 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@emulex.com>
+Date: Fri, 6 Jun 2014 10:45:49 +0530
+Subject: [PATCH 18/21] RDMA/ocrdma: do not skip setting deffered_arm
+
+ib_request_notify_cq() when called for the first time
+ocrdma tries to skip setting deffered_arm flag. This
+may lead CQ to an un-armed state thus, never generating
+CQ event and leaving consumer in hung state.
+
+This patch removes the part of code that skkips setting
+deffered_arm flag.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+Signed-off-by: Mitesh Ahuja <mitesh.ahuja@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |    4 +---
+ 1 files changed, 1 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index 55aad54..0ac7193 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -2846,11 +2846,9 @@ int ocrdma_arm_cq(struct ib_cq *ibcq, enum ib_cq_notify_flags cq_flags)
+ 	if (cq->first_arm) {
+ 		ocrdma_ring_cq_db(dev, cq_id, arm_needed, sol_needed, 0);
+ 		cq->first_arm = false;
+-		goto skip_defer;
+ 	}
+-	cq->deferred_arm = true;
+ 
+-skip_defer:
++	cq->deferred_arm = true;
+ 	cq->deferred_sol = sol_needed;
+ 	spin_unlock_irqrestore(&cq->cq_lock, flags);
+ 
+-- 
+1.7.1
+

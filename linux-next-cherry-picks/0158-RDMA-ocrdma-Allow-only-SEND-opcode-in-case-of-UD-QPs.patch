@@ -1,0 +1,35 @@
+From 66e9bb03219959cee18ec8cbd50c29b0c7b1c8d9 Mon Sep 17 00:00:00 2001
+From: Mitesh Ahuja <mitesh.ahuja@emulex.Com>
+Date: Mon, 2 Jun 2014 10:54:40 +0530
+Subject: [PATCH 35/45] RDMA/ocrdma: Allow only SEND opcode in case of UD QPs
+
+Prevent posting opcodes other than send and send immediate on the UD QPs
+
+Signed-off-by: Mitesh Ahuja <mitesh.ahuja@emulex.Com>
+Signed-off-by: Devesh Sharma <devesh.sharma@emulex.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |    7 +++++++
+ 1 files changed, 7 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index dda2ae9..fd1a6d9 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -2057,6 +2057,13 @@ int ocrdma_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 	}
+ 
+ 	while (wr) {
++		if (qp->qp_type == IB_QPT_UD &&
++		    (wr->opcode != IB_WR_SEND &&
++		     wr->opcode != IB_WR_SEND_WITH_IMM)) {
++			*bad_wr = wr;
++			status = -EINVAL;
++			break;
++		}
+ 		if (ocrdma_hwq_free_cnt(&qp->sq) == 0 ||
+ 		    wr->num_sge > qp->sq.max_sges) {
+ 			*bad_wr = wr;
+-- 
+1.7.1
+
