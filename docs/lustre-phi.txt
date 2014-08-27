@@ -1,0 +1,270 @@
+This document describes how to cross-compile Lustre client for Xeon Phi.
+
+-------------
+Prerequisites
+-------------
+- MPSS 3.1 installed and running
+- IPoIB configured and running on the card (i.e. can you ping?)
+
+---------
+Downloads
+---------
+Download the MPSS 3.1 release package matching your distribution
+mpss-3.1-<distro>.tar (e.g. mpss-3.1-rhel-6.4.tar)
+
+Download the MPSS 3.1 release package for Xeon Phi
+mpss-3.1-k1om.tar
+
+Download the MPSS 3.1 release source package
+mpss-src-3.1.tar
+
+---------------------------
+Cross-compile Lustre client
+---------------------------
+
+Untar the packages
+------------------
+# for i in mpss-*.tar; do tar xf $i; done
+
+Install OFED header files (if not already done)
+-----------------------------------------------
+# yum install ./mpss-3.1/ofed/ofed-driver-*-devel-*.rpm
+
+This should create the /usr/src/ofed-driver-<kernel_version>.x86_84/ directory.
+These headers will be used to enable IB support for Lustre.
+
+Prepare the Linux kernel source code
+------------------------------------
+# tar xjf ./mpss-3.1/src/linux-2.6.38+mpss3.1.tar.bz2
+
+This should create the new ./linux-2.6.38+mpss3.1 directory containing the
+Linux kernel source code.
+
+# rpm2cpio ./mpss-3.1/k1om/kernel-dev-2.6.38+mpss3.1*knightscorner.rpm | cpio -idmv
+
+This should create the new ./boot directory containing the files needed to
+build new kernel modules for the card.
+
+# cp ./boot/config-2.6.38.8+mpss3.1 ./linux-2.6.38+mpss3.1/.config
+# cp ./boot/Module.symvers-2.6.38.8+mpss3.1 ./linux-2.6.38+mpss3.1/Module.symvers
+# cd ./linux-2.6.38+mpss3.1
+# make modules_prepare
+# cd ..
+
+Prepare Lustre source code
+--------------------------
+Several patches need to be applied to the Lustre source code in order to
+enable cross-compilation. These patches can be found in the Appendix.
+Please copy/paste the patches into a new directory named "lustre-patches".
+
+# ls lustre-patches
+./lustre-patches/add_pci-dma_header.patch
+./lustre-patches/allow_cross_compilation_of_ldiskfs.patch
+./lustre-patches/change_arch_name.patch
+./lustre-patches/prevent-uninitialized-pointers.patch
+
+Retrieve the Lustre source code. At press time, the current release is 2.4
+
+# git clone git://git.whamcloud.com/fs/lustre-release.git
+# cd lustre-release
+# git checkout b2_4
+
+Apply the patches
+
+# patch -p1 < ../lustre-patches/add_pci-dma_header.patch
+# patch -p1 < ../lustre-patches/allow_cross_compilation_of_ldiskfs.patch
+# patch -p1 < ../lustre-patches/change_arch_name.patch
+# patch -p1 < ../lustre-patches/prevent-uninitialized-pointers.patch
+# cd ..
+
+Build Lustre client for Xeon Phi
+--------------------------------
+We are now ready to cross-compile Lustre client. For your convenience, a
+build script can be found in the Appendix. Please copy/paste the script into
+a new file called "build-phi.sh"
+
+# chmod +x ./build-phi.sh
+# ./build-phi.sh
+
+This should have created a new lustre-phi.tar.gz tarball.
+
+Install Lustre client on Xeon Phi
+---------------------------------
+# scp lustre-phi.tar.gz mic0:/
+# ssh mic0 "cd / && tar xvzf lustre-phi.tar.gz && depmod"
+
+Configure and Launch Lustre on Xeon Phi
+---------------------------------------
+This step assumes that IPoIB is correctly configured on the card.
+In this example, the card's IPoIB interface is 'ib0'.
+# ssh mic0 "echo 'options lnet networks=\"o2ib0(ib0),tcp(ib0)\"' >> /etc/modprobe.d/lustre.conf"
+# ssh mic0 "modprobe lnet"
+# ssh mic0 "lctl network up"
+
+
+--------------
+Appendix
+--------------
+
+------------
+Build Script
+------------
+
+build-phi.sh
+------------
+#!/bin/bash
+set -e
+
+BUILD_DIR=`readlink -f $PWD`
+DEST_DIR=${BUILD_DIR}/lustre-root
+PATCHES_DIR=${BUILD_DIR}/lustre-patches
+MPSS_DIR=${BUILD_DIR}/mpss-3.1
+SCM_DIR=${BUILD_DIR}/lustre-release
+
+mkdir -p ${DEST_DIR}
+
+export ARCH=k1om
+source /opt/mpss/3.1/environment-setup-k1om-mpss-linux
+export LD=k1om-mpss-linux-ld
+
+cd ${SCM_DIR}
+
+#for i in ${PATCHES_DIR}/*
+#do
+#	patch -p1 < $i
+#done
+
+sh autogen.sh
+
+./configure $CONFIGURE_FLAGS \
+		--disable-tests --disable-doc --disable-server \
+		--host=x86_64-${ARCH}-linux \
+		--target=x86_64-${ARCH}-linux \
+		--with-o2ib=/usr/src/ofed-driver-*.x86_64/ \
+		--with-linux=${BUILD_DIR}/linux-2.6.38+mpss3.1
+
+make
+make install DESTDIR=${DEST_DIR}
+
+cd ${DEST_DIR}
+tar cvzf ${BUILD_DIR}/lustre-phi.tar.gz ./
+
+cd ${BUILD_DIR}
+
+
+-------
+Patches
+-------
+Please create a new directory called "lustre-patches".
+Then save the following patches in that directory.
+
+add_pci-dma_header.patch
+------------------------
+diff --git a/lnet/klnds/o2iblnd/o2iblnd.h b/lnet/klnds/o2iblnd/o2iblnd.h
+index fee5273..1134d96 100644
+--- a/lnet/klnds/o2iblnd/o2iblnd.h
++++ b/lnet/klnds/o2iblnd/o2iblnd.h
+@@ -58,6 +58,7 @@
+ #include <linux/kmod.h>
+ #include <linux/sysctl.h>
+ #include <linux/pci.h>
++#include <linux/pci-dma.h>
+
+ #include <net/sock.h>
+ #include <linux/in.h>
+
+
+allow_cross_compilation_of_ldiskfs.patch
+----------------------------------------
+diff --git a/ldiskfs/config/ldiskfs-build.m4 b/ldiskfs/config/ldiskfs-build.m4
+index be144de..44503c9 100644
+--- a/ldiskfs/config/ldiskfs-build.m4
++++ b/ldiskfs/config/ldiskfs-build.m4
+@@ -279,7 +279,7 @@ AC_DEFUN([LB_LINUX_COMPILE_IFELSE], [
+ 	rm -Rf build-test && mkdir -p build-test
+ 	echo "obj-m := conftest.o" >build-test/Makefile
+ 	AS_IF(
+-		[AC_TRY_COMMAND(cp conftest.c build-test && make [$2] -C $LINUX_OBJ EXTRA_CFLAGS="-Werror-implicit-function-declaration $EXTRA_KCFLAGS" M=$PWD/build-test) >/dev/null && AC_TRY_COMMAND([$3])],
++		[AC_TRY_COMMAND(cp conftest.c build-test && make [$2] ${LD:+"LD=$LD"} CC="$CC" -C $LINUX_OBJ EXTRA_CFLAGS="-Werror-implicit-function-declaration $EXTRA_KCFLAGS" M=$PWD/build-test) >/dev/null && AC_TRY_COMMAND([$3])],
+ 		[$4],
+ 		[_AC_MSG_LOG_CONFTEST m4_ifvaln([$5],[$5])]
+ 	)
+
+
+change_arch_name.patch
+----------------------
+diff --git a/config/lustre-build-linux.m4 b/config/lustre-build-linux.m4
+index 909cb75..6bf7c2d 100644
+--- a/config/lustre-build-linux.m4
++++ b/config/lustre-build-linux.m4
+@@ -298,17 +298,16 @@ case $target_vendor in
+ 	k1om)
+ 		AC_MSG_RESULT([Intel(R) Xeon Phi(TM)])
+ 		CC_TARGET_ARCH=`$CC -v 2>&1 | grep Target: | sed -e 's/Target: //'`
+-		if test $CC_TARGET_ARCH != x86_64-$target_vendor-linux ; then
++		if test $CC_TARGET_ARCH != $target_vendor-mpss-linux ; then
+ 			AC_MSG_ERROR([Cross compiler not found in PATH.])
+ 		fi
+-		CROSS_VARS="ARCH=$target_vendor CROSS_COMPILE=x86_64-$target_vendor-linux-"
+-		CROSS_PATH=${CROSS_PATH:=/opt/intel/mic/lustre/device-k1om}
++		CROSS_VARS="ARCH=$target_vendor CROSS_COMPILE=$target_vendor-mpss-linux-"
+ 		CCAS=$CC
+ 		# need to produce special section for debuginfo extraction
+ 		LDFLAGS="${LDFLAGS} -Wl,--build-id"
+ 		EXTRA_KLDFLAGS="${EXTRA_KLDFLAGS} -Wl,--build-id"
+ 		if test x$enable_server = xyes ; then
+-			AC_MSG_WARN([Disabling server (not supported for x86_64-$target_vendor-linux).])
++			AC_MSG_WARN([Disabling server (not supported for $target_vendor-mpss-linux).])
+ 			enable_server='no'
+ 		fi
+ 		;;
+diff --git a/libsysio/configure.in b/libsysio/configure.in
+index 80013b6..addf0f9 100644
+--- a/libsysio/configure.in
++++ b/libsysio/configure.in
+@@ -32,7 +32,7 @@ case $target_vendor in
+ 	# So, the $target_arch is x86_64.
+ 	k1om)
+ 		CC_TARGET_ARCH=`$CC -v 2>&1 | grep Target: | sed -e 's/Target: //'`
+-		if test $CC_TARGET_ARCH != x86_64-$target_vendor-linux ; then
++		if test $CC_TARGET_ARCH != $target_vendor-mpss-linux ; then
+ 			AC_MSG_ERROR([Cross compiler not found in PATH.])
+ 		fi
+ 		CCAS=$CC
+
+
+prevent-uninitialized-pointers.patch
+------------------------------------
+diff --git a/libcfs/libcfs/nidstrings.c b/libcfs/libcfs/nidstrings.c
+index f06c77e..e9ce74d 100644
+--- a/libcfs/libcfs/nidstrings.c
++++ b/libcfs/libcfs/nidstrings.c
+@@ -459,10 +459,10 @@ libcfs_nid2str(lnet_nid_t nid)
+ static struct netstrfns *
+ libcfs_str2net_internal(const char *str, __u32 *net)
+ {
+-        struct netstrfns *nf;
+         int               nob;
+         int               netnum;
+         int               i;
++        struct netstrfns *nf = NULL;
+
+         for (i = 0; i < libcfs_nnetstrfns; i++) {
+                 nf = &libcfs_netstrfns[i];
+diff --git a/lustre/lmv/lmv_obd.c b/lustre/lmv/lmv_obd.c
+index 3bcc81f..665a3ad 100644
+--- a/lustre/lmv/lmv_obd.c
++++ b/lustre/lmv/lmv_obd.c
+@@ -80,9 +80,9 @@ static void lmv_activate_target(struct lmv_obd *lmv,
+ static int lmv_set_mdc_active(struct lmv_obd *lmv, struct obd_uuid *uuid,
+                               int activate)
+ {
+-        struct lmv_tgt_desc    *tgt;
+-        struct obd_device      *obd;
+-        int                     i;
++        struct obd_device      *obd = NULL;
++        struct lmv_tgt_desc    *tgt = NULL;
++        int                     i = 0;
+         int                     rc = 0;
+         ENTRY;
+
