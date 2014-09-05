@@ -115,11 +115,14 @@ Usage:  `basename $0` [options]
     --with-mlx5_debug-mod         make CONFIG_MLX5_DEBUG=y [yes]
     --without-mlx5_debug-mod      [no]
 
-    --with-xeon-phi-mod    make CONFIG_IBP_SERVER=m CONFIG_INFINIBAND_SCIF=m [no]
-    --without-xeon-phi-mod    [yes]
+    --with-ibscif-mod    make CONFIG_INFINIBAND_SCIF=m [no]
+    --without-ibscif-mod    [yes]
 
-    --with-xeon-phi-debug-mod    make CONFIG_IBP_DEBUG=y [no]
-    --without-xeon-phi-debug-mod    [yes]
+    --with-ibp-server-mod    make CONFIG_IBP_SERVER=m [no]
+    --without-ibp-server-mod    [yes]
+
+    --with-ibp-debug-mod    make CONFIG_IBP_DEBUG=y [no]
+    --without-ibp-debug-mod    [yes]
 
     --with-ipath_inf-mod    make CONFIG_INFINIBAND_IPATH=m [no]
     --without-ipath_inf-mod    [yes]
@@ -500,7 +503,7 @@ main()
                         --with-ibp-server-mod)
                             CONFIG_IBP_SERVER="m"
                         ;;
-                        --with-ibp=server-debug-mod)
+                        --with-ibp-debug-mod)
                             CONFIG_IBP_DEBUG="y"
                         ;;
                         --with-ipath_inf-mod)
