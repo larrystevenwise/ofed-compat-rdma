@@ -694,8 +694,5 @@ fi
 %{_prefix}/src/openib
 
 %changelog
-* Wed Jul 06 2014  Jay Sternberg <jay.e.sternberg@intel.com>, Phil Cayton <phil.cayton@intel.com>
-- Add Tech Preview for Xeon-Phi 
-
 * Thu Feb 16 2012 Vladimir Sokolovsky <vlad@mellanox.com>
 - Created spec file for compat-rdma
