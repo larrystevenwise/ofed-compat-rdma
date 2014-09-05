@@ -66,7 +66,7 @@ foreach_card()
 		# Try host-cardN, cardN, host-cardN.domain, in order:
 		for card_hostname in ${names[@]} ; do
 			for cmd in $@; do
-				$cmd $card_hostname $card
+				$cmd $card_hostname $card 2> /dev/null
 			done
 
 			[ $? == 0 ] && break
@@ -196,7 +196,7 @@ start()
 		modprobe ibp_sa_server &&
 		modprobe ibscif
 
-		retval+=$?
+		retval=$?
 		[ $retval -eq 0 ] && eval $_success || eval $_failure
 	fi
 
@@ -204,6 +204,10 @@ start()
 	foreach_card copy_numa_map start_mic
 	retval+=$?
 
+	# set up the special address "mic0:ib" for supporting RDMA CM over
+	# the emulated IB interface (ibscif). this is used for address
+	# resolution only. there is no need to set up "mic1:ib" even if
+	# more than one cards are installed.
 	ip address add 192.0.2.100/24 dev mic0 label mic0:ib
 
 	return $retval
@@ -235,7 +239,7 @@ stop()
 		stop_module ibp_cm_server
 		retval+=$?
 
-		killall -q /usr/sbin/ibpd
+		kill $(pidof /usr/sbin/ibpd) &>/dev/null
 		stop_module ibp_server
 		retval+=$?
 
