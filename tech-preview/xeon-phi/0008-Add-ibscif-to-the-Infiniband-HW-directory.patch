@@ -1,111 +1,6 @@
-From 7f029de4573b51bc7a77409cfa667b3d43d31f81 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Fri, 11 Jul 2014 12:17:24 -0700
-Subject: [PATCH 08/12] Add ibscif to the Infiniband HW directory
-
-Signed-off-by: Jianxin Xiong <jianxin.xiong@intel.com>
-Signed-off-by: Phil Cayton <phil.cayton@intel.com>
-Signed-off-by: Jay Sternberg <jay.e.sternberg@intel.com>
----
- drivers/infiniband/hw/scif/Kconfig            |    4 +
- drivers/infiniband/hw/scif/Makefile           |   40 +
- drivers/infiniband/hw/scif/ibscif_ah.c        |   50 +
- drivers/infiniband/hw/scif/ibscif_cm.c        |  514 +++++
- drivers/infiniband/hw/scif/ibscif_cq.c        |  313 +++
- drivers/infiniband/hw/scif/ibscif_driver.h    |  774 +++++++
- drivers/infiniband/hw/scif/ibscif_loopback.c  |  583 +++++
- drivers/infiniband/hw/scif/ibscif_main.c      |  351 +++
- drivers/infiniband/hw/scif/ibscif_mr.c        |  566 +++++
- drivers/infiniband/hw/scif/ibscif_pd.c        |   56 +
- drivers/infiniband/hw/scif/ibscif_post.c      |  306 +++
- drivers/infiniband/hw/scif/ibscif_procfs.c    |  185 ++
- drivers/infiniband/hw/scif/ibscif_protocol.c  | 2832 +++++++++++++++++++++++++
- drivers/infiniband/hw/scif/ibscif_protocol.h  |  395 ++++
- drivers/infiniband/hw/scif/ibscif_provider.c  |  409 ++++
- drivers/infiniband/hw/scif/ibscif_qp.c        |  825 +++++++
- drivers/infiniband/hw/scif/ibscif_scheduler.c |  195 ++
- drivers/infiniband/hw/scif/ibscif_util.c      |  574 +++++
- 18 files changed, 8972 insertions(+)
- create mode 100644 drivers/infiniband/hw/scif/Kconfig
- create mode 100644 drivers/infiniband/hw/scif/Makefile
- create mode 100644 drivers/infiniband/hw/scif/ibscif_ah.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_cm.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_cq.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_driver.h
- create mode 100644 drivers/infiniband/hw/scif/ibscif_loopback.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_main.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_mr.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_pd.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_post.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_procfs.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_protocol.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_protocol.h
- create mode 100644 drivers/infiniband/hw/scif/ibscif_provider.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_qp.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_scheduler.c
- create mode 100644 drivers/infiniband/hw/scif/ibscif_util.c
-
-diff --git a/drivers/infiniband/hw/scif/Kconfig b/drivers/infiniband/hw/scif/Kconfig
-new file mode 100644
-index 0000000..cda125f
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/Kconfig
-@@ -0,0 +1,4 @@
-+config INFINIBAND_SCIF
-+	tristate "SCIF RDMA driver support"
-+	---help---
-+	  RDMA over SCIF driver.
-diff --git a/drivers/infiniband/hw/scif/Makefile b/drivers/infiniband/hw/scif/Makefile
-new file mode 100644
-index 0000000..eb74366
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/Makefile
-@@ -0,0 +1,40 @@
-+ifneq ($(KERNELRELEASE),)
-+
-+# Original Make begins
-+
-+obj-$(CONFIG_INFINIBAND_SCIF) += ibscif.o
-+
-+ibscif-y :=	ibscif_main.o		\
-+		ibscif_ah.o		\
-+		ibscif_pd.o		\
-+		ibscif_cq.o		\
-+		ibscif_qp.o		\
-+		ibscif_mr.o		\
-+		ibscif_cm.o		\
-+		ibscif_post.o		\
-+		ibscif_procfs.o		\
-+		ibscif_loopback.o	\
-+		ibscif_provider.o	\
-+		ibscif_protocol.o	\
-+		ibscif_scheduler.o	\
-+		ibscif_util.o
-+
-+# Original Makefile ends
-+
-+else
-+
-+ifeq ($(KVER),)
-+  ifeq ($(KDIR),)
-+    KDIR := /lib/modules/$(shell uname -r)/build
-+  endif
-+else
-+  KDIR := /lib/modules/$(KVER)/build
-+endif
-+
-+all:
-+	$(MAKE) -C $(KDIR) SUBDIRS=$(shell pwd) CONFIG_INFINIBAND_SCIF=m
-+
-+clean:
-+	rm -rf *.o *.ko *.mod.c .*.cmd Module.* .tmp_versions
-+
-+endif
-diff --git a/drivers/infiniband/hw/scif/ibscif_ah.c b/drivers/infiniband/hw/scif/ibscif_ah.c
-new file mode 100644
-index 0000000..fb24486
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_ah.c
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_ah.c b/drivers/infiniband/hw/scif/ibscif_ah.c
+--- a/drivers/infiniband/hw/scif/ibscif_ah.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_ah.c	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -144,7 +39,7 @@ index 0000000..fb24486
 +	struct ibscif_ah *ah;
 +
 +	ah = kzalloc(sizeof *ah, GFP_KERNEL);
-+	if (!ah)
++	if (!ah) 
 +		return ERR_PTR(-ENOMEM);
 +
 +	ah->dlid = cpu_to_be16(attr->dlid);
@@ -157,12 +52,10 @@ index 0000000..fb24486
 +	kfree(to_ah(ibah));
 +	return 0;
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_cm.c b/drivers/infiniband/hw/scif/ibscif_cm.c
-new file mode 100644
-index 0000000..18c07c1
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_cm.c
-@@ -0,0 +1,514 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_cm.c b/drivers/infiniband/hw/scif/ibscif_cm.c
+--- a/drivers/infiniband/hw/scif/ibscif_cm.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_cm.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,515 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -236,12 +129,12 @@ index 0000000..18c07c1
 +}
 +
 +static inline void get_cm(struct ibscif_cm *cm_ctx)
-+{
++{        
 +        kref_get(&cm_ctx->kref);
 +}
-+
++ 
 +static inline void put_cm(struct ibscif_cm *cm_ctx)
-+{
++{        
 +        kref_put(&cm_ctx->kref, free_cm);
 +}
 +
@@ -253,12 +146,12 @@ index 0000000..18c07c1
 +}
 +
 +static inline void get_listen(struct ibscif_listen *listen)
-+{
++{        
 +        kref_get(&listen->kref);
 +}
-+
++ 
 +static inline void put_listen(struct ibscif_listen *listen)
-+{
++{        
 +        kref_put(&listen->kref, free_listen);
 +}
 +
@@ -271,17 +164,17 @@ index 0000000..18c07c1
 +
 +        qp = ibscif_get_qp(cm_ctx->qpn);
 +        if (IS_ERR(qp)) {
-+                printk(KERN_ERR "%s: invalid QP number: %d\n", __func__, cm_ctx->qpn);
-+                return -EINVAL;
++                printk(KERN_ERR PFX "%s: invalid QP number: %d\n", __func__, cm_ctx->qpn);
++                return -EINVAL; 
 +        }
-+
++         
 +        qp_attr_mask =  IB_QP_STATE |
-+                        IB_QP_AV |
++                        IB_QP_AV |  
 +                        IB_QP_DEST_QPN |
 +                        IB_QP_ACCESS_FLAGS |
 +                        IB_QP_MAX_QP_RD_ATOMIC |
 +                        IB_QP_MAX_DEST_RD_ATOMIC;
-+
++ 
 +        qp_attr.ah_attr.ah_flags = 0;
 +        qp_attr.ah_attr.dlid = IBSCIF_NODE_ID_TO_LID(cm_ctx->remote_node_id);
 +        qp_attr.dest_qp_num = cm_ctx->remote_qpn;
@@ -292,23 +185,23 @@ index 0000000..18c07c1
 +                                  IB_ACCESS_REMOTE_ATOMIC;
 +        qp_attr.max_rd_atomic = 16;     /* 8-bit value, don't use MAX_OR */
 +        qp_attr.max_dest_rd_atomic = 16;/* 8-bit value, don't use MAX_IR */
-+
++ 
 +        err = ib_modify_qp(&qp->ibqp, &qp_attr, qp_attr_mask);
-+
++ 
 +        if (!err) {
 +                qp->cm_context = cm_ctx;
 +		get_cm(cm_ctx);
 +	}
-+
++ 
 +        ibscif_put_qp(qp);
-+
++ 
 +        return err;
 +}
 +
 +static void event_connection_close(struct ibscif_cm *cm_ctx)
 +{
 +        struct iw_cm_event event;
-+
++ 
 +        memset(&event, 0, sizeof(event));
 +        event.event = IW_CM_EVENT_CLOSE;
 +        event.status = -ECONNRESET;
@@ -322,7 +215,7 @@ index 0000000..18c07c1
 +static void event_connection_reply(struct ibscif_cm *cm_ctx, int status)
 +{
 +        struct iw_cm_event event;
-+
++ 
 +        memset(&event, 0, sizeof(event));
 +        event.event             = IW_CM_EVENT_CONNECT_REPLY;
 +        event.status            = status;
@@ -345,7 +238,7 @@ index 0000000..18c07c1
 +static void event_connection_request(struct ibscif_cm *cm_ctx)
 +{
 +        struct iw_cm_event event;
-+
++ 
 +        memset(&event, 0, sizeof(event));
 +        event.event             = IW_CM_EVENT_CONNECT_REQUEST;
 +        event.local_addr        = *(struct sockaddr_storage *) &cm_ctx->local_addr;
@@ -366,7 +259,7 @@ index 0000000..18c07c1
 +static void event_connection_established( struct ibscif_cm *cm_ctx )
 +{
 +        struct iw_cm_event event;
-+
++ 
 +        memset(&event, 0, sizeof(event));
 +        event.event = IW_CM_EVENT_ESTABLISHED;
 +	event.ird = 16;
@@ -379,7 +272,7 @@ index 0000000..18c07c1
 +void ibscif_cm_async_callback(void *cm_context)
 +{
 +        struct ibscif_cm *cm_ctx = cm_context;
-+
++ 
 +        if (cm_ctx) {
 +                event_connection_close(cm_ctx);
 +                put_cm(cm_ctx);
@@ -397,7 +290,7 @@ index 0000000..18c07c1
 +
 +	cm_ctx = kzalloc(sizeof *cm_ctx, GFP_KERNEL);
 +	if (!cm_ctx) {
-+		printk(KERN_ALERT "%s: cannot allocate cm_ctx\n", __func__);
++		printk(KERN_ALERT PFX "%s: cannot allocate cm_ctx\n", __func__);
 +		return -ENOMEM;
 +	}
 +
@@ -407,7 +300,7 @@ index 0000000..18c07c1
 +	node_id = sockaddr_in_to_node_id(*local_addr);
 +	remote_node_id = sockaddr_in_to_node_id(*remote_addr);
 +	if (node_id<0 || remote_node_id<0) {
-+		printk(KERN_ALERT "%s: invalid address, local_addr=%8x, remote_addr=%8x, node_id=%d, remote_node_id=%d\n",
++		printk(KERN_ALERT PFX "%s: invalid address, local_addr=%8x, remote_addr=%8x, node_id=%d, remote_node_id=%d\n",
 +				__func__, local_addr->sin_addr.s_addr, remote_addr->sin_addr.s_addr,
 +				node_id, remote_node_id);
 +		err = -EINVAL;
@@ -416,7 +309,7 @@ index 0000000..18c07c1
 +
 +	cm_ctx->conn = ibscif_get_conn( node_id, remote_node_id, 0 );
 +	if (!cm_ctx->conn) {
-+		printk(KERN_ALERT "%s: failed to get connection %d-->%d\n", __func__, node_id, remote_node_id);
++		printk(KERN_ALERT PFX "%s: failed to get connection %d-->%d\n", __func__, node_id, remote_node_id);
 +		err = -EINVAL;
 +		goto out_free;
 +	}
@@ -432,7 +325,7 @@ index 0000000..18c07c1
 +	cm_ctx->qpn = conn_param->qpn;
 +	cm_ctx->plen = conn_param->private_data_len;
 +	if (cm_ctx->plen > IBSCIF_MAX_PDATA_SIZE) {
-+		printk(KERN_ALERT "%s: plen (%d) exceeds the limit (%d), truncated.\n",
++		printk(KERN_ALERT PFX "%s: plen (%d) exceeds the limit (%d), truncated.\n",
 +				__func__, cm_ctx->plen, IBSCIF_MAX_PDATA_SIZE);
 +		cm_ctx->plen = IBSCIF_MAX_PDATA_SIZE;
 +	}
@@ -458,7 +351,7 @@ index 0000000..18c07c1
 +	cm_ctx->qpn = conn_param->qpn;
 +	cm_ctx->plen = conn_param->private_data_len;
 +	if (cm_ctx->plen > IBSCIF_MAX_PDATA_SIZE) {
-+		printk(KERN_ALERT "%s: plen (%d) exceeds the limit (%d), truncated.\n",
++		printk(KERN_ALERT PFX "%s: plen (%d) exceeds the limit (%d), truncated.\n",
 +				__func__, cm_ctx->plen, IBSCIF_MAX_PDATA_SIZE);
 +		cm_ctx->plen = IBSCIF_MAX_PDATA_SIZE;
 +	}
@@ -467,13 +360,13 @@ index 0000000..18c07c1
 +
 +	err = connect_qp( cm_ctx );
 +	if (err) {
-+		printk(KERN_ALERT "%s: failed to modify QP into connected state\n", __func__);
++		printk(KERN_ALERT PFX "%s: failed to modify QP into connected state\n", __func__);
 +		goto err_out;
 +	}
 +
 +	err = ibscif_send_cm_rep( cm_ctx );
 +	if (err) {
-+		printk(KERN_ALERT "%s: failed to send REP\n", __func__);
++		printk(KERN_ALERT PFX "%s: failed to send REP\n", __func__);
 +		goto err_out;
 +	}
 +
@@ -504,10 +397,10 @@ index 0000000..18c07c1
 +
 +	listen = kzalloc(sizeof *listen, GFP_KERNEL);
 +	if (!listen) {
-+		printk(KERN_ALERT "%s: cannot allocate listen object\n", __func__);
++		printk(KERN_ALERT PFX "%s: cannot allocate listen object\n", __func__);
 +		return -ENOMEM;
 +	}
-+
++	
 +	kref_init(&listen->kref); /* refcnt <- 1 */
 +
 +	listen->cm_id = cm_id;
@@ -595,7 +488,7 @@ index 0000000..18c07c1
 +	  case IBSCIF_CM_REQ:
 +		cm_ctx = kzalloc(sizeof *cm_ctx, GFP_KERNEL);
 +		if (!cm_ctx) {
-+			printk(KERN_ALERT "%s: cannot allocate cm_ctx\n", __func__);
++			printk(KERN_ALERT PFX "%s: cannot allocate cm_ctx\n", __func__);
 +			return -ENOMEM;
 +		}
 +		kref_init(&cm_ctx->kref); /* refcnt <- 1 */
@@ -611,7 +504,7 @@ index 0000000..18c07c1
 +		spin_unlock_bh(&listen_list_lock);
 +
 +		if (!cm_ctx->listen) {
-+			printk(KERN_ALERT "%s: no matching listener for connection request, port=%d\n", __func__, port);
++			printk(KERN_ALERT PFX "%s: no matching listener for connection request, port=%d\n", __func__, port);
 +			put_cm(cm_ctx);
 +			/* fix me: send CM_REJ */
 +			return -EINVAL;
@@ -627,7 +520,7 @@ index 0000000..18c07c1
 +		cm_ctx->remote_qpn = qpn;
 +		cm_ctx->plen = plen;
 +		if (cm_ctx->plen > IBSCIF_MAX_PDATA_SIZE) {
-+			printk(KERN_ALERT "%s: plen (%d) exceeds the limit (%d), truncated.\n",
++			printk(KERN_ALERT PFX "%s: plen (%d) exceeds the limit (%d), truncated.\n",
 +					__func__, cm_ctx->plen, IBSCIF_MAX_PDATA_SIZE);
 +			cm_ctx->plen = IBSCIF_MAX_PDATA_SIZE;
 +		}
@@ -648,10 +541,10 @@ index 0000000..18c07c1
 +		cm_ctx->remote_qpn = qpn;
 +		cm_ctx->peer_context = rep_ctx;
 +		err = connect_qp( cm_ctx );
-+		if (!err)
++		if (!err) 
 +			err = ibscif_send_cm_rtu(cm_ctx);
 +		if (err)
-+			printk(KERN_ALERT "%s: failed to modify QP into connected state\n", __func__);
++			printk(KERN_ALERT PFX "%s: failed to modify QP into connected state\n", __func__);
 +		event_connection_reply(cm_ctx, err);
 +		put_cm(cm_ctx);
 +		break;
@@ -671,17 +564,16 @@ index 0000000..18c07c1
 +		break;
 +
 +	  default:
-+		printk(KERN_ALERT "%s: invalid CM cmd: %d\n", __func__, pdu->cm.cmd);
++		printk(KERN_ALERT PFX "%s: invalid CM cmd: %d\n", __func__, pdu->cm.cmd);
 +		break;
 +	}
 +
 +	return 0;
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_cq.c b/drivers/infiniband/hw/scif/ibscif_cq.c
-new file mode 100644
-index 0000000..3b1c402
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_cq.c
++
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_cq.c b/drivers/infiniband/hw/scif/ibscif_cq.c
+--- a/drivers/infiniband/hw/scif/ibscif_cq.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_cq.c	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,313 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -878,7 +770,7 @@ index 0000000..3b1c402
 +		cq->head = (cq->head + 1) % ibcq->cqe;
 +		spin_unlock_bh(&cq->lock);
 +
-+		/* WQ may no longer exist or has been flushed. */
++		/* WQ may no longer exist or has been flushed. */ 
 +		if (wq) {
 +			spin_lock_bh(&wq->lock);
 +			wq->head = (wq->head + reap) % wq->size;
@@ -996,12 +888,10 @@ index 0000000..3b1c402
 +
 +	spin_unlock_bh(&cq->lock);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_driver.h b/drivers/infiniband/hw/scif/ibscif_driver.h
-new file mode 100644
-index 0000000..f6cb10f
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_driver.h
-@@ -0,0 +1,774 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_driver.h b/drivers/infiniband/hw/scif/ibscif_driver.h
+--- a/drivers/infiniband/hw/scif/ibscif_driver.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_driver.h	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,787 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -1046,6 +936,19 @@ index 0000000..f6cb10f
 +#include <linux/version.h>	/* for LINUX_VERSION_CODE */
 +#include <linux/poll.h>
 +#include <linux/workqueue.h>
++#include <linux/semaphore.h>
++
++/* these macros are defined in "linux/semaphore.h".
++ * however, they may be missing on older systems.
++ */
++#ifndef DECLARE_MUTEX
++#define DECLARE_MUTEX(name) \
++	struct semaphore name = __SEMAPHORE_INITIALIZER(name, 1)
++#endif
++
++#ifndef init_MUTEX
++#define init_MUTEX(sem)         sema_init(sem, 1)
++#endif
 +
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)
 +  #include <linux/interrupt.h>
@@ -1076,6 +979,7 @@ index 0000000..f6cb10f
 +#define DRV_DESC	"OpenFabrics IBSCIF Driver"
 +#define DRV_VERSION	"0.1"
 +#define DRV_SIGNON	DRV_DESC " v" DRV_VERSION
++#define DRV_BUILD	" built " __DATE__ " " __TIME__
 +
 +#define UVERBS_ABI_VER	6
 +#define VENDOR_ID	0x8086	/* Intel Corporation */
@@ -1094,12 +998,12 @@ index 0000000..f6cb10f
 +#define	MAX_QPS		(64 * 1024)
 +#define	MAX_QP_SIZE	(16 * 1024)
 +#define	MAX_CQS		(MAX_QPS * 2)	  /* x2:send queues + recv queues */
-+#define	MAX_CQ_SIZE	(MAX_QP_SIZE * 4) /* or combined		  */
++#define	MAX_CQ_SIZE	(MAX_QP_SIZE * 4) /* or combined		  */ 
 +#define	MAX_PDS		MAX_QPS		  /* 1 per QP			  */
 +#if 0
 +#define	MAX_MRS		(MAX_QPS * 4)	  /* x4:local/remote,read/write	  */
 +#else
-+#define	MAX_MRS		16383		  /* limited by IBSCIF_MR_MAX_KEY */
++#define	MAX_MRS		16383	  	  /* limited by IBSCIF_MR_MAX_KEY */
 +#endif
 +#define	MAX_MR_SIZE	(2U * 1024 * 1024 * 1024)
 +#define	MAX_SGES	(PAGE_SIZE / sizeof(struct ib_sge))
@@ -1117,9 +1021,10 @@ index 0000000..f6cb10f
 +extern int host_proxy;
 +extern int new_ib_type;
 +extern int verbose;
++extern int check_grh;
 +
 +extern struct list_head devlist;
-+extern spinlock_t devlist_lock;
++extern struct semaphore devlist_mutex;
 +
 +extern struct idr wiremap;
 +extern rwlock_t wiremap_lock;
@@ -1174,8 +1079,9 @@ index 0000000..f6cb10f
 +struct ibscif_conn {
 +	struct list_head	entry;
 +	atomic_t		refcnt;
-+	scif_epd_t		ep;
++	scif_epd_t 		ep;
 +	unsigned short		remote_node_id;
++	union ib_gid		remote_gid;
 +	struct ibscif_dev	*dev;
 +	int			local_close;
 +	int			remote_close;
@@ -1208,16 +1114,17 @@ index 0000000..f6cb10f
 +
 +struct ibscif_dev {
 +	struct ib_device	ibdev;
-+	struct net_device	*netdev;	/* for RDMA CM support */
++	struct net_device	*netdev; 	/* for RDMA CM support */
 +	struct list_head	entry;
 +
 +	char			name[IBSCIF_NAME_SIZE];
++	union ib_gid		gid;
 +	unsigned short		node_id;
 +	atomic_t		refcnt;
-+	scif_epd_t		listen_ep;
-+	struct list_head	conn_list;
++	scif_epd_t 		listen_ep;
++	struct list_head 	conn_list;
 +	struct list_head	mr_list;
-+	spinlock_t		mr_list_lock;
++	struct semaphore	mr_list_mutex;
 +
 +	struct proc_dir_entry	*procfs;
 +	struct ibscif_stats	stats;
@@ -1232,7 +1139,7 @@ index 0000000..f6cb10f
 +
 +	spinlock_t		atomic_op;
 +
-+	spinlock_t		lock;
++	struct semaphore	mutex;
 +	struct list_head	wq_list;	/* List of WQ's on this device */
 +};
 +
@@ -1417,10 +1324,6 @@ index 0000000..f6cb10f
 +	int			ud_msg_id;
 +};
 +
-+struct ibscif_mac {
-+	u8			addr[ETH_ALEN];
-+};
-+
 +enum ibscif_qp_state {
 +	QP_IDLE,
 +	QP_CONNECTED,
@@ -1456,7 +1359,7 @@ index 0000000..f6cb10f
 +	atomic_t		or_depth;
 +	atomic_t		or_posted;
 +
-+	struct mutex		mutex;
++	struct semaphore	modify_mutex;
 +	spinlock_t		lock;
 +	enum ibscif_qp_state	state;
 +	u16			local_node_id;
@@ -1499,19 +1402,19 @@ index 0000000..f6cb10f
 +	u32			length;
 +	int			npages;
 +	struct page		**page;
-+	scif_pinned_pages_t	pinned_pages;
++	scif_pinned_pages_t 	pinned_pages;
 +	struct list_head	mreg_list;
 +};
 +
 +/* Canonical virtual address on X86_64 falls in the range 0x0000000000000000-0x00007fffffffffff
 + * and 0xffff800000000000-0xffffffffffffffff. The range 0x0000800000000000-0xffff7fffffffffff
 + * are unused. This basically means only 48 bits are used and the highest 16 bits are just sign
-+ * extensions. We can put rkey into these 16 bits and use the result as the "offset" of SCIF's
++ * extensions. We can put rkey into these 16 bits and use the result as the "offset" of SCIF's 
 + * registered address space. By doing this, the SCIF_MAP_FIXED flag can be used so that the offset
-+ * can be calculated directly from rkey and virtual address w/o using the "remote registration cache"
++ * can be calculated directly from rkey and virtual address w/o using the "remote registration cache" 
 + * mechanism.
 + *
-+ * SCIF reserve the top 2 bits of the offset for internal uses, leaving 14 bits for rkey.
++ * SCIF reserve the top 2 bits of the offset for internal uses, leaving 14 bits for rkey. 
 + */
 +#define IBSCIF_MR_MAX_KEY	(0x3FFF)
 +#define IBSCIF_MR_VADDR_MASK	(0x0000FFFFFFFFFFFFUL)
@@ -1776,12 +1679,10 @@ index 0000000..f6cb10f
 +int ibscif_send_cm_rtu(struct ibscif_cm *cm_ctx);
 +
 +#endif /* IBSCIF_DRIVER_H */
-diff --git a/drivers/infiniband/hw/scif/ibscif_loopback.c b/drivers/infiniband/hw/scif/ibscif_loopback.c
-new file mode 100644
-index 0000000..d9193e6
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_loopback.c
-@@ -0,0 +1,583 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_loopback.c b/drivers/infiniband/hw/scif/ibscif_loopback.c
+--- a/drivers/infiniband/hw/scif/ibscif_loopback.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_loopback.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,582 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -2118,9 +2019,8 @@ index 0000000..d9193e6
 +
 +	spin_lock_bh(&rq->lock);
 +
-+	err = ibscif_validate_wq(rq,
-+		((enum ib_wr_opcode)write_wr->opcode == IB_WR_RDMA_WRITE_WITH_IMM) ?
-+			&recv_wr : NULL, IB_ACCESS_REMOTE_WRITE);
++	err = ibscif_validate_wq(rq, ((enum ib_wr_opcode)write_wr->opcode == IB_WR_RDMA_WRITE_WITH_IMM) ?
++					&recv_wr : NULL, IB_ACCESS_REMOTE_WRITE);
 +	if (unlikely(err))
 +		goto out;
 +
@@ -2255,7 +2155,7 @@ index 0000000..d9193e6
 +	err = ibscif_dscopy(atomic_wr->ds_list, &src_ds, sizeof atomic_wr->atomic_rsp.orig_data);
 +	if (likely(!err)) {
 +		src_addr = ibscif_map_src(src_page) + src_offset;
-+		if ((enum ib_wr_opcode) atomic_wr->opcode == IB_WR_ATOMIC_FETCH_AND_ADD)
++		if ((enum ib_wr_opcode)atomic_wr->opcode == IB_WR_ATOMIC_FETCH_AND_ADD)
 +			 *src_addr += atomic_wr->fetch_add.add_operand;
 +		else if (*src_addr == atomic_wr->cmp_swp.cmp_operand)
 +			 *src_addr  = atomic_wr->cmp_swp.swp_operand;
@@ -2365,12 +2265,10 @@ index 0000000..d9193e6
 +		goto again;
 +	}
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_main.c b/drivers/infiniband/hw/scif/ibscif_main.c
-new file mode 100644
-index 0000000..e10d954
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_main.c
-@@ -0,0 +1,351 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_main.c b/drivers/infiniband/hw/scif/ibscif_main.c
+--- a/drivers/infiniband/hw/scif/ibscif_main.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_main.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,357 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -2403,7 +2301,7 @@ index 0000000..e10d954
 +
 +#include "ibscif_driver.h"
 +
-+static const char ibscif_signon[] = DRV_SIGNON;
++static const char ibscif_signon[] = DRV_SIGNON DRV_BUILD;
 +
 +MODULE_AUTHOR("Intel Corporation");
 +MODULE_LICENSE("Dual BSD/GPL");
@@ -2448,7 +2346,7 @@ index 0000000..e10d954
 +MODULE_PARAM(int, host_proxy, 0,
 +	     "Proxy card side RDMA operations to host");
 +
-+#if (LINUX_VERSION_CODE>=KERNEL_VERSION(3,5,0))
++#if ((LINUX_VERSION_CODE>=KERNEL_VERSION(3,5,0)) || CONFIG_MK1OM || CONFIG_ML1OM)
 +#define USE_NEW_IB_TYPE	1
 +#else
 +#define USE_NEW_IB_TYPE	0
@@ -2459,10 +2357,13 @@ index 0000000..e10d954
 +MODULE_PARAM(int, verbose, 0,
 +	     "Produce more log info for debugging purpose");
 +
++MODULE_PARAM(int, check_grh, 1,
++	     "Detect outside-box connection by checking the global routing header");
++
 +static atomic_t avail_pages; /* Calculated from max_pinned and totalram_pages */
 +
 +LIST_HEAD(devlist);
-+DEFINE_SPINLOCK(devlist_lock);
++DECLARE_MUTEX(devlist_mutex);
 +
 +DEFINE_IDR(wiremap);
 +DEFINE_RWLOCK(wiremap_lock);
@@ -2476,7 +2377,7 @@ index 0000000..e10d954
 +	len = len > 64 ? 64 : len;
 +	while (len) {
 +		p = tmp;
-+		for (i = len > 16 ? 16 : len; i; i--, len--)
++		for (i = len > 16 ? 16 : len; i; i--, len--) 
 +			p += sprintf(p, "%2x ", *buf++);
 +		printk("(%d)%s: %s\n", smp_processor_id(), str, tmp);
 +	}
@@ -2518,7 +2419,7 @@ index 0000000..e10d954
 + * To work around MPI's assumptions that data is written atomically in their
 + * header structures, write the first 16 integers of a transfer atomically.
 + *
-+ * Update: the assumption of MPI's ofa module is different in that the last
++ * Update: the assumption of MPI's ofa module is different in that the last 
 + * four bytes needs to be written last and atomically. The buffers used in
 + * this case is always aligned.
 + */
@@ -2533,11 +2434,11 @@ index 0000000..e10d954
 +		return head_copied;
 +
 +	head_aligned =	!((unsigned long)src_addr & (sizeof(int)-1)) &&
-+			!((unsigned long)dst_addr & (sizeof(int)-1));
++		  	!((unsigned long)dst_addr & (sizeof(int)-1)); 
 +
 +
 +	tail_aligned =	!((unsigned long)(src_addr+copy_len) & (sizeof(int)-1)) &&
-+			!((unsigned long)(dst_addr+copy_len) & (sizeof(int)-1));
++		  	!((unsigned long)(dst_addr+copy_len) & (sizeof(int)-1)); 
 +
 +	if (!head_copied && head_aligned) {
 +
@@ -2585,7 +2486,7 @@ index 0000000..e10d954
 +                *dst_x = *src_x;
 +                goto done;
 +        }
-+
++ 
 +	/* Bad alignment. Copy all but the last byte, then the last byte */
 +	if (--copy_len)
 +		memcpy((void *)dst_x, (void *)src_x, copy_len);
@@ -2692,13 +2593,15 @@ index 0000000..e10d954
 +			"fast_rdma=%d, "
 +			"host_proxy=%d, "
 +			"rma_threshold=%d, scif_loopback=%d, "
-+			"new_ib_type=%d, verbose=%d\n",
++			"new_ib_type=%d, verbose=%d, "
++			"check_grh=%d\n",
 +			max_pinned, window_size,
 +			blocking_send, blocking_recv,
 +			fast_rdma,
 +			host_proxy,
 +			rma_threshold, scif_loopback,
-+			new_ib_type, verbose);
++			new_ib_type, verbose,
++			check_grh);
 +
 +	ibscif_init_params();
 +
@@ -2718,16 +2621,15 @@ index 0000000..e10d954
 +{
 +	ibscif_dev_cleanup();
 +	ibscif_free_wiremap();
++	printk(KERN_INFO PFX "unloaded\n");
 +}
 +
 +module_init(ibscif_init);
 +module_exit(ibscif_exit);
-diff --git a/drivers/infiniband/hw/scif/ibscif_mr.c b/drivers/infiniband/hw/scif/ibscif_mr.c
-new file mode 100644
-index 0000000..3df1d12
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_mr.c
-@@ -0,0 +1,566 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_mr.c b/drivers/infiniband/hw/scif/ibscif_mr.c
+--- a/drivers/infiniband/hw/scif/ibscif_mr.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_mr.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,569 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -2774,7 +2676,7 @@ index 0000000..3df1d12
 +	mr = kzalloc(sizeof *mr, GFP_KERNEL);
 +	if (!mr) {
 +		err = -ENOMEM;
-+		printk(KERN_ALERT "%s: unable to allocate mr.\n", __func__);
++		printk(KERN_ALERT PFX "%s: unable to allocate mr.\n", __func__); 
 +		goto out1;
 +	}
 +
@@ -2783,13 +2685,13 @@ index 0000000..3df1d12
 +
 +	err = ibscif_wiremap_add(mr, &mr->ibmr.lkey);
 +	if (err) {
-+		printk(KERN_ALERT "%s: unable to allocate lkey.\n", __func__);
++		printk(KERN_ALERT PFX "%s: unable to allocate lkey.\n", __func__); 
 +		goto out2;
 +	}
 +
 +	if (mr->ibmr.lkey > IBSCIF_MR_MAX_KEY) {
 +		err = -ENOSPC;
-+		printk(KERN_ALERT "%s: lkey (%x) out of range.\n", __func__, mr->ibmr.lkey);
++		printk(KERN_ALERT PFX "%s: lkey (%x) out of range.\n", __func__, mr->ibmr.lkey); 
 +		goto out3;
 +	}
 +
@@ -2904,7 +2806,7 @@ index 0000000..3df1d12
 +	mr->umem = ib_umem_get(ibpd->uobject->context, start, length, access, 0/*dma_sync*/);
 +	if (IS_ERR(mr->umem)) {
 +		err = PTR_ERR(mr->umem);
-+		printk(KERN_ALERT "%s: ib_umem_get returns %d.\n", __func__, err);
++		printk(KERN_ALERT PFX "%s: ib_umem_get returns %d.\n", __func__, err); 
 +		goto out;
 +	}
 +
@@ -2921,7 +2823,7 @@ index 0000000..3df1d12
 +	mr->page = vzalloc(mr->npages * sizeof *mr->page);
 +	if (!mr->page) {
 +		err = -ENOMEM;
-+		printk(KERN_ALERT "%s: unable to allocate mr->page.\n", __func__);
++		printk(KERN_ALERT PFX "%s: unable to allocate mr->page.\n", __func__); 
 +		goto out;
 +	}
 +
@@ -2936,13 +2838,13 @@ index 0000000..3df1d12
 +#endif
 +
 +	err = ibscif_mr_init_mreg(mr);
-+	if (err)
++	if (err) 
 +		goto out;
 +
-+	dev = to_dev(mr->ibmr.device);
-+	spin_lock(&dev->mr_list_lock);
++ 	dev = to_dev(mr->ibmr.device);
++	down(&dev->mr_list_mutex);
 +	list_add_tail(&mr->entry, &dev->mr_list);
-+	spin_unlock(&dev->mr_list_lock);
++	up(&dev->mr_list_mutex);
 +
 +	return &mr->ibmr;
 +out:
@@ -2973,8 +2875,8 @@ index 0000000..3df1d12
 +		}
 +		while (ret == -ERESTARTSYS);
 +
-+		if (ret && ret != -ENOTCONN)
-+			printk(KERN_ALERT "%s: scif_unregister returns %d. ep=%p, offset=%llx, length=%x\n",
++		if (ret && ret != -ENOTCONN) 
++			printk(KERN_ALERT PFX "%s: scif_unregister returns %d. ep=%p, offset=%llx, length=%x\n", 
 +				__func__, ret, mreg->conn->ep, mreg->aligned_offset, mreg->aligned_length);
 +
 +		ibscif_put_conn(mreg->conn);
@@ -2982,14 +2884,14 @@ index 0000000..3df1d12
 +		kfree(mreg);
 +	}
 +
-+	spin_lock(&dev->mr_list_lock);
++	down(&dev->mr_list_mutex);
 +	list_for_each_entry_safe(mr0, next0, &dev->mr_list, entry) {
 +		if (mr0 == mr) {
 +			list_del(&mr0->entry);
 +			break;
 +		}
 +	}
-+	spin_unlock(&dev->mr_list_lock);
++	up(&dev->mr_list_mutex);
 +
 +	if (mr->pinned_pages)
 +		scif_unpin_pages(mr->pinned_pages);
@@ -3141,7 +3043,7 @@ index 0000000..3df1d12
 +	struct ibscif_mr *mr;
 +
 +	list_for_each_entry(mr, &dev->mr_list, entry){
-+		printk(KERN_ALERT "%s: mr=%p [%llx, %x, %x]\n", __func__, mr, mr->addr, mr->length, mr->ibmr.rkey);
++		printk(KERN_ALERT PFX "%s: mr=%p [%llx, %x, %x]\n", __func__, mr, mr->addr, mr->length, mr->ibmr.rkey);
 +	}
 +}
 +
@@ -3162,9 +3064,11 @@ index 0000000..3df1d12
 +	offset = scif_register_pinned_pages(conn->ep, mr->pinned_pages, aligned_offset, SCIF_MAP_FIXED);
 +
 +	if (IS_ERR_VALUE(offset)) {
-+		printk(KERN_ALERT "%s: scif_register_pinned_pages returns %d\n", __func__, (int)offset);
-+		printk(KERN_ALERT "%s: conn=%p, ep=%p, mr=%p, addr=%llx, length=%x, rkey=%x, aligned_addr=%llx, aligned_length=%x, aligned_offset=%llx\n",
-+			__func__, conn, conn->ep, mr, mr->addr, mr->length, mr->ibmr.rkey, aligned_addr, aligned_length, (uint64_t)aligned_offset);
++		printk(KERN_ALERT PFX "%s: scif_register_pinned_pages returns %d\n", __func__, (int)offset);
++		printk(KERN_ALERT PFX "%s: conn=%p, ep=%p, mr=%p, addr=%llx, length=%x, rkey=%x, "
++			"aligned_addr=%llx, aligned_length=%x, aligned_offset=%llx\n", 
++			__func__, conn, conn->ep, mr, mr->addr, mr->length, mr->ibmr.rkey,
++			aligned_addr, aligned_length, (uint64_t)aligned_offset);
 +		ibscif_dump_mr_list(conn->dev);
 +		return (int)offset;
 +	}
@@ -3180,8 +3084,8 @@ index 0000000..3df1d12
 +		}
 +		while (err == -ERESTARTSYS);
 +
-+		if (err && err != -ENOTCONN)
-+			printk(KERN_ALERT "%s: scif_unregister returns %d. ep=%p, offset=%llx, length=%x\n",
++		if (err && err != -ENOTCONN) 
++			printk(KERN_ALERT PFX "%s: scif_unregister returns %d. ep=%p, offset=%llx, length=%x\n",
 +				__func__, err, conn->ep, (uint64_t)aligned_offset, aligned_length);
 +
 +		return -ENOMEM;
@@ -3198,7 +3102,7 @@ index 0000000..3df1d12
 +		ibscif_send_reopen(conn);
 +	}
 +
-+	if (new_mreg)
++	if (new_mreg) 
 +		*new_mreg = mreg;
 +
 +	return 0;
@@ -3211,7 +3115,7 @@ index 0000000..3df1d12
 +	int i;
 +
 +	if (unlikely(!conn)) {
-+		printk(KERN_ALERT "%s: conn==NULL\n", __func__);
++		printk(KERN_ALERT PFX "%s: conn==NULL\n", __func__);
 +		return NULL;
 +	}
 +
@@ -3224,22 +3128,22 @@ index 0000000..3df1d12
 +	err = ibscif_mr_reg_with_conn(mr, conn, &mreg);
 +	if (err != -EADDRINUSE)
 +		return mreg;
-+
++		
 +	/* another thread is performing the registration */
 +	if (verbose)
-+		printk(KERN_INFO "%s: mr is being registered by another thread. mr=%p, conn=%p.\n", __func__, mr, conn);
++		printk(KERN_INFO PFX "%s: mr is being registered by another thread. mr=%p, conn=%p.\n", __func__, mr, conn);
 +	for (i=0; i<10000; i++) {
 +		list_for_each_entry(mreg, &mr->mreg_list, entry){
 +			if (mreg->conn == conn) {
 +				if (verbose)
-+					printk(KERN_INFO "%s: got mreg after %d retries.\n", __func__, i+1);
++					printk(KERN_INFO PFX "%s: got mreg after %d retries.\n", __func__, i+1);
 +				return mreg;
 +			}
 +		}
 +		schedule();
 +	}
 +	if (verbose)
-+		printk(KERN_INFO "%s: failed to get mreg after %d retries.\n", __func__, i);
++		printk(KERN_INFO PFX "%s: failed to get mreg after %d retries.\n", __func__, i);
 +	return NULL;
 +}
 +
@@ -3261,25 +3165,25 @@ index 0000000..3df1d12
 +	prot =  ((mr->access & IB_ACCESS_REMOTE_READ)?SCIF_PROT_READ:0) |
 +		((mr->access & IB_ACCESS_REMOTE_WRITE)?SCIF_PROT_WRITE:0);
 +#else
-+	// In IB, the same buffer can be registered multiple times with different access rights.
-+	// SCIF doesn't have mechanism to support that. So we just turn on all the access rights.
-+	// Otherwise we may end up with protection error.
++  	// In IB, the same buffer can be registered multiple times with different access rights. 
++  	// SCIF doesn't have mechanism to support that. So we just turn on all the access rights.
++  	// Otherwise we may end up with protection error.
 +	prot = SCIF_PROT_READ | SCIF_PROT_WRITE;
 +#endif
 +
 +	err = scif_pin_pages((void *)aligned_addr, aligned_length, prot, 0/*user addr*/, &mr->pinned_pages);
 +	if (err) {
-+		printk(KERN_ALERT "%s: scif_pin_pages returns %d\n", __func__, err);
++		printk(KERN_ALERT PFX "%s: scif_pin_pages returns %d\n", __func__, err);
 +		return err;
 +	}
 +
-+	spin_lock(&dev->lock);
++	down(&dev->mutex);
 +	list_for_each_entry(conn, &dev->conn_list, entry) {
 +		err = ibscif_mr_reg_with_conn(mr, conn, NULL);
 +		if (err)
 +			break;
 +	}
-+	spin_unlock(&dev->lock);
++	up(&dev->mutex);
 +
 +	return err;
 +}
@@ -3288,17 +3192,16 @@ index 0000000..3df1d12
 +{
 +	struct ibscif_mr *mr;
 +
-+	spin_lock(&conn->dev->mr_list_lock);
++	down(&conn->dev->mr_list_mutex);
 +	list_for_each_entry(mr, &conn->dev->mr_list, entry){
 +		ibscif_mr_get_mreg(mr, conn);
 +	}
-+	spin_unlock(&conn->dev->mr_list_lock);
++	up(&conn->dev->mr_list_mutex);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_pd.c b/drivers/infiniband/hw/scif/ibscif_pd.c
-new file mode 100644
-index 0000000..a5682cf
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_pd.c
++
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_pd.c b/drivers/infiniband/hw/scif/ibscif_pd.c
+--- a/drivers/infiniband/hw/scif/ibscif_pd.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_pd.c	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,56 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3356,11 +3259,9 @@ index 0000000..a5682cf
 +	kfree(to_pd(ibpd));
 +	return 0;
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_post.c b/drivers/infiniband/hw/scif/ibscif_post.c
-new file mode 100644
-index 0000000..c3bc588
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_post.c
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_post.c b/drivers/infiniband/hw/scif/ibscif_post.c
+--- a/drivers/infiniband/hw/scif/ibscif_post.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_post.c	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,306 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3636,7 +3537,7 @@ index 0000000..c3bc588
 +	}
 +
 +	for (err = 0; ibwr; ibwr = ibwr->next) {
-+
++ 
 +		if (unlikely(rq->depth == rq->size)) {
 +			err = -ENOBUFS;
 +			goto out;
@@ -3668,12 +3569,10 @@ index 0000000..c3bc588
 +
 +	return err;
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_procfs.c b/drivers/infiniband/hw/scif/ibscif_procfs.c
-new file mode 100644
-index 0000000..0e14e9c
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_procfs.c
-@@ -0,0 +1,185 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_procfs.c b/drivers/infiniband/hw/scif/ibscif_procfs.c
+--- a/drivers/infiniband/hw/scif/ibscif_procfs.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_procfs.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,180 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -3743,8 +3642,7 @@ index 0000000..0e14e9c
 +		"        recv %lu recv_imm %lu read %lu comp %lu fetch %lu\n"
 +		"        read_rsp %lu atomic_rsp %lu ud %lu\n"
 +		"    fast_rdma :\n"
-+		"        write %lu read %lu unavailable %lu fallback %lu "
-+		"force_ack %lu tail_write %lu\n",
++		"        write %lu read %lu unavailable %lu fallback %lu force_ack %lu tail_write %lu\n",
 +		dev->ibdev.name,
 +		DEV_STAT(dev, bytes_sent),
 +		DEV_STAT(dev, bytes_rcvd),
@@ -3791,42 +3689,41 @@ index 0000000..0e14e9c
 +
 +#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,10,0))
 +static ssize_t ibscif_stats_write(struct file *file, const char __user *buffer,
-+				  size_t count, loff_t *ppos)
++				 size_t count, loff_t *ppos)
 +{
-+	struct ibscif_dev *dev = PDE_DATA(file_inode(file));
-+	memset(&dev->stats, 0, sizeof dev->stats);
-+	return count;
++       struct ibscif_dev *dev = PDE_DATA(file_inode(file));
++       memset(&dev->stats, 0, sizeof dev->stats);
++       return count;
 +}
 +
 +static int ibscif_stats_open(struct inode *inode, struct file *file)
 +{
-+	return single_open(file, ibscif_stats_show, PDE_DATA(inode));
++       return single_open(file, ibscif_stats_show, PDE_DATA(inode));
 +}
 +
 +struct file_operations ibscif_fops = {
-+	.owner = THIS_MODULE,
-+	.open = ibscif_stats_open, 
-+	.read = seq_read,
-+	.write = ibscif_stats_write,
-+	.llseek = seq_lseek,
-+	.release = seq_release,
++       .owner = THIS_MODULE,
++       .open = ibscif_stats_open,
++       .read = seq_read,
++       .write = ibscif_stats_write,
++       .llseek = seq_lseek,
++       .release = seq_release,
 +};
 +
 +int ibscif_procfs_add_dev(struct ibscif_dev *dev)
 +{
-+	dev->procfs = proc_mkdir(dev->ibdev.name, init_net.proc_net);
-+	if (!dev->procfs)
-+		return -ENOENT;
++       dev->procfs = proc_mkdir(dev->ibdev.name, init_net.proc_net);
++       if (!dev->procfs)
++	       return -ENOENT;
 +
-+	if (proc_create_data("stats", S_IRUGO | S_IWUGO, dev->procfs,
-+			     &ibscif_fops ,dev))
-+		return -ENOENT;
++       if (proc_create_data("stats", S_IRUGO | S_IWUGO, dev->procfs,
++			    &ibscif_fops ,dev))
++	       return -ENOENT;
 +
-+	return 0;
++       return 0;
 +}
 +#else /* (LINUX_VERSION_CODE < KERNEL_VERSION(3,10,0)) */
-+static int ibscif_stats_write(struct file *file, const char __user *buffer,
-+			      unsigned long count, void *data)
++static int ibscif_stats_write(struct file *file, const char __user *buffer, unsigned long count, void *data)
 +{
 +	struct ibscif_dev *dev = data;
 +	memset(&dev->stats, 0, sizeof dev->stats);
@@ -3841,11 +3738,9 @@ index 0000000..0e14e9c
 +	if (!dev->procfs)
 +		return -ENOENT;
 +
-+	entry = create_proc_read_entry("stats", S_IRUGO | S_IWUGO,
-+				       dev->procfs, ibscif_stats_read, dev);
++	entry = create_proc_read_entry("stats", S_IRUGO | S_IWUGO, dev->procfs, ibscif_stats_read, dev);
 +	if (!entry)
 +		return -ENOENT;
-+
 +	entry->write_proc = ibscif_stats_write;
 +
 +	return 0;
@@ -3856,15 +3751,12 @@ index 0000000..0e14e9c
 +{
 +	if (dev->procfs)
 +		remove_proc_entry("stats", dev->procfs);
-+
 +	remove_proc_entry(dev->ibdev.name, init_net.proc_net);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_protocol.c b/drivers/infiniband/hw/scif/ibscif_protocol.c
-new file mode 100644
-index 0000000..58f3080
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_protocol.c
-@@ -0,0 +1,2832 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_protocol.c b/drivers/infiniband/hw/scif/ibscif_protocol.c
+--- a/drivers/infiniband/hw/scif/ibscif_protocol.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_protocol.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,2838 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -3902,7 +3794,7 @@ index 0000000..58f3080
 +struct ibscif_skb_cb {
 +	struct ibscif_dev	*dev;
 +	struct ibscif_wr	*wr;
-+	scif_epd_t		scif_ep;
++	scif_epd_t 		scif_ep;
 +	struct ibscif_qp	*qp;	/* for UD only */
 +};
 +
@@ -3926,7 +3818,7 @@ index 0000000..58f3080
 +#else
 +  #define KMAP(x) kmap(skb_frag_page(x))
 +  #define KUNMAP(x) kunmap(skb_frag_page(x))
-+  #define SET_PAGE(x,y) __skb_frag_set_page(x, y) 
++  #define SET_PAGE(x,y) __skb_frag_set_page(x, y)
 +  #define GET_PAGE(x) __skb_frag_ref(x)
 +#endif
 +
@@ -3992,7 +3884,7 @@ index 0000000..58f3080
 +		hdr_size = skb->len - skb->data_len;
 +		for (i=0; i<hdr_size; ) {
 +			ret = scif_send(scif_ep, skb->data+i, hdr_size-i,
-+					 blocking_send ? SCIF_SEND_BLOCK : 0);
++					 blocking_send ? SCIF_SEND_BLOCK : 0); 
 +			if (ret < 0) {
 +				printk(KERN_ALERT PFX "%s: fail to send header, hdr_size=%d, ret=%d\n", __func__, hdr_size, ret);
 +				goto next;
@@ -4005,9 +3897,9 @@ index 0000000..58f3080
 +		while (num_frags--) {
 +			vaddr = KMAP(frag); /* because scif_send() may cause scheduling */
 +			for (i=0; i<frag->size; ) {
-+				ret = scif_send(scif_ep, vaddr + frag->page_offset + i,
-+						frag->size - i,
-+						blocking_send ? SCIF_SEND_BLOCK : 0);
++				ret = scif_send(scif_ep, vaddr + frag->page_offset + i, 
++						frag->size - i, 
++						blocking_send ? SCIF_SEND_BLOCK : 0); 
 +				if (ret < 0) {
 +					printk(KERN_ALERT PFX "%s: scif_send returns %d, frag_size=%d\n", __func__, ret, frag->size);
 +					break;
@@ -4052,7 +3944,7 @@ index 0000000..58f3080
 +	}
 +
 +	/* only one instance can be enqueued, otherwise there is race condition between scif_send() calls. */
-+	/* notice that the current running worker may miss the newly added item, but it will be picked up in the poll_thread */
++	/* notice that the current running worker may miss the newly added item, but it will be picked up in the poll_thread */ 
 +	if (!atomic_xchg(&xmit_busy, 1))
 +		schedule_work(&ibscif_xmit_work);
 +
@@ -4162,7 +4054,7 @@ index 0000000..58f3080
 +		}
 +		pdu->ibscif.write.msg_id	     = __cpu_to_be32(wr->msg_id);
 +		pdu->ibscif.write.rdma_key     = __cpu_to_be32(wr->write.rkey);
-+		pdu->ibscif.write.rdma_address = __cpu_to_be64(wr->write.remote_address +
++		pdu->ibscif.write.rdma_address = __cpu_to_be64(wr->write.remote_address + 
 +							      (wr->length - wr_len_remaining));
 +		if (wr->use_rma) {
 +			opcode = ibscif_op_write_rma;
@@ -4286,7 +4178,7 @@ index 0000000..58f3080
 +
 +	pdu = (struct ibscif_full_frame *)skb->data;
 +	pdu->ibscif.hdr.hdr_size	= __cpu_to_be16(hdr_size);
-+
++	
 +	return skb;
 +bail:
 +	atomic_inc(&dev->available);
@@ -4352,10 +4244,10 @@ index 0000000..58f3080
 +
 +	for (i=0; i<wr->num_ds; i++) {
 +		ds = &wr->ds_list[i];
-+		if (!ds->current_mreg)
++		if (!ds->current_mreg) 
 +			ds->current_mreg = ibscif_mr_get_mreg(ds->mr, wq->qp->conn);
 +
-+		if (!ds->current_mreg)
++		if (!ds->current_mreg) 
 +			return 0;
 +	}
 +
@@ -4497,7 +4389,7 @@ index 0000000..58f3080
 +	wr->sar.rea.final_length = total_length - rdma_length;
 +
 +	/* we can't call ibscif_process_sq_completions here because we are holding the sq lock.
-+	 * set the flag and let the upper level make the call */
++ 	 * set the flag and let the upper level make the call */
 +	wq->fast_rdma_completions = 1;
 +
 +	if (wr->opcode == WR_RDMA_WRITE)
@@ -4506,7 +4398,7 @@ index 0000000..58f3080
 +		DEV_STAT(qp->dev, fast_rdma_read++);
 +
 +	/* the fast rdma protocol doesn't send any packet, and thus can not piggyback any ack
-+	 * for the peer. send separate ack packet when necessary. */
++ 	 * for the peer. send separate ack packet when necessary. */
 +	if (qp->wire.sq.rx.last_seq_acked < qp->wire.sq.rx.last_in_seq ||
 +	    qp->wire.iq.rx.last_seq_acked < qp->wire.iq.rx.last_in_seq) {
 +		ibscif_send_ack(qp);
@@ -4598,13 +4490,13 @@ index 0000000..58f3080
 +	u32 max_payload, wr_length, page_offset, ds_len_left, payload_left;
 +
 +	/* Try to process RDMA read/write directly with SCIF functions.
-+	 * The usual reason for failure is that the remote memory has not yet been
-+	 * registered with SCIF. The normal packet based path should handle that.
++	 * The usual reason for failure is that the remote memory has not yet been 
++	 * registered with SCIF. The normal packet based path should handle that. 
 +	 */
 +	if (host_proxy && wq->qp->local_node_id>0 && wq->qp->remote_node_id==0) {
 +		/* don't try fast rdma becasue we want to let the host do the data transfer */
 +	}
-+	else if (fast_rdma) {
++	else if (fast_rdma) { 
 +		num_xmited = 0;
 +		if (ibscif_try_fast_rdma(wq, wr))
 +			goto finish2;
@@ -4641,7 +4533,7 @@ index 0000000..58f3080
 +				from_seq++;
 +			}
 +		}
-+		else
++		else 
 +			printk(KERN_ALERT PFX "%s: fail to set up RMA addresses for the work request.\n", __func__);
 +
 +		goto finish;
@@ -4856,8 +4748,8 @@ index 0000000..58f3080
 +	struct sk_buff *skb;
 +
 +	if (!qp || IS_ERR(qp)) {
-+		if (qp != ERR_PTR(-ENOENT))
-+			printk(KERN_ALERT "%s: qp=%p hdr=%p in_skb=%p reason=%d\n", __func__, qp, hdr, in_skb, reason);
++		if (qp != ERR_PTR(-ENOENT) && verbose)
++			printk(KERN_ALERT PFX "%s: qp=%p hdr=%p in_skb=%p reason=%d\n", __func__, qp, hdr, in_skb, reason);
 +		return;
 +	}
 +
@@ -4917,7 +4809,7 @@ index 0000000..58f3080
 +	pdu->ibscif.hdr.seq_num	  = 0; /* seq_num has no meaning. */
 +	pdu->ibscif.hdr.sq_ack_num = __cpu_to_be32(sq_seq);
 +	pdu->ibscif.hdr.iq_ack_num = __cpu_to_be32(iq_seq);
-+	pdu->ibscif.hdr.hdr_size	 = __cpu_to_be16(size);
++	pdu->ibscif.hdr.hdr_size	 = __cpu_to_be16(size); 
 +
 +	return skb;
 +}
@@ -4966,7 +4858,7 @@ index 0000000..58f3080
 +	pdu->ibscif.hdr.seq_num	  = 0; /* seq_num has no meaning. */
 +	pdu->ibscif.hdr.sq_ack_num = 0; /* unused */
 +	pdu->ibscif.hdr.iq_ack_num = 0; /* unused */
-+	pdu->ibscif.hdr.hdr_size	 = __cpu_to_be16(size);
++	pdu->ibscif.hdr.hdr_size	 = __cpu_to_be16(size); 
 +
 +	return skb;
 +}
@@ -5030,7 +4922,7 @@ index 0000000..58f3080
 +	pdu->ibscif.hdr.seq_num	  = 0; /* seq_num has no meaning. */
 +	pdu->ibscif.hdr.sq_ack_num = 0; /* unused */
 +	pdu->ibscif.hdr.iq_ack_num = 0; /* unused */
-+	pdu->ibscif.hdr.hdr_size  = __cpu_to_be16(size);
++	pdu->ibscif.hdr.hdr_size  = __cpu_to_be16(size); 
 +
 +	return skb;
 +}
@@ -5040,7 +4932,7 @@ index 0000000..58f3080
 +	struct ibscif_full_frame *pdu;
 +	struct sk_buff *skb;
 +
-+	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + cm_ctx->plen);
++	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + cm_ctx->plen); 
 +	if (unlikely(!skb))
 +		return -ENOMEM;
 +
@@ -5062,7 +4954,7 @@ index 0000000..58f3080
 +	struct ibscif_full_frame *pdu;
 +	struct sk_buff *skb;
 +
-+	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + cm_ctx->plen);
++	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + cm_ctx->plen); 
 +	if (unlikely(!skb))
 +		return -ENOMEM;
 +
@@ -5085,7 +4977,7 @@ index 0000000..58f3080
 +	struct ibscif_full_frame *pdu;
 +	struct sk_buff *skb;
 +
-+	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + plen);
++	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm + plen); 
 +	if (unlikely(!skb))
 +		return -ENOMEM;
 +
@@ -5106,7 +4998,7 @@ index 0000000..58f3080
 +	struct ibscif_full_frame *pdu;
 +	struct sk_buff *skb;
 +
-+	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm);
++	skb = ibscif_create_cm_hdr(cm_ctx->conn, sizeof pdu->ibscif.cm); 
 +	if (unlikely(!skb))
 +		return -ENOMEM;
 +
@@ -5220,7 +5112,7 @@ index 0000000..58f3080
 +		wr = ibscif_get_wr(wq, index);
 +
 +		/* Skip over non-IQ entries. */
-+		if (iq_flag &&
++		if (iq_flag && 
 +		    ((wr->opcode == WR_UD)	      ||
 +		     (wr->opcode == WR_SEND)	      ||
 +		     (wr->opcode == WR_SEND_WITH_IMM) ||
@@ -5244,7 +5136,7 @@ index 0000000..58f3080
 +		if (iq_flag) {
 +			/*
 +			 * Completed IQ replies are defered until earlier
-+			 * non-IQ WR have completed.  This is determined
++			 * non-IQ WR have completed.  This is determined 
 +			 * with a second iteration of the WQ below.
 +			 */
 +			wr->state = WR_COMPLETED;
@@ -5396,7 +5288,7 @@ index 0000000..58f3080
 +	if (is_sq(wq)) {
 +		err = ibscif_process_sq_completions(wq->qp);
 +		if (unlikely(err)) {
-+			printk(KERN_ALERT "%s: sq completion error: err=%d \n", __func__, err);
++			printk(KERN_ALERT PFX "%s: sq completion error: err=%d \n", __func__, err);
 +			ibscif_protocol_error(wq->qp, IBSCIF_REASON_QP_FATAL);
 +			status = 0;
 +		}
@@ -5571,7 +5463,7 @@ index 0000000..58f3080
 +	int msg_id;
 +
 +	if (unlikely(qp->ibqp.qp_type != IB_QPT_UD)) {
-+		printk(KERN_ALERT "%s: UD packet received on non-UD QP\n", __func__);
++		printk(KERN_ALERT PFX "%s: UD packet received on non-UD QP\n", __func__);
 +		return -EINVAL;
 +	}
 +
@@ -5580,7 +5472,7 @@ index 0000000..58f3080
 +
 +	/* Only one pdu is allowed for one UD packet, otherwise drop the pdu */
 +	if (unlikely(pdu->ud.msg_length != pdu->hdr.length || pdu->ud.msg_offset)) {
-+		printk(KERN_INFO "%s: dropping fragmented UD packet. total_length=%d msg_length=%d msg_offset=%d\n",
++		printk(KERN_INFO PFX "%s: dropping fragmented UD packet. total_length=%d msg_length=%d msg_offset=%d\n",
 +				__func__, pdu->hdr.length, pdu->ud.msg_length, pdu->ud.msg_offset);
 +		return -EINVAL;
 +	}
@@ -5588,7 +5480,7 @@ index 0000000..58f3080
 +	spin_lock_bh(&qp->rq.lock);
 +	if (unlikely(qp->rq.ud_msg_id >= qp->rq.next_msg_id)) {
 +		spin_unlock_bh(&qp->rq.lock);
-+		printk(KERN_ALERT "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
++		printk(KERN_ALERT PFX "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
 +				__func__, pdu->send.msg_id, qp->rq.next_msg_id);
 +		return -EBADRQC;
 +	}
@@ -5603,7 +5495,7 @@ index 0000000..58f3080
 +		return -EMSGSIZE;
 +
 +	/* GRH is included as part of the received message */
-+	skb_pull(skb, sizeof(pdu->ud)-grh_size);
++	skb_pull(skb, sizeof(pdu->ud)-grh_size); 
 +
 +	err = ibscif_place_data(qp, wr, skb, pdu->hdr.length+grh_size, pdu->ud.msg_offset, pdu->hdr.seq_num);
 +	if (unlikely(err))
@@ -5627,7 +5519,7 @@ index 0000000..58f3080
 +	spin_lock_bh(&qp->rq.lock);
 +	if (unlikely(pdu->send.msg_id >= qp->rq.next_msg_id)) {
 +		spin_unlock_bh(&qp->rq.lock);
-+		printk(KERN_ALERT "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
++		printk(KERN_ALERT PFX "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
 +				__func__, pdu->send.msg_id, qp->rq.next_msg_id);
 +		return -EBADRQC;
 +	}
@@ -5686,7 +5578,7 @@ index 0000000..58f3080
 +		spin_lock_bh(&qp->rq.lock);
 +		if (unlikely(pdu->write.msg_id >= qp->rq.next_msg_id)) {
 +			spin_unlock_bh(&qp->rq.lock);
-+			printk(KERN_ALERT "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
++			printk(KERN_ALERT PFX "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
 +					__func__, pdu->write.msg_id, qp->rq.next_msg_id);
 +			return -EBADRQC;
 +		}
@@ -5872,7 +5764,7 @@ index 0000000..58f3080
 +	wr->length = 0;
 +	wr->msg_id = msg_id;
 +	wr->num_ds = 0;
-+	wr->atomic_rsp.opcode = (opcode==ibscif_op_comp_swap)? ibscif_op_comp_swap_rsp : ibscif_op_fetch_add_rsp;
++	wr->atomic_rsp.opcode = (opcode==ibscif_op_comp_swap)? ibscif_op_comp_swap_rsp : ibscif_op_fetch_add_rsp; 
 +	/* The wr->atomic_rsp.orig_data field was set above. */
 +
 +	ibscif_append_wqe(&qp->iq);
@@ -5948,7 +5840,7 @@ index 0000000..58f3080
 +	spin_lock_bh(&qp->rq.lock);
 +	if (unlikely(pdu->send.msg_id >= qp->rq.next_msg_id)) {
 +		spin_unlock_bh(&qp->rq.lock);
-+		printk(KERN_ALERT "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
++		printk(KERN_ALERT PFX "%s: ERROR: message arrives before recv is posted. msg_id=%d, rq.next_msg_id=%d\n",
 +				__func__, pdu->send.msg_id, qp->rq.next_msg_id);
 +		return -EBADRQC;
 +	}
@@ -6017,7 +5909,7 @@ index 0000000..58f3080
 +
 +				err = scif_readfrom(qp->conn->ep, loffset, xfer_len, rma_offset, rma_flag);
 +				if (err) {
-+					printk(KERN_ALERT "%s: scif_readfrom (%d bytes) returns %d\n", __func__, xfer_len, err);
++					printk(KERN_ALERT PFX "%s: scif_readfrom (%d bytes) returns %d\n", __func__, xfer_len, err);
 +					break;
 +				}
 +
@@ -6038,7 +5930,7 @@ index 0000000..58f3080
 +				rma_length = __be32_to_cpu(pdu->send.rma_addrs[cur_rma_addr].length);
 +			}
 +		}
-+
++		
 +		seg_num++;
 +		ds++;
 +	}
@@ -6137,7 +6029,7 @@ index 0000000..58f3080
 +		if (rdma_len < rma_length)
 +			rma_length = rdma_len;
 +
-+		if (rma_length == 0)
++		if (rma_length == 0) 
 +			continue;
 +
 +		loffset = mreg->offset + (rdma_addr - mr->addr) + total;
@@ -6148,7 +6040,7 @@ index 0000000..58f3080
 +
 +		err = scif_readfrom(qp->conn->ep, loffset, rma_length, rma_offset, rma_flag);
 +		if (err) {
-+			printk(KERN_ALERT "%s: scif_readfrom (%d bytes) returns %d\n", __func__, rma_length, err);
++			printk(KERN_ALERT PFX "%s: scif_readfrom (%d bytes) returns %d\n", __func__, rma_length, err);
 +			break;
 +		}
 +
@@ -6160,11 +6052,11 @@ index 0000000..58f3080
 +
 +	if (wr) {
 +		wr->sar.rea.final_length    = total;
-+		wr->state = WR_LAST_SEEN;
++		wr->state = WR_LAST_SEEN; 
 +		wr->sar.rea.opcode	    = pdu->hdr.opcode;
 +		wr->sar.rea.last_packet_seq = pdu->hdr.seq_num;
 +		wr->sar.rea.immediate_data  = __be32_to_cpu(pdu->write.immed_data);
-+	}
++	} 
 +
 +	/* Respond to the initiator with the result */
 +	wr = ibscif_reserve_wqe(&qp->iq);
@@ -6237,7 +6129,7 @@ index 0000000..58f3080
 +		if (rdma_len < rma_length)
 +			rma_length = rdma_len;
 +
-+		if (rma_length == 0)
++		if (rma_length == 0) 
 +			continue;
 +
 +		loffset = mreg->offset + (rdma_addr - mr->addr) + total;
@@ -6248,7 +6140,7 @@ index 0000000..58f3080
 +
 +		err = scif_writeto(qp->conn->ep, loffset, rma_length, rma_offset, rma_flag);
 +		if (err) {
-+			printk(KERN_ALERT "%s: scif_writeto (%d bytes) returns %d\n", __func__, rma_length, err);
++			printk(KERN_ALERT PFX "%s: scif_writeto (%d bytes) returns %d\n", __func__, rma_length, err);
 +			break;
 +		}
 +
@@ -6364,7 +6256,7 @@ index 0000000..58f3080
 +	}
 +
 +	if (unlikely(err)) {
-+		printk(KERN_ALERT "%s: ERROR: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
++		printk(KERN_ALERT PFX "%s: ERROR: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
 +		ibscif_protocol_error(qp, IBSCIF_REASON_QP_FATAL);
 +	}
 +
@@ -6404,7 +6296,7 @@ index 0000000..58f3080
 +	if (qp->ibqp.qp_type == IB_QPT_UD) {
 +		err = ibscif_schedule_rx_completions(qp, 0, rx);
 +		if (unlikely(err)) {
-+			printk(KERN_ALERT "%s: rx completion error: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
++			printk(KERN_ALERT PFX "%s: rx completion error: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
 +			ibscif_protocol_error(qp, IBSCIF_REASON_QP_FATAL);
 +		}
 +		goto done;
@@ -6417,7 +6309,7 @@ index 0000000..58f3080
 +		/* PDU is in sequence so schedule/remove completed work requests. */
 +		err = ibscif_schedule_rx_completions(qp, ibscif_pdu_is_iq(pdu->hdr.opcode), rx);
 +		if (unlikely(err)) {
-+			printk(KERN_ALERT "%s: rx completion error: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
++			printk(KERN_ALERT PFX "%s: rx completion error: err=%d, opcode=%d\n", __func__, err, ibscif_pdu_base_type(pdu->hdr.opcode));
 +			ibscif_protocol_error(qp, IBSCIF_REASON_QP_FATAL);
 +			goto done;
 +		}
@@ -6444,7 +6336,7 @@ index 0000000..58f3080
 +}
 +
 +#if LINUX_VERSION_CODE <= KERNEL_VERSION(2,6,21)
-+#define skb_mac_header(skb) (skb->mac.raw)
++#define skb_mac_header(skb) (skb->mac.raw) 
 +#endif
 +
 +static int ibscif_recv_pkt(struct sk_buff *skb, struct ibscif_dev *dev, scif_epd_t ep, struct ibscif_conn *conn)
@@ -6462,12 +6354,12 @@ index 0000000..58f3080
 +	pdu->hdr.iq_ack_num = __be32_to_cpu(pdu->hdr.iq_ack_num);
 +
 +	if (pdu->hdr.opcode == ibscif_op_close) {
-+		//printk(KERN_INFO "%s: op_close, conn=%p, local_close=%d\n", __func__, conn, conn->local_close);
++		//printk(KERN_INFO PFX "%s: op_close, conn=%p, local_close=%d\n", __func__, conn, conn->local_close);
 +		conn->remote_close = 1;
 +		goto done_no_qp;
 +	}
 +	else if (pdu->hdr.opcode == ibscif_op_reopen) {
-+		//printk(KERN_INFO "%s: op_reopen, conn=%p, local_close=%d\n", __func__, conn, conn->local_close);
++		//printk(KERN_INFO PFX "%s: op_reopen, conn=%p, local_close=%d\n", __func__, conn, conn->local_close);
 +		conn->remote_close = 0;
 +		goto done_no_qp;
 +	}
@@ -6533,7 +6425,7 @@ index 0000000..58f3080
 +			printk(KERN_ALERT PFX "%s(): fail to receive hdr, ret=%d, expecting %d\n", __func__, ret, (int)recv_size);
 +			if (ret == -ENOTCONN || ret == -ECONNRESET) {
 +				if (verbose)
-+					printk(KERN_INFO "%s: ep disconnected by peer (%d). conn=%p, local_close=%d\n",
++					printk(KERN_INFO PFX "%s: ep disconnected by peer (%d). conn=%p, local_close=%d\n",
 +							__func__, ret, conn, conn->local_close);
 +				ibscif_remove_ep( dev, ep );
 +				ibscif_refresh_pollep_list();
@@ -6574,7 +6466,7 @@ index 0000000..58f3080
 +		recv_buffer += ret;
 +	}
 +
-+	if (ret < 0)
++	if (ret < 0) 
 +		goto errout;
 +
 +	skb->len       = pdu_size;
@@ -6595,6 +6487,7 @@ index 0000000..58f3080
 +static struct ibscif_conn	*poll_conns[IBSCIF_MAX_POLL_COUNT];
 +static struct task_struct	*poll_thread = NULL;
 +static atomic_t			poll_eps_changed = ATOMIC_INIT(0);
++static volatile int		poll_thread_running = 0;
 +
 +void ibscif_refresh_pollep_list( void )
 +{
@@ -6609,6 +6502,7 @@ index 0000000..58f3080
 +	int busy;
 +	int idle_count = 0;
 +
++	poll_thread_running = 1;
 +	while (!kthread_should_stop()) {
 +		if (atomic_xchg(&poll_eps_changed, 0)) {
 +			poll_count = IBSCIF_MAX_POLL_COUNT;
@@ -6626,7 +6520,7 @@ index 0000000..58f3080
 +		if (ret > 0) {
 +			for (i=0; i<poll_count; i++) {
 +				if (poll_eps[i].revents & POLLIN) {
-+					if (poll_types[i] == IBSCIF_EP_TYPE_LISTEN) {
++					if (poll_types[i] == IBSCIF_EP_TYPE_LISTEN) { 
 +						ibscif_do_accept( poll_devs[i] );
 +						busy = 1;
 +					}
@@ -6637,7 +6531,7 @@ index 0000000..58f3080
 +				}
 +				else if (poll_eps[i].revents & POLLERR) {
 +					if (verbose)
-+						printk(KERN_INFO "%s: ep error, conn=%p.\n", __func__, poll_conns[i]);
++						printk(KERN_INFO PFX "%s: ep error, conn=%p.\n", __func__, poll_conns[i]);
 +					ibscif_remove_ep( poll_devs[i], poll_eps[i].epd );
 +					ibscif_refresh_pollep_list();
 +					/* in most the case, the error is caused by ep being already closed */
@@ -6646,15 +6540,15 @@ index 0000000..58f3080
 +				else if (poll_eps[i].revents & POLLHUP) {
 +					struct ibscif_conn *conn = poll_conns[i];
 +					if (verbose)
-+						printk(KERN_INFO "%s: ep disconnected by peer.\n", __func__);
++						printk(KERN_INFO PFX "%s: ep disconnected by peer.\n", __func__);
 +					ibscif_remove_ep( poll_devs[i], poll_eps[i].epd );
 +					ibscif_refresh_pollep_list();
 +					if (conn) {
 +						if (verbose)
-+							printk(KERN_INFO "%s: conn=%p, local_close=%d.\n", __func__, conn, conn->local_close);
++							printk(KERN_INFO PFX "%s: conn=%p, local_close=%d.\n", __func__, conn, conn->local_close);
 +						conn->remote_close = 1;
 +						if (conn->local_close) {
-+							ibscif_free_conn(conn);
++							ibscif_free_conn(conn);	
 +						}
 +					}
 +					busy = 1;
@@ -6680,6 +6574,7 @@ index 0000000..58f3080
 +		}
 +	}
 +
++	poll_thread_running = 0;
 +	return 0;
 +}
 +
@@ -6696,12 +6591,13 @@ index 0000000..58f3080
 +void ibscif_protocol_cleanup(void)
 +{
 +	kthread_stop( poll_thread );
++
++	while (poll_thread_running)
++		schedule();
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_protocol.h b/drivers/infiniband/hw/scif/ibscif_protocol.h
-new file mode 100644
-index 0000000..66b55f7
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_protocol.h
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_protocol.h b/drivers/infiniband/hw/scif/ibscif_protocol.h
+--- a/drivers/infiniband/hw/scif/ibscif_protocol.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_protocol.h	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,395 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -7052,7 +6948,7 @@ index 0000000..66b55f7
 +union ibscif_pdu {
 +	struct base_hdr		hdr;
 +	struct ud_hdr		ud;
-+	struct send_hdr		send;
++	struct send_hdr 	send;
 +	struct write_hdr	write;
 +	struct read_req_hdr	read_req;
 +	struct read_rsp_hdr	read_rsp;
@@ -7098,12 +6994,10 @@ index 0000000..66b55f7
 +#define ibscif_tx_window(tx)		((u32)window_size - ibscif_tx_unacked_window(tx))
 +
 +#endif /* IBSCIF_PROTOCOL_H */
-diff --git a/drivers/infiniband/hw/scif/ibscif_provider.c b/drivers/infiniband/hw/scif/ibscif_provider.c
-new file mode 100644
-index 0000000..c42ce6d
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_provider.c
-@@ -0,0 +1,409 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_provider.c b/drivers/infiniband/hw/scif/ibscif_provider.c
+--- a/drivers/infiniband/hw/scif/ibscif_provider.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_provider.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,406 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -7175,7 +7069,7 @@ index 0000000..c42ce6d
 +	attr->gid_tbl_len  = 1;
 +	attr->pkey_tbl_len = 1;
 +	attr->max_msg_sz   = MAX_MR_SIZE;
-+	attr->phys_state   = 5; /* LinkUp */
++	attr->phys_state   = 5; /* LinkUp */ 
 +	attr->state	   = IB_PORT_ACTIVE;
 +	attr->max_mtu	   = IB_MTU_4096;
 +	attr->active_mtu   = IB_MTU_4096;
@@ -7197,14 +7091,7 @@ index 0000000..c42ce6d
 +{
 +	struct ibscif_dev *dev = to_dev(ibdev);
 +
-+	/*
-+	 * Form a link local unicast address.
-+	 * See http://www.faqs.org/rfcs/rfc2373.html.
-+	 */
-+	ibgid->global.subnet_prefix = cpu_to_be64(0xFE80000000000000);
-+	memcpy(&ibgid->global.interface_id, &dev->ibdev.node_guid, 8);
-+	((u8 *)&ibgid->global.interface_id)[0] ^= 2;
-+
++	memcpy(ibgid, &dev->gid, sizeof(*ibgid));
 +	return 0;
 +}
 +
@@ -7222,9 +7109,6 @@ index 0000000..c42ce6d
 +
 +static void ibscif_generate_eui64(struct ibscif_dev *dev, u8 *eui64)
 +{
-+	/* use the MAC address of the netdev as the node GUID so RDMA CM
-+	 * can find the ibdev from IP address associated with the netdev.
-+	 */
 +	memcpy(eui64, dev->netdev->dev_addr, 3);
 +	eui64[3] = 0xFF;
 +	eui64[4] = 0xFE;
@@ -7258,8 +7142,12 @@ index 0000000..c42ce6d
 +		(1ull << IB_USER_VERBS_CMD_REG_MR)		|
 +		(1ull << IB_USER_VERBS_CMD_DEREG_MR)		|
 +		(1ull << IB_USER_VERBS_CMD_POST_SEND)		|
-+		(1ull << IB_USER_VERBS_CMD_POST_RECV);
++		(1ull << IB_USER_VERBS_CMD_POST_RECV);		
++#if	defined(MOFED) && !defined(MOFED_2_1)
++	dev->ibdev.node_type		= new_ib_type ? RDMA_EXP_NODE_MIC : RDMA_NODE_RNIC;
++#else
 +	dev->ibdev.node_type		= new_ib_type ? RDMA_NODE_MIC : RDMA_NODE_RNIC;
++#endif
 +	dev->ibdev.phys_port_cnt	= 1;
 +
 +	dev->ibdev.query_device		= ibscif_query_device;		// Mandatory
@@ -7312,7 +7200,7 @@ index 0000000..c42ce6d
 +}
 +
 +/*
-+ * Hold devlist_lock during this call for synchronization as needed.
++ * Hold devlist_mutex during this call for synchronization as needed.
 + * Upon return, dev is invalid.
 + */
 +static void ibscif_remove_dev(struct ibscif_dev *dev)
@@ -7324,21 +7212,19 @@ index 0000000..c42ce6d
 +
 +	WARN_ON(!list_empty(&dev->wq_list));
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_del(&dev->entry);
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	ibscif_refresh_pollep_list();
 +
-+	/* spin_lock_bh() cause in_interrupt() be true, which leads
-+	 * to kernel panic inside SCIF API functions */
-+	spin_lock(&dev->lock);
++	down(&dev->mutex); 
 +	list_for_each_entry_safe(conn, next, &dev->conn_list, entry) {
 +		scif_close(conn->ep);
 +		list_del(&conn->entry);
 +		kfree(conn);
 +	}
-+	spin_unlock(&dev->lock);
++	up(&dev->mutex);
 +
 +	if (dev->listen_ep)
 +		scif_close(dev->listen_ep);
@@ -7352,10 +7238,10 @@ index 0000000..c42ce6d
 +static void ibscif_remove_one(struct net_device *netdev)
 +{
 +        struct ibscif_dev *dev, *next;
-+
++ 
 +        list_for_each_entry_safe(dev, next, &devlist, entry) {
 +                if (netdev == dev->netdev) {
-+                        ibscif_remove_dev(dev);
++                        ibscif_remove_dev(dev); 
 +                        break;
 +                }
 +        }
@@ -7380,14 +7266,19 @@ index 0000000..c42ce6d
 +
 +	INIT_LIST_HEAD(&dev->conn_list);
 +	INIT_LIST_HEAD(&dev->mr_list);
-+	spin_lock_init(&dev->mr_list_lock);
-+	spin_lock_init(&dev->lock);
++	init_MUTEX(&dev->mr_list_mutex);
++	init_MUTEX(&dev->mutex);
 +	spin_lock_init(&dev->atomic_op);
 +	INIT_LIST_HEAD(&dev->wq_list);
 +	atomic_set(&dev->available, 256); /* FIXME */
 +
 +	dev_hold(netdev);
 +	dev->netdev = netdev;
++
++	/* use the MAC address of the netdev as the GID so that RDMA CM can
++	 * find the ibdev from the IP address associated with the netdev.
++	 */
++	memcpy(&dev->gid, dev->netdev->dev_addr, ETH_ALEN);
 +
 +	dev->ibdev.dma_device = kzalloc(sizeof *dev->ibdev.dma_device, GFP_KERNEL);
 +	if (!dev->ibdev.dma_device) {
@@ -7403,7 +7294,7 @@ index 0000000..c42ce6d
 +	ret = device_register(dev->ibdev.dma_device);
 +	if (ret) {
 +		printk(KERN_ALERT PFX "%s: fail to register dma_device, ret=%d\n", __func__, ret);
-+		kfree(dev->ibdev.dma_device);
++		kfree(dev->ibdev.dma_device); 
 +		goto out_free_ibdev;
 +	}
 +
@@ -7424,7 +7315,7 @@ index 0000000..c42ce6d
 +
 +	node_cnt = ret;
 +	dev->node_id = my_node_id;
-+	printk(KERN_ALERT "%s: my node_id is %d\n", __func__, dev->node_id);
++	printk(KERN_ALERT PFX "%s: my node_id is %d\n", __func__, dev->node_id);
 +
 +	ret = scif_bind(dev->listen_ep, SCIF_OFED_PORT_0);
 +	if (ret < 0) {
@@ -7439,9 +7330,9 @@ index 0000000..c42ce6d
 +		goto out_close_ep;
 +	}
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_add_tail(&dev->entry, &devlist);
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	if (ibscif_register_device(dev))
 +		ibscif_remove_dev(dev);
@@ -7498,7 +7389,7 @@ index 0000000..c42ce6d
 +	ibscif_protocol_init_pre();
 +
 +	err = register_netdevice_notifier(&ibscif_notifier_block);
-+	if (err)
++	if (err) 
 +		ibscif_protocol_cleanup();
 +
 +	return err;
@@ -7508,17 +7399,15 @@ index 0000000..c42ce6d
 +{
 +	struct ibscif_dev *dev, *next;
 +
-+	unregister_netdevice_notifier(&ibscif_notifier_block);
 +	ibscif_protocol_cleanup();
++	unregister_netdevice_notifier(&ibscif_notifier_block);
 +	list_for_each_entry_safe(dev, next, &devlist, entry)
 +		ibscif_remove_dev(dev);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_qp.c b/drivers/infiniband/hw/scif/ibscif_qp.c
-new file mode 100644
-index 0000000..992a7a7
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_qp.c
-@@ -0,0 +1,825 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_qp.c b/drivers/infiniband/hw/scif/ibscif_qp.c
+--- a/drivers/infiniband/hw/scif/ibscif_qp.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_qp.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,868 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -7737,7 +7626,7 @@ index 0000000..992a7a7
 +
 +	kref_init(&qp->ref);
 +	init_completion(&qp->done);
-+	mutex_init(&qp->mutex);
++	init_MUTEX(&qp->modify_mutex);
 +	spin_lock_init(&qp->lock);
 +	ibscif_init_wire(&qp->wire);
 +	qp->sq_policy = attr->sq_sig_type;
@@ -7947,7 +7836,7 @@ index 0000000..992a7a7
 +	ibscif_cm_async_callback(qp->cm_context);
 +	qp->cm_context = NULL;
 +
-+	/* don't generate the error event because transitioning to IB_QPS_ERR
++	/* don't generate the error event because transitioning to IB_QPS_ERR 
 +           state is normal when a QP is disconnected */
 +
 +	//ibscif_qp_event(qp, IB_EVENT_QP_FATAL);
@@ -8077,12 +7966,12 @@ index 0000000..992a7a7
 +} qp_transition[NR_QP_STATES][NR_QP_STATES] = {
 +
 +	START_STATE(QP_IDLE)
-+		VALID_TRANSITION( QP_IDLE,	 MODIFY_ALLOWED	)
++		VALID_TRANSITION( QP_IDLE,	 MODIFY_ALLOWED	)	
 +		VALID_TRANSITION( QP_CONNECTED,	 MODIFY_ALLOWED	)
 +		INVAL_TRANSITION( QP_DISCONNECT			)
 +		VALID_TRANSITION( QP_ERROR,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)
++		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)	
++		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)	
 +	CEASE_STATE(QP_IDLE)
 +
 +	START_STATE(QP_CONNECTED)
@@ -8090,8 +7979,8 @@ index 0000000..992a7a7
 +		VALID_TRANSITION( QP_CONNECTED,	 MODIFY_INVALID	)
 +		VALID_TRANSITION( QP_DISCONNECT, MODIFY_INVALID	)
 +		VALID_TRANSITION( QP_ERROR,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)
++		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)	
++		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)	
 +	CEASE_STATE(QP_CONNECTED)
 +
 +	START_STATE(QP_DISCONNECT) /* Automatic transition to IDLE */
@@ -8099,8 +7988,8 @@ index 0000000..992a7a7
 +		INVAL_TRANSITION( QP_CONNECTED			)
 +		INVAL_TRANSITION( QP_DISCONNECT			)
 +		INVAL_TRANSITION( QP_ERROR			)
-+		INVAL_TRANSITION( QP_RESET			)
-+		INVAL_TRANSITION( QP_IGNORE			)
++		INVAL_TRANSITION( QP_RESET			)	
++		INVAL_TRANSITION( QP_IGNORE			)	
 +	CEASE_STATE(QP_DISCONNECT)
 +
 +	START_STATE(QP_ERROR)
@@ -8108,8 +7997,8 @@ index 0000000..992a7a7
 +		INVAL_TRANSITION( QP_CONNECTED			)
 +		INVAL_TRANSITION( QP_DISCONNECT			)
 +		VALID_TRANSITION( QP_ERROR,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)
++		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)	
++		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)	
 +	CEASE_STATE(QP_ERROR)
 +
 +	START_STATE(QP_RESET)
@@ -8117,8 +8006,8 @@ index 0000000..992a7a7
 +		INVAL_TRANSITION( QP_CONNECTED			)
 +		INVAL_TRANSITION( QP_DISCONNECT			)
 +		VALID_TRANSITION( QP_ERROR,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)
-+		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)
++		VALID_TRANSITION( QP_RESET,	 MODIFY_INVALID	)	
++		VALID_TRANSITION( QP_IGNORE,	 MODIFY_ALLOWED	)	
 +	CEASE_STATE(QP_RESET)
 +};
 +
@@ -8132,7 +8021,7 @@ index 0000000..992a7a7
 +	/*
 +	 * Mutex prevents simultaneous user-mode QP modifies.
 +	 */
-+	mutex_lock(&qp->mutex);
++	down(&qp->modify_mutex);
 +
 +	cur_state = qp->state;
 +
@@ -8162,6 +8051,48 @@ index 0000000..992a7a7
 +
 +		if (!qp_transition[cur_state][new_state].modify_allowed)
 +			goto out;
++
++		if ((attr_mask & IB_QP_AV)  && (attr->ah_attr.ah_flags & IB_AH_GRH) && check_grh) {
++			int remote_node_id = IBSCIF_LID_TO_NODE_ID(attr->ah_attr.dlid);
++			struct ibscif_conn *conn;
++			union ib_gid *dgid;
++
++			if (verbose)
++				printk(KERN_INFO PFX "%s: %d-->%d, DGID=%llx:%llx\n",
++					__func__, qp->local_node_id, remote_node_id,
++					__be64_to_cpu(attr->ah_attr.grh.dgid.global.subnet_prefix),
++					__be64_to_cpu(attr->ah_attr.grh.dgid.global.interface_id));
++
++			if (remote_node_id == qp->local_node_id) {
++				dgid = &qp->dev->gid;
++			}
++			else {
++				spin_lock(&qp->lock);
++				conn = ibscif_get_conn(qp->local_node_id, remote_node_id, 0);
++				spin_unlock(&qp->lock);
++				if (!conn) {
++					if (verbose)
++						printk(KERN_INFO PFX "%s: failed to make SCIF connection %d-->%d.\n",
++							__func__, qp->local_node_id, remote_node_id);
++					goto out;
++				}
++				dgid = &conn->remote_gid;
++				ibscif_put_conn(conn);
++			}
++
++			if (verbose)
++				printk(KERN_INFO PFX "%s: local GID[%d]=%llx:%llx\n",
++					__func__, remote_node_id,
++					__be64_to_cpu(dgid->global.subnet_prefix),
++					__be64_to_cpu(dgid->global.interface_id));
++
++			if (memcmp(dgid, &attr->ah_attr.grh.dgid, sizeof(*dgid))) {
++				if (verbose)
++					printk(KERN_INFO PFX "%s: connecting to DGID outside the box is unsupported.\n",
++						__func__);
++				goto out;
++			}
++		}
 +
 +		if (attr_mask & IB_QP_CAP) {
 +			sq_size = attr->cap.max_send_wr;
@@ -8242,7 +8173,7 @@ index 0000000..992a7a7
 +
 +	__ibscif_query_qp(qp, attr, NULL);
 +out:
-+	mutex_unlock(&qp->mutex);
++	up(&qp->modify_mutex);
 +	return err;
 +}
 +
@@ -8326,7 +8257,7 @@ index 0000000..992a7a7
 +	if (qp->ibqp.qp_type != IB_QPT_UD)
 +		return;
 +
-+
++	
 +	spin_lock_bh(&qp->lock);
 +
 +	for (i=0; i<IBSCIF_MAX_DEVICES; i++) {
@@ -8344,11 +8275,10 @@ index 0000000..992a7a7
 +done:
 +	spin_unlock_bh(&qp->lock);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_scheduler.c b/drivers/infiniband/hw/scif/ibscif_scheduler.c
-new file mode 100644
-index 0000000..30e5a9f
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_scheduler.c
++
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_scheduler.c b/drivers/infiniband/hw/scif/ibscif_scheduler.c
+--- a/drivers/infiniband/hw/scif/ibscif_scheduler.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_scheduler.c	2014-09-08 13:57:08.000000000 -0700
 @@ -0,0 +1,195 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -8477,9 +8407,9 @@ index 0000000..30e5a9f
 +	if (unlikely(err))
 +		ibscif_qp_internal_disconnect(wq->qp, IBSCIF_REASON_QP_FATAL);
 +
-+	if (fast_rdma && need_call_sq_completions)
++	if (fast_rdma && need_call_sq_completions) 
 +		ibscif_process_sq_completions(wq->qp);
-+
++		
 +	return err;
 +}
 +
@@ -8499,7 +8429,7 @@ index 0000000..30e5a9f
 +
 +	while (atomic_xchg(&dev->was_new, 0)) {
 +		/* Bail if the device is busy. */
-+		if (!spin_trylock_bh(&dev->lock))
++		if (down_trylock(&dev->mutex))
 +			goto out;
 +
 +		/*
@@ -8512,14 +8442,14 @@ index 0000000..30e5a9f
 +			if (!ibscif_schedule_wq(wq)) {
 +				DEV_STAT(dev, sched_exhaust++);
 +				list_splice(&processed, dev->wq_list.prev);
-+				spin_unlock_bh(&dev->lock);
++				up(&dev->mutex);
 +				goto out;
 +			}
 +			list_move_tail(&wq->entry, &processed);
 +		}
 +		list_splice(&processed, dev->wq_list.prev);
 +
-+		spin_unlock_bh(&dev->lock);
++		up(&dev->mutex);
 +	}
 +	return;
 +out:
@@ -8530,27 +8460,25 @@ index 0000000..30e5a9f
 +{
 +	struct ibscif_dev *dev = qp->dev;
 +
-+	spin_lock_bh(&dev->lock);
++	down(&dev->mutex);
 +	list_add_tail(&qp->sq.entry, &dev->wq_list);
 +	list_add_tail(&qp->iq.entry, &dev->wq_list);
-+	spin_unlock_bh(&dev->lock);
++	up(&dev->mutex);
 +}
 +
 +void ibscif_scheduler_remove_qp(struct ibscif_qp *qp)
 +{
 +	struct ibscif_dev *dev = qp->dev;
 +
-+	spin_lock_bh(&dev->lock);
++	down(&dev->mutex);
 +	list_del(&qp->sq.entry);
 +	list_del(&qp->iq.entry);
-+	spin_unlock_bh(&dev->lock);
++	up(&dev->mutex);
 +}
-diff --git a/drivers/infiniband/hw/scif/ibscif_util.c b/drivers/infiniband/hw/scif/ibscif_util.c
-new file mode 100644
-index 0000000..7433203
---- /dev/null
-+++ b/drivers/infiniband/hw/scif/ibscif_util.c
-@@ -0,0 +1,574 @@
+diff -ruN a/drivers/infiniband/hw/scif/ibscif_util.c b/drivers/infiniband/hw/scif/ibscif_util.c
+--- a/drivers/infiniband/hw/scif/ibscif_util.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/ibscif_util.c	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,623 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -8596,13 +8524,24 @@ index 0000000..7433203
 +#define IBSCIF_CONN_REJ 2
 +#define IBSCIF_CONN_ERR 3
 +
++struct ibscif_conn_resp {
++	int cmd;
++	union ib_gid gid;
++};
++
 +void ibscif_do_accept(struct ibscif_dev *dev)
 +{
 +	struct scif_portID peer;
 +	scif_epd_t ep;
 +	struct ibscif_conn *conn;
 +	int ret;
-+	int resp;
++	struct ibscif_conn_resp resp;
++	int resp_size;
++
++	if (check_grh)
++		resp_size = sizeof(resp);
++	else
++		resp_size = sizeof(int);
 +
 +	ret = scif_accept(dev->listen_ep, &peer, &ep, SCIF_ACCEPT_SYNC);
 +	if (ret) {
@@ -8611,73 +8550,89 @@ index 0000000..7433203
 +	}
 +
 +	if (verbose)
-+		printk(KERN_INFO "%s: %d<--%d\n", __func__, dev->node_id, peer.node);
++		printk(KERN_INFO PFX "%s: %d<--%d\n", __func__, dev->node_id, peer.node);
++
++	if (check_grh)
++		memcpy(&resp.gid, &dev->gid, sizeof(resp.gid));
 +
 +	spin_lock(&conn_state_lock);
 +	switch (conn_state[dev->node_id][peer.node]) {
 +	  case IBSCIF_CONN_IDLE:
 +		conn_state[dev->node_id][peer.node] = IBSCIF_CONN_REQ_RCVD;
-+		resp = IBSCIF_CONN_REP;
++		resp.cmd = IBSCIF_CONN_REP;
 +		if (verbose)
-+			printk(KERN_INFO "%s: no double connection, accepting\n", __func__);
++			printk(KERN_INFO PFX "%s: no double connection, accepting\n", __func__);
 +		break;
 +
 +	  case IBSCIF_CONN_REQ_SENT:
 +		/* A connection request has been sent, but no response yet. Node id is used to
-+		 * break the tie when both side send the connection request. One side is allowed
-+		 * to accept the request and its own request will be rejected by the peer.
-+		 */
++ 		 * break the tie when both side send the connection request. One side is allowed
++ 		 * to accept the request and its own request will be rejected by the peer.
++ 		 */
 +		if (dev->node_id > peer.node) {
-+			resp = IBSCIF_CONN_REJ;
++			resp.cmd = IBSCIF_CONN_REJ;
 +			if (verbose)
-+				printk(KERN_INFO "%s: double connection, rejecting (peer will accept)\n", __func__);
++				printk(KERN_INFO PFX "%s: double connection, rejecting (peer will accept)\n", __func__);
 +		}
 +		else if (dev->node_id == peer.node) {
 +			conn_state[dev->node_id][peer.node] = IBSCIF_CONN_REQ_RCVD;
-+			resp = IBSCIF_CONN_REP;
++			resp.cmd = IBSCIF_CONN_REP;
 +			if (verbose)
-+				printk(KERN_INFO "%s: loopback connection, accepting\n", __func__);
++				printk(KERN_INFO PFX "%s: loopback connection, accepting\n", __func__);
 +		}
 +		else {
 +			conn_state[dev->node_id][peer.node] = IBSCIF_CONN_REQ_RCVD;
-+			resp = IBSCIF_CONN_REP;
++			resp.cmd = IBSCIF_CONN_REP;
 +			if (verbose)
-+				printk(KERN_INFO "%s: double connection, accepting (peer will reject)\n", __func__);
++				printk(KERN_INFO PFX "%s: double connection, accepting (peer will reject)\n", __func__);
 +		}
 +		break;
 +
 +	  case IBSCIF_CONN_REQ_RCVD:
 +		if (verbose)
-+			printk(KERN_INFO "%s: duplicated connection request, rejecting\n", __func__);
-+		resp = IBSCIF_CONN_REJ;
++			printk(KERN_INFO PFX "%s: duplicated connection request, rejecting\n", __func__);
++		resp.cmd = IBSCIF_CONN_REJ;
 +		break;
 +
 +	  case IBSCIF_CONN_ESTABLISHED:
 +	  case IBSCIF_CONN_ACTIVE:
 +		if (verbose)
-+			printk(KERN_INFO "%s: already connected, rejecting\n", __func__);
-+		resp = IBSCIF_CONN_REJ;
++			printk(KERN_INFO PFX "%s: already connected, rejecting\n", __func__);
++		resp.cmd = IBSCIF_CONN_REJ;
 +		break;
 +
 +	  default:
 +		if (verbose)
-+			printk(KERN_INFO "%s: invalid state: %d\n", __func__, conn_state[dev->node_id][peer.node]);
-+		resp = IBSCIF_CONN_ERR;
++			printk(KERN_INFO PFX "%s: invalid state: %d\n", __func__, conn_state[dev->node_id][peer.node]);
++		resp.cmd = IBSCIF_CONN_ERR;
 +		break;
 +	}
 +	spin_unlock(&conn_state_lock);
 +
-+	ret = scif_send(ep, &resp, sizeof(resp), SCIF_SEND_BLOCK);
++	ret = scif_send(ep, &resp, resp_size, SCIF_SEND_BLOCK);
 +	if (ret < 0) {
 +		printk(KERN_ALERT PFX "%s: scif_send returns %d\n", __func__, ret);
++		scif_close(ep);
 +		return;
 +	}
 +
-+	if (resp != IBSCIF_CONN_REP) {
++	if (resp.cmd != IBSCIF_CONN_REP) {
 +		/* one additional hand shaking to prevent the previous send from being trashed by ep closing */
-+		scif_recv(ep, &resp, sizeof(resp), SCIF_RECV_BLOCK);
++		scif_recv(ep, &resp, resp_size, SCIF_RECV_BLOCK);
 +		scif_close(ep);
 +		return;
++	}
++
++	if (check_grh) {
++		ret = scif_recv(ep, &resp, resp_size, SCIF_RECV_BLOCK);
++		if (ret < 0) {
++			printk(KERN_ALERT PFX "%s: scif_recv returns %d\n", __func__, ret);
++			scif_close(ep);
++			spin_lock(&conn_state_lock);
++			conn_state[dev->node_id][peer.node] = IBSCIF_CONN_IDLE;
++			spin_unlock(&conn_state_lock);
++			return;
++		}
 +	}
 +
 +	conn = kzalloc(sizeof (*conn), GFP_KERNEL);
@@ -8692,6 +8647,8 @@ index 0000000..7433203
 +
 +	conn->ep = ep;
 +	conn->remote_node_id = peer.node;
++	if (check_grh)
++		memcpy(&conn->remote_gid, &resp.gid, sizeof(conn->remote_gid));
 +	conn->dev = dev;
 +	atomic_set(&conn->refcnt, 0);
 +
@@ -8700,15 +8657,15 @@ index 0000000..7433203
 +	spin_unlock(&conn_state_lock);
 +
 +	if (verbose)
-+		printk(KERN_INFO "%s: connection established. ep=%p\n", __func__, ep);
++		printk(KERN_INFO PFX "%s: connection established. ep=%p\n", __func__, ep);
 +
 +	ibscif_refresh_mreg(conn);
 +
 +	/* one addition sync to ensure the MRs are registered with the new ep at both side */
-+	scif_send(ep, &resp, sizeof(resp), SCIF_SEND_BLOCK);
-+	scif_recv(ep, &resp, sizeof(resp), SCIF_RECV_BLOCK);
++	scif_send(ep, &resp, resp_size, SCIF_SEND_BLOCK);
++	scif_recv(ep, &resp, resp_size, SCIF_RECV_BLOCK);
 +
-+	list_add(&conn->entry, &dev->conn_list);
++	list_add(&conn->entry, &dev->conn_list); 
 +	ibscif_refresh_pollep_list();
 +
 +	spin_lock(&conn_state_lock);
@@ -8722,10 +8679,17 @@ index 0000000..7433203
 +	struct ibscif_conn *conn = NULL;
 +	int ret;
 +	scif_epd_t ep;
-+	int resp;
++	struct ibscif_conn_resp resp;
++	union ib_gid peer_gid;
++	int resp_size;
++
++	if (check_grh)
++		resp_size = sizeof(resp);
++	else
++		resp_size = sizeof(int);
 +
 +	if (verbose)
-+		printk(KERN_INFO "%s: %d-->%d\n", __func__, dev->node_id, remote_node_id);
++		printk(KERN_INFO PFX "%s: %d-->%d\n", __func__, dev->node_id, remote_node_id);
 +
 +	/* Validate remote_node_id for conn_state array check */
 +	if ((remote_node_id < 0) || (remote_node_id >= IBSCIF_MAX_DEVICES))
@@ -8735,7 +8699,7 @@ index 0000000..7433203
 +	if (conn_state[dev->node_id][remote_node_id] != IBSCIF_CONN_IDLE) {
 +		spin_unlock(&conn_state_lock);
 +		if (verbose)
-+			printk(KERN_INFO "%s: connection already in progress, retry\n", __func__);
++			printk(KERN_INFO PFX "%s: connection already in progress, retry\n", __func__);
 +		return ERR_PTR(-EAGAIN);
 +	}
 +	conn_state[dev->node_id][remote_node_id] = IBSCIF_CONN_REQ_SENT;
@@ -8743,7 +8707,7 @@ index 0000000..7433203
 +
 +	ep = scif_open();
 +	if (!ep) /* SCIF API semantics */
-+		goto out_state;
++		goto out_state; 
 +
 +	if (IS_ERR(ep)) /* SCIF emulator semantics */
 +		goto out_state;
@@ -8752,36 +8716,46 @@ index 0000000..7433203
 +	dest.port = SCIF_OFED_PORT_0;
 +
 +	ret = scif_connect(ep, &dest);
-+	if (ret < 0)
++	if (ret < 0) 
 +		goto out_close;
 +
 +	/* Now ret is the port number ep is bound to */
 +
-+	ret = scif_recv(ep, &resp, sizeof(resp), SCIF_RECV_BLOCK);
++	ret = scif_recv(ep, &resp, resp_size, SCIF_RECV_BLOCK);
 +	if (ret < 0) {
 +		printk(KERN_ALERT PFX "%s: scif_recv returns %d\n", __func__, ret);
 +		goto out_close;
 +	}
 +
-+	if (resp != IBSCIF_CONN_REP) {
-+		scif_send(ep, &resp, sizeof(resp), SCIF_SEND_BLOCK);
++	if (resp.cmd != IBSCIF_CONN_REP) {
++		scif_send(ep, &resp, resp_size, SCIF_SEND_BLOCK);
 +		/* the peer has issued the connection request */
-+		if (resp == IBSCIF_CONN_REJ) {
++		if (resp.cmd == IBSCIF_CONN_REJ) {
 +			if (verbose)
-+				printk(KERN_INFO "%s: rejected by peer due to double connection\n", __func__);
++				printk(KERN_INFO PFX "%s: rejected by peer due to double connection\n", __func__);
 +			scif_close(ep);
 +			/* don't reset the state becasue it's used for checking connection state */
 +			return ERR_PTR(-EAGAIN);
 +		}
 +		else {
 +			if (verbose)
-+				printk(KERN_INFO "%s: rejected by peer due to invalid state\n", __func__);
++				printk(KERN_INFO PFX "%s: rejected by peer due to invalid state\n", __func__);
++			goto out_close;
++		}
++	}
++
++	if (check_grh) {
++		memcpy(&peer_gid, &resp.gid, sizeof(peer_gid));
++		memcpy(&resp.gid, &dev->gid, sizeof(resp.gid));
++		ret = scif_send(ep, &resp, resp_size, SCIF_SEND_BLOCK);
++		if (ret < 0) {
++			printk(KERN_ALERT PFX "%s: scif_send returns %d\n", __func__, ret);
 +			goto out_close;
 +		}
 +	}
 +
 +	if (verbose)
-+		printk(KERN_INFO "%s: connection established. ep=%p\n", __func__, ep);
++		printk(KERN_INFO PFX "%s: connection established. ep=%p\n", __func__, ep);
 +
 +	spin_lock(&conn_state_lock);
 +	conn_state[dev->node_id][remote_node_id] = IBSCIF_CONN_ESTABLISHED;
@@ -8795,14 +8769,16 @@ index 0000000..7433203
 +
 +	conn->ep = ep;
 +	conn->remote_node_id = remote_node_id;
++	if (check_grh)
++		memcpy(&conn->remote_gid, &peer_gid, sizeof(conn->remote_gid));
 +	conn->dev = dev;
 +	atomic_set(&conn->refcnt, 0);
 +
 +	ibscif_refresh_mreg(conn);
 +
 +	/* one addition sync to ensure the MRs are registered with the new ep at both side */
-+	scif_send(ep, &resp, sizeof(resp), SCIF_SEND_BLOCK);
-+	scif_recv(ep, &resp, sizeof(resp), SCIF_RECV_BLOCK);
++	scif_send(ep, &resp, resp_size, SCIF_SEND_BLOCK);
++	scif_recv(ep, &resp, resp_size, SCIF_RECV_BLOCK);
 +
 +	list_add_tail(&conn->entry, &dev->conn_list);
 +	ibscif_refresh_pollep_list();
@@ -8830,14 +8806,14 @@ index 0000000..7433203
 +	struct ibscif_conn *conn, *conn1, *conn2;
 +	int done=0, err=0, connect_tried=0;
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_for_each_entry_safe(cur, next, &devlist, entry) {
 +		if (cur->node_id == node_id) {
 +			dev = cur;
 +			break;
 +		}
 +	}
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	if (!dev)
 +		return NULL;
@@ -8845,7 +8821,7 @@ index 0000000..7433203
 +again:
 +	conn1 = NULL;
 +	conn2 = NULL;
-+	spin_lock(&dev->lock);
++	down(&dev->mutex);
 +	list_for_each_entry(conn, &dev->conn_list, entry)
 +	{
 +		if (conn->remote_node_id == remote_node_id) {
@@ -8859,7 +8835,7 @@ index 0000000..7433203
 +					break;
 +				}
 +			}
-+			spin_unlock(&dev->lock);
++			up(&dev->mutex);
 +			atomic_inc(&conn->refcnt);
 +			if (conn->local_close) {
 +				conn->local_close = 0;
@@ -8868,11 +8844,11 @@ index 0000000..7433203
 +			return conn;
 +		}
 +	}
-+	spin_unlock(&dev->lock);
++	up(&dev->mutex);
 +
 +	/* for loopback connections, we must wait for both endpoints be in the list to ensure that
-+	 * different endpoints are assigned to the two sides
-+	 */
++ 	 * different endpoints are assigned to the two sides
++ 	 */
 +	if (node_id == remote_node_id) {
 +		if (conn1 && conn2) {
 +			conn = find_local_peer ? conn2 : conn1;
@@ -8890,7 +8866,7 @@ index 0000000..7433203
 +	}
 +
 +	if (connect_tried) {
-+		printk(KERN_ALERT "%s: ERROR: cannot get connection (%d-->%d) after waiting, state=%d\n",
++		printk(KERN_ALERT PFX "%s: ERROR: cannot get connection (%d-->%d) after waiting, state=%d\n", 
 +				__func__, dev->node_id, remote_node_id, err-1);
 +		return NULL;
 +	}
@@ -8928,7 +8904,7 @@ index 0000000..7433203
 +		return;
 +
 +	if (atomic_dec_and_test(&conn->refcnt)) {
-+		// printk(KERN_INFO "%s: local_close, conn=%p, remote_close=%d\n", __func__, conn, conn->remote_close);
++		// printk(KERN_INFO PFX "%s: local_close, conn=%p, remote_close=%d\n", __func__, conn, conn->remote_close);
 +		ibscif_send_close(conn);
 +		conn->local_close = 1;
 +	}
@@ -8942,7 +8918,7 @@ index 0000000..7433203
 +	int i = 0;
 +	int max = *count;
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_for_each_entry(dev, &devlist, entry) {
 +		if (i >= max)
 +			break;
@@ -8951,13 +8927,13 @@ index 0000000..7433203
 +		polleps[i].events = POLLIN;
 +		polleps[i].revents = 0;
 +		devs[i] = dev;
-+		types[i] = IBSCIF_EP_TYPE_LISTEN;
++		types[i] = IBSCIF_EP_TYPE_LISTEN; 
 +		conns[i] = NULL;
 +		i++;
 +		if (verbose)
-+			printk(KERN_INFO "%s: ep=%p (%d:listen)\n", __func__, dev->listen_ep, dev->node_id);
++			printk(KERN_INFO PFX "%s: ep=%p (%d:listen)\n", __func__, dev->listen_ep, dev->node_id);
 +
-+		spin_lock(&dev->lock);
++		down(&dev->mutex);
 +		list_for_each_entry(conn, &dev->conn_list, entry)
 +		{
 +			if (i >= max)
@@ -8966,18 +8942,18 @@ index 0000000..7433203
 +			polleps[i].events = POLLIN;
 +			polleps[i].revents = 0;
 +			devs[i] = dev;
-+			types[i] = IBSCIF_EP_TYPE_COMM;
++			types[i] = IBSCIF_EP_TYPE_COMM; 
 +			conns[i] = conn;
 +			i++;
 +			if (verbose)
-+				printk(KERN_INFO "%s: ep=%p (%d<--->%d)\n", __func__, conn->ep, dev->node_id, conn->remote_node_id);
++				printk(KERN_INFO PFX "%s: ep=%p (%d<--->%d)\n", __func__, conn->ep, dev->node_id, conn->remote_node_id);
 +		}
-+		spin_unlock(&dev->lock);
++		up(&dev->mutex);
 +	}
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	if (verbose)
-+		printk(KERN_INFO "%s: count=%d\n", __func__, i);
++		printk(KERN_INFO PFX "%s: count=%d\n", __func__, i);
 +	*count = i;
 +}
 +
@@ -8988,12 +8964,12 @@ index 0000000..7433203
 +	int i = 0;
 +	int max = *count;
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_for_each_entry(dev, &devlist, entry) {
 +		if (i >= max)
 +			break;
 +
-+		spin_lock(&dev->lock);
++		down(&dev->mutex);
 +		list_for_each_entry(conn, &dev->conn_list, entry)
 +		{
 +			if (i >= max)
@@ -9001,9 +8977,9 @@ index 0000000..7433203
 +			eps[i] = conn->ep;
 +			i++;
 +		}
-+		spin_unlock(&dev->lock);
++		up(&dev->mutex);
 +	}
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	*count = i;
 +}
@@ -9011,7 +8987,7 @@ index 0000000..7433203
 +void ibscif_remove_ep(struct ibscif_dev *dev, scif_epd_t ep)
 +{
 +	struct ibscif_conn *conn, *next;
-+	spin_lock(&dev->lock);
++	down(&dev->mutex);
 +	list_for_each_entry_safe(conn, next, &dev->conn_list, entry)
 +	{
 +		if (conn->ep == ep) {
@@ -9021,7 +8997,7 @@ index 0000000..7433203
 +			list_del(&conn->entry);
 +		}
 +	}
-+	spin_unlock(&dev->lock);
++	up(&dev->mutex);
 +}
 +
 +
@@ -9038,9 +9014,9 @@ index 0000000..7433203
 +	struct ibscif_conn *idle_conns[IBSCIF_MAX_DEVICES];
 +	int i, n=0;
 +
-+	spin_lock_bh(&devlist_lock);
++	down(&devlist_mutex);
 +	list_for_each_entry(dev, &devlist, entry) {
-+		spin_lock(&dev->lock);
++		down(&dev->mutex);
 +		list_for_each_entry_safe(conn, next, &dev->conn_list, entry)
 +		{
 +			if (conn->local_close && conn->remote_close) {
@@ -9051,15 +9027,15 @@ index 0000000..7433203
 +				idle_conns[n++] = conn;
 +			}
 +		}
-+		spin_unlock(&dev->lock);
++		up(&dev->mutex);
 +	}
-+	spin_unlock_bh(&devlist_lock);
++	up(&devlist_mutex);
 +
 +	for (i=0; i<n; i++)
 +		ibscif_free_conn(idle_conns[i]);
 +
-+	if (n)
-+		printk(KERN_ALERT "%s: n=%d\n", __func__, n);
++	if (n && verbose)
++		printk(KERN_ALERT PFX "%s: n=%d\n", __func__, n);
 +
 +	return n;
 +}
@@ -9076,7 +9052,7 @@ index 0000000..7433203
 +	static struct timeval t0;
 +	static struct timeval t;
 +	uint32_t usec;
-+
++	
 +	if (first) {
 +		do_gettimeofday(&t0);
 +		first = 0;
@@ -9085,7 +9061,7 @@ index 0000000..7433203
 +
 +	do_gettimeofday(&t);
 +	usec = (t.tv_sec - t0.tv_sec) * 1000000UL;
-+	if (t.tv_usec >= t0.tv_usec)
++	if (t.tv_usec >= t0.tv_usec) 
 +		usec += (t.tv_usec - t0.tv_usec);
 +	else
 +		usec -= (t0.tv_usec - t.tv_usec);
@@ -9125,6 +9101,57 @@ index 0000000..7433203
 +		}
 +	}
 +}
--- 
-1.8.3.1
-
++
+diff -ruN a/drivers/infiniband/hw/scif/Kconfig b/drivers/infiniband/hw/scif/Kconfig
+--- a/drivers/infiniband/hw/scif/Kconfig	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/Kconfig	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,4 @@
++config INFINIBAND_SCIF
++	tristate "SCIF RDMA driver support"
++	---help---
++	  RDMA over SCIF driver.
+diff -ruN a/drivers/infiniband/hw/scif/Makefile b/drivers/infiniband/hw/scif/Makefile
+--- a/drivers/infiniband/hw/scif/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/hw/scif/Makefile	2014-09-08 13:57:08.000000000 -0700
+@@ -0,0 +1,41 @@
++ifneq ($(KERNELRELEASE),)
++
++# Original Make begins
++
++obj-$(CONFIG_INFINIBAND_SCIF) += ibscif.o
++
++ibscif-y :=	ibscif_main.o		\
++		ibscif_ah.o		\
++		ibscif_pd.o		\
++		ibscif_cq.o		\
++		ibscif_qp.o		\
++		ibscif_mr.o		\
++		ibscif_cm.o		\
++		ibscif_post.o		\
++		ibscif_procfs.o		\
++		ibscif_loopback.o	\
++		ibscif_provider.o	\
++		ibscif_protocol.o	\
++		ibscif_scheduler.o	\
++		ibscif_util.o
++
++# Original Makefile ends
++
++else
++
++ifeq ($(KVER),)
++  ifeq ($(KDIR),)
++    KDIR := /lib/modules/$(shell uname -r)/build
++  endif
++else
++  KDIR := /lib/modules/$(KVER)/build
++endif
++
++all:
++	$(MAKE) -C $(KDIR) SUBDIRS=$(shell pwd) CONFIG_INFINIBAND_SCIF=m
++
++clean:
++	rm -rf *.o *.ko *.mod.c .*.cmd Module.* .tmp_versions
++
++endif
++
