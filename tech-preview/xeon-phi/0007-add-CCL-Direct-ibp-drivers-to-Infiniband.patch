@@ -1,139 +1,6 @@
-From 7d4073157ee8c20908724869b9915b3a0a6dcd49 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Fri, 11 Jul 2014 12:16:12 -0700
-Subject: [PATCH 07/12] add CCL-Direct (ibp) drivers to Infiniband
-
-This includes the base ibp server module as well as
-the server modules for sa and cm
-
-Signed-off-by: Phil Cayton <phil.cayton@intel.com>
-Signed-off-by: Jay Sternberg <jay.e.sternberg@intel.com>
----
- drivers/infiniband/ibp/Kconfig            |   16 +
- drivers/infiniband/ibp/Makefile           |    3 +
- drivers/infiniband/ibp/cm/Makefile        |   21 +
- drivers/infiniband/ibp/cm/cm_ibp_abi.h    |  399 ++++
- drivers/infiniband/ibp/cm/cm_server_msg.c | 1055 +++++++++++
- drivers/infiniband/ibp/cm/common.h        |  106 ++
- drivers/infiniband/ibp/cm/ibp-abi.h       |   94 +
- drivers/infiniband/ibp/cm/ibp_exports.h   |   50 +
- drivers/infiniband/ibp/cm/server.c        |  191 ++
- drivers/infiniband/ibp/cm/server.h        |  127 ++
- drivers/infiniband/ibp/cm/server_msg.c    |  160 ++
- drivers/infiniband/ibp/drv/Makefile       |   21 +
- drivers/infiniband/ibp/drv/common.h       |  109 ++
- drivers/infiniband/ibp/drv/ibp-abi.h      |  649 +++++++
- drivers/infiniband/ibp/drv/ibp.h          |  257 +++
- drivers/infiniband/ibp/drv/server.c       |  587 ++++++
- drivers/infiniband/ibp/drv/server.h       |  175 ++
- drivers/infiniband/ibp/drv/server_msg.c   | 2899 +++++++++++++++++++++++++++++
- drivers/infiniband/ibp/drv/stack.c        |  102 +
- drivers/infiniband/ibp/drv/stack.h        |   57 +
- drivers/infiniband/ibp/sa/Makefile        |   21 +
- drivers/infiniband/ibp/sa/common.h        |  108 ++
- drivers/infiniband/ibp/sa/ibp-abi.h       |  101 +
- drivers/infiniband/ibp/sa/ibp_exports.h   |   49 +
- drivers/infiniband/ibp/sa/sa_ibp_abi.h    |  251 +++
- drivers/infiniband/ibp/sa/sa_server_msg.c |  973 ++++++++++
- drivers/infiniband/ibp/sa/sa_table.h      |  131 ++
- drivers/infiniband/ibp/sa/server.c        |  193 ++
- drivers/infiniband/ibp/sa/server.h        |  166 ++
- drivers/infiniband/ibp/sa/server_msg.c    |  152 ++
- 30 files changed, 9223 insertions(+)
- create mode 100644 drivers/infiniband/ibp/Kconfig
- create mode 100644 drivers/infiniband/ibp/Makefile
- create mode 100644 drivers/infiniband/ibp/cm/Makefile
- create mode 100644 drivers/infiniband/ibp/cm/cm_ibp_abi.h
- create mode 100644 drivers/infiniband/ibp/cm/cm_server_msg.c
- create mode 100644 drivers/infiniband/ibp/cm/common.h
- create mode 100644 drivers/infiniband/ibp/cm/ibp-abi.h
- create mode 100644 drivers/infiniband/ibp/cm/ibp_exports.h
- create mode 100644 drivers/infiniband/ibp/cm/server.c
- create mode 100644 drivers/infiniband/ibp/cm/server.h
- create mode 100644 drivers/infiniband/ibp/cm/server_msg.c
- create mode 100644 drivers/infiniband/ibp/drv/Makefile
- create mode 100644 drivers/infiniband/ibp/drv/common.h
- create mode 100644 drivers/infiniband/ibp/drv/ibp-abi.h
- create mode 100644 drivers/infiniband/ibp/drv/ibp.h
- create mode 100644 drivers/infiniband/ibp/drv/server.c
- create mode 100644 drivers/infiniband/ibp/drv/server.h
- create mode 100644 drivers/infiniband/ibp/drv/server_msg.c
- create mode 100644 drivers/infiniband/ibp/drv/stack.c
- create mode 100644 drivers/infiniband/ibp/drv/stack.h
- create mode 100644 drivers/infiniband/ibp/sa/Makefile
- create mode 100644 drivers/infiniband/ibp/sa/common.h
- create mode 100644 drivers/infiniband/ibp/sa/ibp-abi.h
- create mode 100644 drivers/infiniband/ibp/sa/ibp_exports.h
- create mode 100644 drivers/infiniband/ibp/sa/sa_ibp_abi.h
- create mode 100644 drivers/infiniband/ibp/sa/sa_server_msg.c
- create mode 100644 drivers/infiniband/ibp/sa/sa_table.h
- create mode 100644 drivers/infiniband/ibp/sa/server.c
- create mode 100644 drivers/infiniband/ibp/sa/server.h
- create mode 100644 drivers/infiniband/ibp/sa/server_msg.c
-
-diff --git a/drivers/infiniband/ibp/Kconfig b/drivers/infiniband/ibp/Kconfig
-new file mode 100644
-index 0000000..341600b
---- /dev/null
-+++ b/drivers/infiniband/ibp/Kconfig
-@@ -0,0 +1,16 @@
-+config IBP_SERVER
-+	tristate "CCL Direct IB Server drivers"
-+	---help---
-+	  Server drivers for CCL Direct including server proxies for
-+	  hw drivers, and core drivers ib_sa and ib_cm.
-+	  Also includes is a kernel mode test module
-+
-+	  To compile this driver as a module, choose M here.
-+	  If unsure, say N.
-+
-+config IBP_DEBUG
-+	bool "CCL Direct debugging"
-+	depends on IBP_SERVER
-+	default y
-+	---help---
-+	  This option causes debug code to be compiled into the CCL Direct drivers.
-diff --git a/drivers/infiniband/ibp/Makefile b/drivers/infiniband/ibp/Makefile
-new file mode 100644
-index 0000000..52212eb
---- /dev/null
-+++ b/drivers/infiniband/ibp/Makefile
-@@ -0,0 +1,3 @@
-+obj-$(CONFIG_IBP_SERVER)		+= drv/
-+obj-$(CONFIG_IBP_SERVER)		+= cm/
-+obj-$(CONFIG_IBP_SERVER)		+= sa/
-diff --git a/drivers/infiniband/ibp/cm/Makefile b/drivers/infiniband/ibp/cm/Makefile
-new file mode 100644
-index 0000000..5bb1b0a
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/Makefile
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
-+
-+obj-$(CONFIG_IBP_SERVER) += ibp_cm_server.o
-+
-+ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
-+
-+ibp_cm_server-y :=	server.o		\
-+			server_msg.o		\
-+			cm_server_msg.o
-+
-+default:
-+	$(MAKE) -C $(KDIR) M=`pwd`
-+
-+modules_install:
-+	$(MAKE) -C $(KDIR) M=`pwd` modules_install
-+
-+clean:
-+	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
-+
-+unix:
-+	dos2unix *.[ch] Kconfig Makefile
-diff --git a/drivers/infiniband/ibp/cm/cm_ibp_abi.h b/drivers/infiniband/ibp/cm/cm_ibp_abi.h
-new file mode 100644
-index 0000000..94d03b0
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/cm_ibp_abi.h
+diff -ruN a/drivers/infiniband/ibp/cm/cm_ibp_abi.h b/drivers/infiniband/ibp/cm/cm_ibp_abi.h
+--- a/drivers/infiniband/ibp/cm/cm_ibp_abi.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/cm_ibp_abi.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,399 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -534,11 +401,9 @@ index 0000000..94d03b0
 +};
 +
 +#endif /* CM_IBP_ABI_H */
-diff --git a/drivers/infiniband/ibp/cm/cm_server_msg.c b/drivers/infiniband/ibp/cm/cm_server_msg.c
-new file mode 100644
-index 0000000..b2b11d9
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/cm_server_msg.c
+diff -ruN a/drivers/infiniband/ibp/cm/cm_server_msg.c b/drivers/infiniband/ibp/cm/cm_server_msg.c
+--- a/drivers/infiniband/ibp/cm/cm_server_msg.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/cm_server_msg.c	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,1055 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -574,7 +439,7 @@ index 0000000..b2b11d9
 +
 +#include "server.h"
 +
-+static LIST_HEAD(cm_entry_list);
++LIST_HEAD(cm_entry_list);
 +
 +void ibp_copy_sa_path_rec(struct ibp_sa_path_rec *a, struct ib_sa_path_rec *b)
 +{
@@ -1595,11 +1460,9 @@ index 0000000..b2b11d9
 +
 +	return ibp_send(client->ep, msg, len);
 +}
-diff --git a/drivers/infiniband/ibp/cm/common.h b/drivers/infiniband/ibp/cm/common.h
-new file mode 100644
-index 0000000..0f59551
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/common.h
+diff -ruN a/drivers/infiniband/ibp/cm/common.h b/drivers/infiniband/ibp/cm/common.h
+--- a/drivers/infiniband/ibp/cm/common.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/common.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,106 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1699,7 +1562,7 @@ index 0000000..0f59551
 +#define print_trace(f, arg...) PRINTK(IBP_DEBUG_VERBOSE, KERN_ERR, f, ##arg)
 +#endif
 +
-+#ifndef	IBP_CM_PORT		/* unique scif port for this service */
++#ifndef IBP_CM_PORT		/* unique scif port for this service */
 +#define IBP_CM_PORT		SCIF_OFED_PORT_3
 +#endif
 +
@@ -1707,11 +1570,9 @@ index 0000000..0f59551
 +int ibp_recv(scif_epd_t ep, void *buf, size_t len);
 +
 +#endif /* COMMON_H */
-diff --git a/drivers/infiniband/ibp/cm/ibp-abi.h b/drivers/infiniband/ibp/cm/ibp-abi.h
-new file mode 100644
-index 0000000..1645867
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/ibp-abi.h
+diff -ruN a/drivers/infiniband/ibp/cm/ibp-abi.h b/drivers/infiniband/ibp/cm/ibp-abi.h
+--- a/drivers/infiniband/ibp/cm/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/ibp-abi.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,94 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1807,11 +1668,9 @@ index 0000000..1645867
 +};
 +
 +#endif /* IBP_ABI_H */
-diff --git a/drivers/infiniband/ibp/cm/ibp_exports.h b/drivers/infiniband/ibp/cm/ibp_exports.h
-new file mode 100644
-index 0000000..09c5dfe
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/ibp_exports.h
+diff -ruN a/drivers/infiniband/ibp/cm/ibp_exports.h b/drivers/infiniband/ibp/cm/ibp_exports.h
+--- a/drivers/infiniband/ibp/cm/ibp_exports.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/ibp_exports.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1863,12 +1722,35 @@ index 0000000..09c5dfe
 +
 +
 +#endif /* IBP_EXPORTS_H */
-diff --git a/drivers/infiniband/ibp/cm/server.c b/drivers/infiniband/ibp/cm/server.c
-new file mode 100644
-index 0000000..11da9ef
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/server.c
-@@ -0,0 +1,191 @@
+diff -ruN a/drivers/infiniband/ibp/cm/Makefile b/drivers/infiniband/ibp/cm/Makefile
+--- a/drivers/infiniband/ibp/cm/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/Makefile	2014-09-03 10:42:06.000000000 -0700
+@@ -0,0 +1,21 @@
++KDIR ?= /lib/modules/`uname -r`/build
++
++obj-$(CONFIG_IBP_SERVER) += ibp_cm_server.o
++
++ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
++
++ibp_cm_server-y :=	server.o		\
++			server_msg.o		\
++			cm_server_msg.o
++
++default:
++	$(MAKE) -C $(KDIR) M=`pwd`
++
++modules_install:
++	$(MAKE) -C $(KDIR) M=`pwd` modules_install
++
++clean:
++	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
++
++unix:
++	dos2unix *.[ch] Kconfig Makefile
+diff -ruN a/drivers/infiniband/ibp/cm/server.c b/drivers/infiniband/ibp/cm/server.c
+--- a/drivers/infiniband/ibp/cm/server.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/server.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,221 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -1920,6 +1802,8 @@ index 0000000..11da9ef
 +
 +struct rw_semaphore				list_rwsem;
 +
++LIST_HEAD(client_list);
++
 +static struct task_struct			*listen_thread;
 +
 +static struct ibp_client *ibp_create_client(scif_epd_t ep, uint16_t node)
@@ -1953,6 +1837,10 @@ index 0000000..11da9ef
 +		goto err2;
 +	}
 +
++	down_write(&list_rwsem);
++	list_add(&client->list, &client_list);
++	up_write(&list_rwsem);
++
 +	client->ibp_cm_client_thread = kthread_run(ibp_process_recvs,
 +						   client, DRV_NAME);
 +	if (!client->ibp_cm_client_thread) {
@@ -1962,6 +1850,10 @@ index 0000000..11da9ef
 +
 +	return client;
 +err3:
++	down_write(&list_rwsem);
++	list_del(&client->list);
++	up_write(&list_rwsem);
++
 +	destroy_workqueue(client->workqueue);
 +err2:
 +	free_page((uintptr_t)client->tx_buf);
@@ -2053,19 +1945,37 @@ index 0000000..11da9ef
 +
 +static void __exit ibp_cm_server_exit(void)
 +{
++	struct ibp_client		*client, *next;
++	struct completion		done;
++
 +	kthread_stop(listen_thread);
++
++	down_write(&list_rwsem);
++	list_for_each_entry_safe(client, next, &client_list, list) {
++		init_completion(&done);
++		client->done = &done;
++
++		/* Close scif ep to unblock the client thread scif_recv */
++		scif_close(client->ep);
++
++		up_write(&list_rwsem);
++
++		/* Wait for client thread to finish */
++		wait_for_completion(&done);
++
++		down_write(&list_rwsem);
++	}
++	up_write(&list_rwsem);
 +
 +	print_info(DRV_DESC " unloaded\n");
 +}
 +
 +module_init(ibp_cm_server_init);
 +module_exit(ibp_cm_server_exit);
-diff --git a/drivers/infiniband/ibp/cm/server.h b/drivers/infiniband/ibp/cm/server.h
-new file mode 100644
-index 0000000..e06ba53
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/server.h
-@@ -0,0 +1,127 @@
+diff -ruN a/drivers/infiniband/ibp/cm/server.h b/drivers/infiniband/ibp/cm/server.h
+--- a/drivers/infiniband/ibp/cm/server.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/server.h	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,128 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -2116,12 +2026,15 @@ index 0000000..e06ba53
 +
 +extern int			timeout;
 +extern struct rw_semaphore	list_rwsem;
++extern struct list_head		client_list;
++extern struct list_head		cm_entry_list;
 +
 +struct ibp_client {
 +	struct list_head	list;
 +	scif_epd_t		ep;
 +	void			*rx_buf;
 +	void			*tx_buf;
++	struct completion	*done;
 +	struct workqueue_struct	*workqueue;
 +	struct task_struct	*ibp_cm_client_thread;
 +};
@@ -2146,8 +2059,6 @@ index 0000000..e06ba53
 +	struct ibp_client       *client;
 +	struct ibp_cm_event	event;
 +};
-+
-+extern struct rw_semaphore	list_rwsem;
 +
 +#define IBP_INIT_MSG(device, msg, size, op)			\
 +	do {							\
@@ -2193,12 +2104,10 @@ index 0000000..e06ba53
 +			    struct ibp_msg_header *hdr);
 +
 +#endif /* SERVER_H */
-diff --git a/drivers/infiniband/ibp/cm/server_msg.c b/drivers/infiniband/ibp/cm/server_msg.c
-new file mode 100644
-index 0000000..93d49ac
---- /dev/null
-+++ b/drivers/infiniband/ibp/cm/server_msg.c
-@@ -0,0 +1,160 @@
+diff -ruN a/drivers/infiniband/ibp/cm/server_msg.c b/drivers/infiniband/ibp/cm/server_msg.c
+--- a/drivers/infiniband/ibp/cm/server_msg.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/cm/server_msg.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,176 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -2284,6 +2193,34 @@ index 0000000..93d49ac
 +	return ibp_send(client->ep, msg, len);
 +}
 +
++static void
++ibp_cm_destroy_client(struct ibp_client *client)
++{
++	struct cm_entry			*cm, *tmp;
++
++	down_write(&list_rwsem);
++	list_del(&client->list);
++	list_for_each_entry_safe(cm, tmp, &cm_entry_list, list)
++		if (cm->client == client) {
++			ib_destroy_cm_id(cm->cm_id);
++			list_del(&cm->list);
++			kfree(cm);
++		}
++	up_write(&list_rwsem);
++
++	destroy_workqueue(client->workqueue);
++
++	free_page((uintptr_t)client->tx_buf);
++	free_page((uintptr_t)client->rx_buf);
++
++	if (client->done)
++		complete(client->done);
++	else
++		scif_close(client->ep);
++
++	kfree(client);
++}
++
 +static int
 +(*ibp_msg_table[])(struct ibp_client *c, struct ibp_msg_header *h) = {
 +	[IBP_CREATE_CM_ID]		= ibp_cmd_create_cm_id,
@@ -2343,54 +2280,13 @@ index 0000000..93d49ac
 +			break;
 +	}
 +
-+	down_write(&list_rwsem);
-+
-+	if (ret != -ENOTCONN)
-+		scif_close(client->ep);
-+
-+	destroy_workqueue(client->workqueue);
-+
-+	free_page((uintptr_t)client->tx_buf);
-+	free_page((uintptr_t)client->rx_buf);
-+
-+	kfree(client);
-+
-+	up_write(&list_rwsem);
++	ibp_cm_destroy_client(client);
 +
 +	return ret;
 +}
-diff --git a/drivers/infiniband/ibp/drv/Makefile b/drivers/infiniband/ibp/drv/Makefile
-new file mode 100644
-index 0000000..3551f2e
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/Makefile
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
-+
-+obj-$(CONFIG_IBP_SERVER)	+= ibp_server.o
-+
-+ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
-+
-+ibp_server-y :=		server.o	\
-+			stack.o		\
-+			server_msg.o
-+
-+default:
-+	$(MAKE) -C $(KDIR) M=`pwd`
-+
-+modules_install:
-+	$(MAKE) -C $(KDIR) M=`pwd` modules_install
-+
-+clean:
-+	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
-+
-+unix:
-+	dos2unix *.[ch] Kconfig Makefile
-diff --git a/drivers/infiniband/ibp/drv/common.h b/drivers/infiniband/ibp/drv/common.h
-new file mode 100644
-index 0000000..1161d63
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/common.h
+diff -ruN a/drivers/infiniband/ibp/drv/common.h b/drivers/infiniband/ibp/drv/common.h
+--- a/drivers/infiniband/ibp/drv/common.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/common.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,109 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -2490,7 +2386,7 @@ index 0000000..1161d63
 +#define print_trace(f, arg...) PRINTK(IBP_DEBUG_VERBOSE, KERN_ERR, f, ##arg)
 +#endif
 +
-+#ifndef	IBP_PORT		/* unique scif port for this service */
++#ifndef IBP_PORT		/* unique scif port for this service */
 +#define IBP_PORT		SCIF_OFED_PORT_2
 +#endif
 +
@@ -2501,11 +2397,9 @@ index 0000000..1161d63
 +void ibp_cleanup(void);
 +
 +#endif /* COMMON_H */
-diff --git a/drivers/infiniband/ibp/drv/ibp-abi.h b/drivers/infiniband/ibp/drv/ibp-abi.h
-new file mode 100644
-index 0000000..fa8a1a9
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/ibp-abi.h
+diff -ruN a/drivers/infiniband/ibp/drv/ibp-abi.h b/drivers/infiniband/ibp/drv/ibp-abi.h
+--- a/drivers/infiniband/ibp/drv/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/ibp-abi.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,649 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -3156,11 +3050,9 @@ index 0000000..fa8a1a9
 +};
 +
 +#endif /* IBP_ABI_H */
-diff --git a/drivers/infiniband/ibp/drv/ibp.h b/drivers/infiniband/ibp/drv/ibp.h
-new file mode 100644
-index 0000000..3cb3676
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/ibp.h
+diff -ruN a/drivers/infiniband/ibp/drv/ibp.h b/drivers/infiniband/ibp/drv/ibp.h
+--- a/drivers/infiniband/ibp/drv/ibp.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/ibp.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,257 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -3419,12 +3311,35 @@ index 0000000..3cb3676
 +			 union ib_gid *gid, u16 lid);
 +
 +#endif /* IBP_H */
-diff --git a/drivers/infiniband/ibp/drv/server.c b/drivers/infiniband/ibp/drv/server.c
-new file mode 100644
-index 0000000..76a3205
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/server.c
-@@ -0,0 +1,587 @@
+diff -ruN a/drivers/infiniband/ibp/drv/Makefile b/drivers/infiniband/ibp/drv/Makefile
+--- a/drivers/infiniband/ibp/drv/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/Makefile	2014-09-03 10:42:06.000000000 -0700
+@@ -0,0 +1,21 @@
++KDIR ?= /lib/modules/`uname -r`/build
++
++obj-$(CONFIG_IBP_SERVER)	+= ibp_server.o
++
++ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
++
++ibp_server-y :=		server.o	\
++			stack.o		\
++			server_msg.o
++
++default:
++	$(MAKE) -C $(KDIR) M=`pwd`
++
++modules_install:
++	$(MAKE) -C $(KDIR) M=`pwd` modules_install
++
++clean:
++	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
++
++unix:
++	dos2unix *.[ch] Kconfig Makefile
+diff -ruN a/drivers/infiniband/ibp/drv/server.c b/drivers/infiniband/ibp/drv/server.c
+--- a/drivers/infiniband/ibp/drv/server.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/server.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,607 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -3472,6 +3387,11 @@ index 0000000..76a3205
 +
 +#ifdef IBP_DEBUG
 +MODULE_PARAM(debug_level, debug_level, int, 0, "Debug: 0-none, 1-some, 2-all");
++#endif
++
++#ifdef MOFED
++void					*ibp_peer_mem_handle;
++invalidate_peer_memory			ib_invalidate;
 +#endif
 +
 +struct rw_semaphore			list_rwsem;
@@ -3941,7 +3861,6 @@ index 0000000..76a3205
 +	int				ret;
 +
 +	print_info(DRV_SIGNON);
-+	print_dbg("DEBUGi VERSION: 2014/06/27 1345\n");
 +
 +	init_rwsem(&list_rwsem);
 +
@@ -3964,10 +3883,20 @@ index 0000000..76a3205
 +		goto err1;
 +	}
 +
++#ifdef MOFED
++	ibp_peer_mem_handle = ib_register_peer_memory_client(&ibp_peer_mem,
++							     &ib_invalidate);
++	if (IS_ERR(ibp_peer_mem_handle)) {
++		ret = PTR_ERR(ibp_peer_mem_handle);
++		print_err("ib_register_peer_memory_client returned %d\n", ret);
++		goto err2;
++	}
++#endif
++
 +	ret = scif_event_register(ibp_event_handler);
 +	if (ret) {
 +		print_err("scif_event_register returned %d\n", ret);
-+		goto err2;
++		goto err3;
 +	}
 +
 +	/* Start a thread for inbound connections. */
@@ -3975,13 +3904,17 @@ index 0000000..76a3205
 +	if (IS_ERR(listen_thread)) {
 +		ret = PTR_ERR(listen_thread);
 +		print_err("kthread_run returned %d\n", ret);
-+		goto err3;
++		goto err4;
 +	}
 +
 +	return 0;
-+err3:
++err4:
 +	scif_event_unregister(ibp_event_handler);
++err3:
++#ifdef MOFED
++	ib_unregister_peer_memory_client(ibp_peer_mem_handle);
 +err2:
++#endif
 +	ib_unregister_client(&ib_client);
 +err1:
 +	class_destroy(ibp_class);
@@ -4001,7 +3934,9 @@ index 0000000..76a3205
 +		ibp_destroy_client(client);
 +
 +	scif_event_unregister(ibp_event_handler);
-+
++#ifdef MOFED
++	ib_unregister_peer_memory_client(ibp_peer_mem_handle);
++#endif
 +	ib_unregister_client(&ib_client);
 +	class_destroy(ibp_class);
 +
@@ -4012,12 +3947,10 @@ index 0000000..76a3205
 +
 +module_init(ibp_server_init);
 +module_exit(ibp_server_exit);
-diff --git a/drivers/infiniband/ibp/drv/server.h b/drivers/infiniband/ibp/drv/server.h
-new file mode 100644
-index 0000000..884c14e
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/server.h
-@@ -0,0 +1,175 @@
+diff -ruN a/drivers/infiniband/ibp/drv/server.h b/drivers/infiniband/ibp/drv/server.h
+--- a/drivers/infiniband/ibp/drv/server.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/server.h	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,194 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -4057,6 +3990,7 @@ index 0000000..884c14e
 +#include <linux/cdev.h>
 +#include <linux/anon_inodes.h>
 +#include <linux/file.h>
++#include <rdma/ib_user_verbs.h>
 +#include <rdma/ib_umem.h>
 +#include "ibp-abi.h"
 +#include "common.h"
@@ -4124,6 +4058,17 @@ index 0000000..884c14e
 +	struct rb_root		reg_tree;
 +};
 +
++struct ibp_qp {
++	struct ib_qp		*ibqp;
++	struct list_head	mcast;
++};
++
++struct ibp_mcast_entry {
++	struct list_head	list;
++	union ib_gid		gid;
++	u16			lid;
++};
++
 +struct ibp_mmap {
 +	struct list_head	list;
 +	struct ibp_ucontext	*ucontext;
@@ -4151,10 +4096,17 @@ index 0000000..884c14e
 +	struct ibp_reg		*reg;
 +};
 +
++#ifdef MOFED
++#include <rdma/peer_mem.h>
++extern struct peer_memory_client ibp_peer_mem;
++extern void			 *ibp_peer_mem_handle;
++extern invalidate_peer_memory    ib_invalidate;
++#else
 +#define IBP_UMEM_MAX_PAGE_CHUNK						\
 +	((PAGE_SIZE - offsetof(struct ib_umem_chunk, page_list)) /	\
 +	 ((void *) &((struct ib_umem_chunk *) 0)->page_list[1] -	\
 +	  (void *) &((struct ib_umem_chunk *) 0)->page_list[0]))
++#endif
 +
 +#define INIT_UDATA(udata, ibuf, obuf, ilen, olen)		\
 +	do {							\
@@ -4193,12 +4145,10 @@ index 0000000..884c14e
 +void ibp_put_device(struct ibp_device *device);
 +
 +#endif /* SERVER_H */
-diff --git a/drivers/infiniband/ibp/drv/server_msg.c b/drivers/infiniband/ibp/drv/server_msg.c
-new file mode 100644
-index 0000000..2ede4ae
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/server_msg.c
-@@ -0,0 +1,2899 @@
+diff -ruN a/drivers/infiniband/ibp/drv/server_msg.c b/drivers/infiniband/ibp/drv/server_msg.c
+--- a/drivers/infiniband/ibp/drv/server_msg.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/server_msg.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,3157 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -4237,21 +4187,15 @@ index 0000000..2ede4ae
 +#include "stack.h"
 +
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
-+    #define MMAP(u,v,w,x,y,z)				\
-+	do {						\
-+		down_write(&current->mm->mmap_sem);	\
-+		do_mmap_pgoff(u,v,w,x,y,z);		\
-+		up_write(&current->mm->mmap_sem);	\
-+	} while (0)
 +    #define MUNMAP(x,y,z)				\
 +	do {						\
-+		down_write(&current->mm->mmap_sem);	\
-+		do_munmap(x,y,z);			\
-+		up_write(&current->mm->mmap_sem);	\
++	    down_write(&current->mm->mmap_sem);		\
++	    do_munmap(x,y,z);				\
++	    up_write(&current->mm->mmap_sem);		\
 +	} while (0)
 +#else
 +    #define MUNMAP(x,y,z)				\
-+		vm_munmap((unsigned long)y,z)
++	vm_munmap((unsigned long)y,z)
 +#endif
 +
 +static struct ibp_stack			*o_stack;
@@ -4291,6 +4235,170 @@ index 0000000..2ede4ae
 +	.copy_from = ibp_copy_from_udata,
 +	.copy_to   = ibp_copy_to_udata
 +};
++
++#ifdef MOFED
++
++static struct ibp_reg *__ibp_find_reg(struct ibp_ucontext *ucontext,
++				      unsigned long virt, size_t size)
++{
++	struct rb_node			*node;
++	struct ibp_reg			*reg;
++
++	node = ucontext->reg_tree.rb_node;
++
++	while (node) {
++		reg = rb_entry(node, struct ibp_reg, node);
++
++		if ((virt   == reg->virt_addr) &&
++		    (size   == reg->length))
++			return reg;
++
++		if (virt < reg->virt_addr)
++			node = node->rb_left;
++		else if (virt > reg->virt_addr)
++			node = node->rb_right;
++		else if (size < reg->length)
++			node = node->rb_left;
++		else if (size > reg->length)
++			node = node->rb_right;
++		else
++			node = node->rb_right;
++	}
++
++	return ERR_PTR(-EFAULT);
++}
++
++static struct ibp_reg *ibp_find_reg(struct ibp_ucontext *ucontext,
++				    unsigned long virt, size_t size)
++{
++	struct ibp_reg			*reg;
++
++	mutex_lock(&ucontext->mutex);
++	reg = __ibp_find_reg(ucontext, virt, size);
++	mutex_unlock(&ucontext->mutex);
++
++	return reg;
++}
++
++/* ibp_peer_acquire return code: 1 mine, 0 not mine */
++static int ibp_peer_acquire(unsigned long addr,
++			    size_t size, void* peer_mem_private_data,
++			    char* peer_mem_name, void** client_context)
++{
++	struct ibp_ucontext *ucontext;
++	struct ibp_reg	    *reg;
++
++	/* Verify private data is ours before ibp_ucontext cast. */
++	if (!peer_mem_name || !peer_mem_private_data ||
++	    strncmp(peer_mem_name, ibp_peer_mem.name,
++		    sizeof(ibp_peer_mem.name)))
++		return 0;
++
++	ucontext = (struct ibp_ucontext *) peer_mem_private_data;
++
++	reg = ibp_find_reg(ucontext, addr, size);
++	if (IS_ERR(reg)) {
++		print_err("ibp_find_reg returned %d\n", (int)PTR_ERR(reg));
++		return 0;
++	}
++
++	*client_context = (void *) reg;
++
++	return 1;
++}
++
++static int ibp_peer_get_pages(unsigned long addr, size_t size, int write,
++			      int force, struct sg_table *sg_head,
++			      void* client_context, void* core_context)
++{
++	struct ibp_reg	   *reg;
++	struct page	   *page;
++	struct scatterlist *sg;
++	void		   **va;
++	int npages, off, i, ret;
++
++	reg = (struct ibp_reg *) client_context;
++
++	off = (addr - reg->virt_addr) + reg->offset;
++	npages = PAGE_ALIGN(size + (off & ~PAGE_MASK)) >> PAGE_SHIFT;
++
++	ret = sg_alloc_table(sg_head, npages, GFP_KERNEL);
++	if (ret)
++		return ret;
++
++	va = reg->range->va;
++
++	for_each_sg(sg_head->sgl, sg, npages, i) {
++		page = vmalloc_to_page(va[i]);
++		if (!page) {
++			print_err("vmalloc_to_page failed\n");
++			ret = -EINVAL;
++			goto err;
++		}
++		sg_set_page(sg, page, PAGE_SIZE, 0);
++	}
++
++	return 0;
++err:
++	sg_free_table(sg_head);
++	return ret;
++}
++
++static int ibp_peer_dma_map(struct sg_table *sg_head, void *client_context,
++			    struct device *dma_device, int dmasync, int *nmap)
++{
++	DEFINE_DMA_ATTRS(attrs);
++	int ret = 0;
++
++	if (dmasync)
++		dma_set_attr(DMA_ATTR_WRITE_BARRIER, &attrs);
++
++	*nmap = dma_map_sg_attrs(dma_device,
++				 sg_head->sgl,
++				 sg_head->orig_nents,
++				 DMA_BIDIRECTIONAL,
++				 &attrs);
++
++	if (*nmap > 0)
++		sg_head->nents = *nmap;
++	else
++		ret = -ENOMEM;
++
++	return ret;
++}
++
++static int ibp_peer_dma_umap(struct sg_table *sg_head, void *client_context,
++			     struct device *dma_device)
++{
++	dma_unmap_sg(dma_device,
++		     sg_head->sgl,
++		     sg_head->nents,
++		     DMA_BIDIRECTIONAL);
++	return 0;
++}
++
++static void ibp_peer_put_pages(struct sg_table *sg_head, void *client_context)
++{
++	sg_free_table(sg_head);
++}
++
++static unsigned long ibp_peer_get_page_size(void *client_context)
++{
++	return PAGE_SIZE;
++}
++
++struct peer_memory_client ibp_peer_mem = {
++	.name		= DRV_NAME,
++	.version	= DRV_VERSION,
++	.acquire	= &ibp_peer_acquire,
++	.get_pages	= &ibp_peer_get_pages,
++	.dma_map	= &ibp_peer_dma_map,
++	.dma_unmap	= &ibp_peer_dma_umap,
++	.put_pages	= &ibp_peer_put_pages,
++	.get_page_size	= &ibp_peer_get_page_size,
++};
++
++#else /* MOFED */
 +
 +static struct ibp_reg *__ibp_find_reg(struct ibp_ucontext *ucontext,
 +				      unsigned long virt, size_t size,
@@ -4498,6 +4606,8 @@ index 0000000..2ede4ae
 +	.get	    = &ibp_umem_get,
 +	.release    = &ibp_umem_release,
 +};
++
++#endif	/* MOFED */
 +
 +static int ibp_send(scif_epd_t ep, void *buf, size_t len)
 +{
@@ -4748,7 +4858,7 @@ index 0000000..2ede4ae
 +	resp->active_width	= attr.active_width;
 +	resp->active_speed	= attr.active_speed;
 +	resp->phys_state	= attr.phys_state;
-+	resp->link_layer	= IB_LINK_LAYER_UNSPECIFIED;
++	resp->link_layer	= 0; // OFED-1.5.4.1 IB_LINK_LAYER_UNSPECIFIED
 +
 +send_resp:
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, ret);
@@ -4907,6 +5017,9 @@ index 0000000..2ede4ae
 +	len	= hdr->length - sizeof(*cmd);
 +	outlen	= MAX_MSG_SIZE - sizeof(*msg) - sizeof(*resp);
 +
++	/* Workaround for len check in mlx5 driver (no impact to others) */
++	len += sizeof(struct ib_uverbs_cmd_hdr);
++
 +	INIT_UDATA(&udata, cmd->data, resp->data, len, outlen);
 +
 +	len = sizeof(*msg);
@@ -4932,8 +5045,14 @@ index 0000000..2ede4ae
 +		goto err2;
 +	}
 +
++#ifdef MOFED
++	ibucontext->peer_mem_name = ibp_peer_mem.name;
++	ibucontext->peer_mem_private_data = ucontext;
++#else
 +	ibucontext->umem_ops = &ibp_umem;
 +	ibucontext->umem_private_data = ucontext;
++#endif
++
 +	ibucontext->device = device->ib_dev;
 +	ibucontext->closing = 0;
 +
@@ -5081,10 +5200,16 @@ index 0000000..2ede4ae
 +		parent = *link;
 +		cur_reg = rb_entry(parent, struct ibp_reg, node);
 +
++#ifdef MOFED
++		if ((reg->virt_addr == cur_reg->virt_addr) &&
++		    (reg->length    == cur_reg->length))
++			return cur_reg;
++#else
 +		if ((reg->virt_addr == cur_reg->virt_addr) &&
 +		    (reg->length    == cur_reg->length)	   &&
 +		    (reg->access    == cur_reg->access))
 +			return cur_reg;
++#endif
 +
 +		if (reg->virt_addr < cur_reg->virt_addr)
 +			link = &(*link)->rb_left;
@@ -5094,8 +5219,10 @@ index 0000000..2ede4ae
 +			link = &(*link)->rb_left;
 +		else if (reg->length > cur_reg->length)
 +			link = &(*link)->rb_right;
++#ifndef MOFED
 +		else if (reg->access < cur_reg->access)
 +			link = &(*link)->rb_left;
++#endif
 +		else
 +			link = &(*link)->rb_right;
 +	}
@@ -5396,8 +5523,8 @@ index 0000000..2ede4ae
 +
 +#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
 +	down_write(&current->mm->mmap_sem);
-+	mmap->vaddr = do_mmap_pgoff(ucontext->filp, 0, cmd->len, cmd->prot,
-+			   	    cmd->flags, cmd->pgoff);
++	mmap->vaddr = do_mmap_pgoff(ucontext->filp, 0, cmd->len,
++				    cmd->prot, cmd->flags, cmd->pgoff);
 +	up_write(&current->mm->mmap_sem);
 +#else
 +	mmap->vaddr = vm_mmap(ucontext->filp, 0, cmd->len, cmd->prot,
@@ -5892,7 +6019,7 @@ index 0000000..2ede4ae
 +	srq->pd		   = pd;
 +	srq->event_handler = init_attr.event_handler;
 +	srq->srq_context   = init_attr.srq_context;
-+	srq->srq_type	   = 0;
++	srq->srq_type      = 0;
 +	srq->ext.xrc.cq	   = NULL;
 +	srq->ext.xrc.xrcd  = NULL;
 +
@@ -6084,7 +6211,7 @@ index 0000000..2ede4ae
 +	struct ibp_ucontext		*ucontext;
 +	struct ib_uobject		*uobj;
 +	struct ib_pd			*pd;
-+	struct ib_qp			*qp;
++	struct ibp_qp			*qp;
 +	struct ib_qp_init_attr		init_attr;
 +	struct ib_udata			udata;
 +	size_t				len;
@@ -6104,6 +6231,14 @@ index 0000000..2ede4ae
 +	INIT_UDATA(&udata, cmd->data, resp->data, len, outlen);
 +
 +	len = sizeof(*msg);
++
++	qp = kzalloc(sizeof *qp, GFP_KERNEL);
++	if (!qp) {
++		print_err("kzalloc failed\n");
++		ret = -ENOMEM;
++		goto send_resp;
++	}
++	INIT_LIST_HEAD(&qp->mcast);
 +
 +	ucontext = (struct ibp_ucontext *) pd->uobject->user_handle;
 +
@@ -6130,9 +6265,9 @@ index 0000000..2ede4ae
 +	init_attr.create_flags	      = cmd->create_flags;
 +	init_attr.port_num	      = cmd->port_num;
 +
-+	qp = device->ib_dev->create_qp(pd, &init_attr, &udata);
-+	if (IS_ERR(qp)) {
-+		ret = PTR_ERR(qp);
++	qp->ibqp = device->ib_dev->create_qp(pd, &init_attr, &udata);
++	if (IS_ERR(qp->ibqp)) {
++		ret = PTR_ERR(qp->ibqp);
 +		print_err("ib_create_qp returned %d\n", ret);
 +		/*
 +		 * Clear uobj's user_handle as destroy_uobj tries to list_del
@@ -6143,23 +6278,23 @@ index 0000000..2ede4ae
 +		goto send_resp;
 +	}
 +
-+	qp->device	  = device->ib_dev;
-+	qp->pd		  = pd;
-+	qp->send_cq	  = init_attr.send_cq;
-+	qp->recv_cq	  = init_attr.recv_cq;
-+	qp->srq		  = init_attr.srq;
-+	qp->event_handler = ibp_ibqp_event;
-+	qp->qp_context	  = (void *) cmd->qp_context;
-+	qp->qp_type	  = init_attr.qp_type;
++	qp->ibqp->device	= device->ib_dev;
++	qp->ibqp->pd		= pd;
++	qp->ibqp->send_cq	= init_attr.send_cq;
++	qp->ibqp->recv_cq	= init_attr.recv_cq;
++	qp->ibqp->srq		= init_attr.srq;
++	qp->ibqp->event_handler = ibp_ibqp_event;
++	qp->ibqp->qp_context	= (void *) cmd->qp_context;
++	qp->ibqp->qp_type	= init_attr.qp_type;
 +
-+	if (qp->qp_type == IB_QPT_XRC_TGT) {
-+		qp->xrcd = init_attr.xrcd;
-+		atomic_inc(&qp->xrcd->usecnt);
++	if (qp->ibqp->qp_type == IB_QPT_XRC_TGT) {
++		qp->ibqp->xrcd = init_attr.xrcd;
++		atomic_inc(&qp->ibqp->xrcd->usecnt);
 +	} else {
-+		qp->xrcd = NULL;
-+		qp->real_qp = qp;
++		qp->ibqp->xrcd = NULL;
++		qp->ibqp->real_qp = qp->ibqp;
 +	}
-+	atomic_set(&qp->usecnt, 0);
++	atomic_set(&qp->ibqp->usecnt, 0);
 +
 +	atomic_inc(&pd->usecnt);
 +	atomic_inc(&init_attr.send_cq->usecnt);
@@ -6168,7 +6303,7 @@ index 0000000..2ede4ae
 +	if (init_attr.srq)
 +		atomic_inc(&init_attr.srq->usecnt);
 +
-+	qp->uobject  = uobj;
++	qp->ibqp->uobject  = uobj;
 +	uobj->object = qp;
 +
 +	mutex_lock(&ucontext->mutex);
@@ -6179,7 +6314,7 @@ index 0000000..2ede4ae
 +	len += outlen - udata.outlen;	/* add driver private data */
 +
 +	resp->qp		  = (uintptr_t) qp;
-+	resp->qpn		  = qp->qp_num;
++	resp->qpn		  = qp->ibqp->qp_num;
 +	resp->cap.max_send_wr	  = init_attr.cap.max_send_wr;
 +	resp->cap.max_recv_wr	  = init_attr.cap.max_recv_wr;
 +	resp->cap.max_send_sge	  = init_attr.cap.max_send_sge;
@@ -6187,6 +6322,9 @@ index 0000000..2ede4ae
 +	resp->cap.max_inline_data = init_attr.cap.max_inline_data;
 +
 +send_resp:
++	if (ret)
++		kfree(qp);
++
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, ret);
 +	return ibp_send(client->ep, msg, len);
 +}
@@ -6198,7 +6336,7 @@ index 0000000..2ede4ae
 +	struct ibp_verb_response_msg	*msg;
 +	struct ibp_modify_qp_cmd	*cmd;
 +	struct ibp_modify_qp_resp	*resp;
-+	struct ib_qp			*qp;
++	struct ibp_qp			*qp;
 +	struct ib_qp_attr		attr;
 +	struct ib_udata			udata;
 +	size_t				len;
@@ -6209,7 +6347,7 @@ index 0000000..2ede4ae
 +
 +	device	= (struct ibp_device *) hdr->device;
 +	cmd	= (struct ibp_modify_qp_cmd *) hdr;
-+	qp	= (struct ib_qp *) cmd->qp;
++	qp	= (struct ibp_qp *) cmd->qp;
 +	msg	= (struct ibp_verb_response_msg *) tx_buf;
 +	resp	= (struct ibp_modify_qp_resp *) msg->data;
 +	len	= hdr->length - sizeof(*cmd);
@@ -6277,7 +6415,7 @@ index 0000000..2ede4ae
 +	attr.alt_port_num		= cmd->alt_port_num;
 +	attr.alt_timeout		= cmd->alt_timeout;
 +
-+	ret = device->ib_dev->modify_qp(qp, &attr, cmd->qp_attr_mask, &udata);
++	ret = device->ib_dev->modify_qp(qp->ibqp, &attr, cmd->qp_attr_mask, &udata);
 +	if (ret) {
 +		print_err("ib_modify_qp returned %d\n", ret);
 +		goto send_resp;
@@ -6304,7 +6442,7 @@ index 0000000..2ede4ae
 +	struct ibp_verb_response_msg	*msg;
 +	struct ibp_query_qp_cmd		*cmd;
 +	struct ibp_query_qp_resp	*resp;
-+	struct ib_qp			*qp;
++	struct ibp_qp			*qp;
 +	struct ib_qp_attr		qp_attr;
 +	struct ib_qp_init_attr		qp_init_attr;
 +	size_t				len;
@@ -6314,11 +6452,11 @@ index 0000000..2ede4ae
 +
 +	device	= (struct ibp_device *) hdr->device;
 +	cmd	= (struct ibp_query_qp_cmd *) hdr;
-+	qp	= (struct ib_qp *) cmd->qp;
++	qp	= (struct ibp_qp *) cmd->qp;
 +	msg	= (struct ibp_verb_response_msg *) tx_buf;
 +	len	= sizeof(*msg);
 +
-+	ret = ib_query_qp(qp, &qp_attr, cmd->qp_attr_mask, &qp_init_attr);
++	ret = ib_query_qp(qp->ibqp, &qp_attr, cmd->qp_attr_mask, &qp_init_attr);
 +	if (ret) {
 +		print_err("ib_query_qp returned %d\n", ret);
 +		goto send_resp;
@@ -6407,7 +6545,7 @@ index 0000000..2ede4ae
 +	struct ibp_queued_response_msg	*msg;
 +	struct ibp_destroy_qp_cmd	*cmd;
 +	struct ib_uobject		*uobj;
-+	struct ib_qp			*qp;
++	struct ibp_qp			*qp;
 +	size_t				len;
 +	int				ret;
 +
@@ -6415,19 +6553,21 @@ index 0000000..2ede4ae
 +
 +	device	= (struct ibp_device *) hdr->device;
 +	cmd	= (struct ibp_destroy_qp_cmd *) hdr;
-+	qp	= (struct ib_qp *) cmd->qp;
++	qp	= (struct ibp_qp *) cmd->qp;
 +	msg	= (struct ibp_queued_response_msg *) tx_buf;
 +	len	= sizeof(*msg);
 +
-+	uobj = qp->uobject;
++	uobj = qp->ibqp->uobject;
 +
-+	ret = ib_destroy_qp(qp);
++	ret = ib_destroy_qp(qp->ibqp);
 +	if (ret) {
 +		print_err("ib_destroy_qp returned %d\n", ret);
 +		goto send_resp;
 +	}
 +
 +	ibp_destroy_uobj(uobj);
++
++	kfree(qp);
 +
 +send_resp:
 +	IBP_INIT_RESP(device, msg, len, QUEUED_RESPONSE, hdr->request, ret);
@@ -6519,6 +6659,9 @@ index 0000000..2ede4ae
 +	size_t				len;
 +	size_t				outlen;
 +	int				ret = 0;
++#ifdef MOFED
++	struct ib_cq_init_attr		attr;
++#endif
 +
 +	print_trace("in\n");
 +
@@ -6541,9 +6684,18 @@ index 0000000..2ede4ae
 +		goto send_resp;
 +	}
 +
++#ifdef  MOFED
++	memset(&attr, 0, sizeof(attr));
++	attr.cqe = cmd->cqe;
++	attr.comp_vector = cmd->vector;
++
++	cq = device->ib_dev->create_cq(device->ib_dev, &attr,
++				       ucontext->ibucontext, &udata);
++#else
 +	cq = device->ib_dev->create_cq(device->ib_dev, (int) cmd->cqe,
 +				      (int) cmd->vector,
 +				       ucontext->ibucontext, &udata);
++#endif
 +	if (IS_ERR(cq)) {
 +		ret = PTR_ERR(cq);
 +		print_err("ib_create_cq returned %d\n", ret);
@@ -6716,8 +6868,13 @@ index 0000000..2ede4ae
 +		goto send_resp;
 +	}
 +
++#ifdef MOFED
++	mr->ibmr = pd->device->reg_user_mr(pd, cmd->hca_va, cmd->length,
++					   cmd->hca_va, cmd->access, &udata, 0);
++#else
 +	mr->ibmr = pd->device->reg_user_mr(pd, cmd->hca_va, cmd->length,
 +					   cmd->hca_va, cmd->access, &udata);
++#endif
 +	if (IS_ERR(mr->ibmr)) {
 +		ret = PTR_ERR(mr->ibmr);
 +		print_err("ib_reg_user_mr returned %d\n", ret);
@@ -6806,7 +6963,9 @@ index 0000000..2ede4ae
 +	struct ibp_device		*device;
 +	struct ibp_verb_response_msg	*msg;
 +	struct ibp_attach_mcast_cmd	*cmd;
-+	struct ib_qp			*qp;
++	struct ibp_mcast_entry		*mcast;
++	struct ibp_ucontext		*ucontext;
++	struct ibp_qp			*qp;
 +	union ib_gid			gid;
 +	size_t				len;
 +	int				ret;
@@ -6815,18 +6974,38 @@ index 0000000..2ede4ae
 +
 +	device	= (struct ibp_device *) hdr->device;
 +	cmd	= (struct ibp_attach_mcast_cmd *) hdr;
-+	qp	= (struct ib_qp *) cmd->qp;
++	qp	= (struct ibp_qp *) cmd->qp;
 +	msg	= (struct ibp_verb_response_msg *) tx_buf;
 +	len	= sizeof(*msg);
++
++	ucontext = (struct ibp_ucontext *) qp->ibqp->uobject->user_handle;
++
++	mcast = kzalloc(sizeof *mcast, GFP_KERNEL);
++	if (!mcast) {
++		print_err("kzalloc failed\n");
++		ret = -ENOMEM;
++		goto send_resp;
++	}
 +
 +	gid.global.subnet_prefix = cmd->subnet_prefix;
 +	gid.global.interface_id  = cmd->interface_id;
 +
-+	ret = ib_attach_mcast(qp, &gid, cmd->lid);
-+
-+	if (ret)
++	ret = ib_attach_mcast(qp->ibqp, &gid, cmd->lid);
++	if (ret) {
 +		print_err("ib_attach_mcast returned %d\n", ret);
++		kfree(mcast);
++		goto send_resp;
++	}
 +
++	mcast->lid = cmd->lid;
++	mcast->gid.global.subnet_prefix = cmd->subnet_prefix;
++	mcast->gid.global.interface_id  = cmd->interface_id;
++
++	mutex_lock(&ucontext->mutex);
++	list_add_tail(&mcast->list, &qp->mcast);
++	mutex_unlock(&ucontext->mutex);
++
++send_resp:
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, ret);
 +	return ibp_send(client->ep, msg, len);
 +}
@@ -6837,7 +7016,9 @@ index 0000000..2ede4ae
 +	struct ibp_device		*device;
 +	struct ibp_verb_response_msg	*msg;
 +	struct ibp_detach_mcast_cmd	*cmd;
-+	struct ib_qp			*qp;
++	struct ibp_mcast_entry		*mcast;
++	struct ibp_ucontext		*ucontext;
++	struct ibp_qp			*qp;
 +	union ib_gid			gid;
 +	size_t				len;
 +	int				ret;
@@ -6846,20 +7027,45 @@ index 0000000..2ede4ae
 +
 +	device	= (struct ibp_device *) hdr->device;
 +	cmd	= (struct ibp_detach_mcast_cmd *) hdr;
-+	qp	= (struct ib_qp *) cmd->qp;
++	qp	= (struct ibp_qp *) cmd->qp;
 +	msg	= (struct ibp_verb_response_msg *) tx_buf;
 +	len	= sizeof(*msg);
++
++	ucontext = (struct ibp_ucontext *) qp->ibqp->uobject->user_handle;
 +
 +	gid.global.subnet_prefix = cmd->subnet_prefix;
 +	gid.global.interface_id  = cmd->interface_id;
 +
-+	ret = ib_detach_mcast(qp, &gid, cmd->lid);
-+
-+	if (ret)
++	ret = ib_detach_mcast(qp->ibqp, &gid, cmd->lid);
++	if (ret) {
 +		print_err("ib_detach_mcast returned %d\n", ret);
++		goto send_resp;
++	}
 +
++	mutex_lock(&ucontext->mutex);
++	list_for_each_entry(mcast, &qp->mcast, list)
++		if (cmd->lid == mcast->lid &&
++		    !memcmp(&gid , mcast->gid.raw, sizeof mcast->gid.raw)) {
++			list_del(&mcast->list);
++			kfree(mcast);
++			break;
++		}
++	mutex_unlock(&ucontext->mutex);
++
++send_resp:
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, ret);
 +	return ibp_send(client->ep, msg, len);
++}
++
++static void ibp_detach_mcast(struct ibp_qp *qp)
++{
++	struct ibp_mcast_entry		*mcast, *tmp;
++
++	list_for_each_entry_safe(mcast, tmp, &qp->mcast, list) {
++		ib_detach_mcast(qp->ibqp, &mcast->gid, mcast->lid);
++		list_del(&mcast->list);
++		kfree(mcast);
++	}
 +}
 +
 +static void ibp_destroy_ucontext(struct ibp_ucontext *ucontext)
@@ -6887,9 +7093,11 @@ index 0000000..2ede4ae
 +	}
 +
 +	list_for_each_entry_safe(uobj, tmp, &ibuctx->qp_list, list) {
-+		struct ib_qp *ibqp = uobj->object;
-+		ib_destroy_qp(ibqp);
++		struct ibp_qp *qp = uobj->object;
++		ibp_detach_mcast(qp);
++		ib_destroy_qp(qp->ibqp);
 +		ibp_destroy_uobj(uobj);
++		kfree(qp);
 +	}
 +
 +	list_for_each_entry_safe(uobj, tmp, &ibuctx->cq_list, list) {
@@ -6936,9 +7144,9 @@ index 0000000..2ede4ae
 +	list_for_each_entry_safe(mmap, tmp_mmap, &ucontext->mmap_list, list) {
 +		ibp_scif_unregister(ucontext->client, mmap);
 +
-+		if (!IS_NULL_OR_ERR(current) && !IS_NULL_OR_ERR(current->mm))
++		if (!IS_NULL_OR_ERR(current) && !IS_NULL_OR_ERR(current->mm)) {
 +			MUNMAP(current->mm, mmap->vaddr, mmap->len);
-+
++		}
 +		kfree(mmap);
 +	}
 +
@@ -7098,11 +7306,9 @@ index 0000000..2ede4ae
 +out:
 +	return ret;
 +}
-diff --git a/drivers/infiniband/ibp/drv/stack.c b/drivers/infiniband/ibp/drv/stack.c
-new file mode 100644
-index 0000000..03e9352
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/stack.c
+diff -ruN a/drivers/infiniband/ibp/drv/stack.c b/drivers/infiniband/ibp/drv/stack.c
+--- a/drivers/infiniband/ibp/drv/stack.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/stack.c	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,102 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7206,11 +7412,9 @@ index 0000000..03e9352
 +
 +	return p;
 +}
-diff --git a/drivers/infiniband/ibp/drv/stack.h b/drivers/infiniband/ibp/drv/stack.h
-new file mode 100644
-index 0000000..b005a88
---- /dev/null
-+++ b/drivers/infiniband/ibp/drv/stack.h
+diff -ruN a/drivers/infiniband/ibp/drv/stack.h b/drivers/infiniband/ibp/drv/stack.h
+--- a/drivers/infiniband/ibp/drv/stack.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/drv/stack.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,57 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7269,38 +7473,36 @@ index 0000000..b005a88
 +void ibp_clear_stack(struct ibp_stack *s);
 +
 +#endif /* _IBP_STACK_H_ */
-diff --git a/drivers/infiniband/ibp/sa/Makefile b/drivers/infiniband/ibp/sa/Makefile
-new file mode 100644
-index 0000000..a1ceab2
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/Makefile
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
+diff -ruN a/drivers/infiniband/ibp/Kconfig b/drivers/infiniband/ibp/Kconfig
+--- a/drivers/infiniband/ibp/Kconfig	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/Kconfig	2014-09-03 10:42:06.000000000 -0700
+@@ -0,0 +1,16 @@
++config IBP_SERVER
++	tristate "CCL Direct IB Server drivers"
++	---help---
++	  Server drivers for CCL Direct including server proxies for
++	  hw drivers, and core drivers ib_sa and ib_cm.
++	  Also includes is a kernel mode test module
 +
-+obj-$(CONFIG_IBP_SERVER) += ibp_sa_server.o
++	  To compile this driver as a module, choose M here.
++	  If unsure, say N.
 +
-+ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
-+
-+ibp_sa_server-y :=	server.o		\
-+			server_msg.o		\
-+			sa_server_msg.o
-+
-+default:
-+	$(MAKE) -C $(KDIR) M=`pwd`
-+
-+modules_install:
-+	$(MAKE) -C $(KDIR) M=`pwd` modules_install
-+
-+clean:
-+	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
-+
-+unix:
-+	dos2unix *.[ch] Kconfig Makefile
-diff --git a/drivers/infiniband/ibp/sa/common.h b/drivers/infiniband/ibp/sa/common.h
-new file mode 100644
-index 0000000..7f430cd
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/common.h
++config IBP_DEBUG
++	bool "CCL Direct debugging"
++	depends on IBP_SERVER
++	default y
++	---help---
++	  This option causes debug code to be compiled into the CCL Direct drivers.
+diff -ruN a/drivers/infiniband/ibp/Makefile b/drivers/infiniband/ibp/Makefile
+--- a/drivers/infiniband/ibp/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/Makefile	2014-09-03 10:42:06.000000000 -0700
+@@ -0,0 +1,3 @@
++obj-$(CONFIG_IBP_SERVER)		+= drv/
++obj-$(CONFIG_IBP_SERVER)		+= cm/
++obj-$(CONFIG_IBP_SERVER)		+= sa/
+diff -ruN a/drivers/infiniband/ibp/sa/common.h b/drivers/infiniband/ibp/sa/common.h
+--- a/drivers/infiniband/ibp/sa/common.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/common.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,108 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7400,7 +7602,7 @@ index 0000000..7f430cd
 +#define print_trace(f, arg...) PRINTK(IBP_DEBUG_VERBOSE, KERN_ERR, f, ##arg)
 +#endif
 +
-+#ifndef	IBP_SA_PORT		/* unique scif port for this service */
++#ifndef IBP_SA_PORT		/* unique scif port for this service */
 +#define IBP_SA_PORT		SCIF_OFED_PORT_4
 +#endif
 +
@@ -7410,11 +7612,9 @@ index 0000000..7f430cd
 +int ibp_recv(scif_epd_t ep, void *buf, size_t len);
 +
 +#endif /* COMMON_H */
-diff --git a/drivers/infiniband/ibp/sa/ibp-abi.h b/drivers/infiniband/ibp/sa/ibp-abi.h
-new file mode 100644
-index 0000000..81cbf21
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/ibp-abi.h
+diff -ruN a/drivers/infiniband/ibp/sa/ibp-abi.h b/drivers/infiniband/ibp/sa/ibp-abi.h
+--- a/drivers/infiniband/ibp/sa/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/ibp-abi.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,101 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7517,11 +7717,9 @@ index 0000000..81cbf21
 +};
 +
 +#endif /* IBP_ABI_H */
-diff --git a/drivers/infiniband/ibp/sa/ibp_exports.h b/drivers/infiniband/ibp/sa/ibp_exports.h
-new file mode 100644
-index 0000000..feb13a1
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/ibp_exports.h
+diff -ruN a/drivers/infiniband/ibp/sa/ibp_exports.h b/drivers/infiniband/ibp/sa/ibp_exports.h
+--- a/drivers/infiniband/ibp/sa/ibp_exports.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/ibp_exports.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,49 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7572,11 +7770,34 @@ index 0000000..feb13a1
 +u64 ibp_resolve_ib_device(struct ib_device *ibdev);
 +
 +#endif /* IBP_EXPORTS_H */
-diff --git a/drivers/infiniband/ibp/sa/sa_ibp_abi.h b/drivers/infiniband/ibp/sa/sa_ibp_abi.h
-new file mode 100644
-index 0000000..131d21f
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/sa_ibp_abi.h
+diff -ruN a/drivers/infiniband/ibp/sa/Makefile b/drivers/infiniband/ibp/sa/Makefile
+--- a/drivers/infiniband/ibp/sa/Makefile	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/Makefile	2014-09-03 10:42:06.000000000 -0700
+@@ -0,0 +1,21 @@
++KDIR ?= /lib/modules/`uname -r`/build
++
++obj-$(CONFIG_IBP_SERVER) += ibp_sa_server.o
++
++ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
++
++ibp_sa_server-y :=	server.o		\
++			server_msg.o		\
++			sa_server_msg.o
++
++default:
++	$(MAKE) -C $(KDIR) M=`pwd`
++
++modules_install:
++	$(MAKE) -C $(KDIR) M=`pwd` modules_install
++
++clean:
++	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
++
++unix:
++	dos2unix *.[ch] Kconfig Makefile
+diff -ruN a/drivers/infiniband/ibp/sa/sa_ibp_abi.h b/drivers/infiniband/ibp/sa/sa_ibp_abi.h
+--- a/drivers/infiniband/ibp/sa/sa_ibp_abi.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/sa_ibp_abi.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,251 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7829,12 +8050,10 @@ index 0000000..131d21f
 +};
 +
 +#endif /* SA_IBP_ABI_H */
-diff --git a/drivers/infiniband/ibp/sa/sa_server_msg.c b/drivers/infiniband/ibp/sa/sa_server_msg.c
-new file mode 100644
-index 0000000..0b4f3b9
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/sa_server_msg.c
-@@ -0,0 +1,973 @@
+diff -ruN a/drivers/infiniband/ibp/sa/sa_server_msg.c b/drivers/infiniband/ibp/sa/sa_server_msg.c
+--- a/drivers/infiniband/ibp/sa/sa_server_msg.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/sa_server_msg.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,970 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + * * This software is available to you under a choice of one of two
@@ -7868,27 +8087,9 @@ index 0000000..0b4f3b9
 +
 +#include "server.h"
 +
-+static LIST_HEAD(sa_entry_list);
-+static LIST_HEAD(query_list);
-+
-+void cleanup_sa_lists(void)
-+{
-+	struct sa_entry				*entry;
-+	struct sa_entry				*next;
-+
-+	down_write(&list_rwsem);
-+
-+	list_for_each_entry_safe(entry, next, &sa_entry_list, list) {
-+		/* force users to 1 so ib_sa_unregister will not dead lock */
-+		atomic_set(&entry->ib_client.users, 1);
-+
-+		ib_sa_unregister_client(&entry->ib_client);
-+
-+		kfree(entry);
-+	}
-+
-+	up_write(&list_rwsem);
-+}
++LIST_HEAD(sa_entry_list);
++LIST_HEAD(query_list);
++LIST_HEAD(mcast_list);
 +
 +static void free_query_list(struct sa_query_entry *entry)
 +{
@@ -8057,8 +8258,9 @@ index 0000000..0b4f3b9
 +		goto send_resp;
 +	}
 +
-+	/* force users to 1 so ib_sa_unregister will not deadlock */
-+	atomic_set(&entry->ib_client.users, 1);
++	down_write(&list_rwsem);
++	list_del(&entry->list);
++	up_write(&list_rwsem);
 +
 +	ib_sa_unregister_client(&entry->ib_client);
 +
@@ -8403,6 +8605,7 @@ index 0000000..0b4f3b9
 +
 +	if (status) {
 +		print_err("callback status %d\n", status);
++		// XXX How is data deallocated in error cases?
 +		goto queue_work;
 +	}
 +
@@ -8676,6 +8879,10 @@ index 0000000..0b4f3b9
 +	mutex_init(&data->lock);
 +	mutex_lock(&data->lock);
 +
++	down_write(&list_rwsem);
++	list_add(&data->list, &mcast_list);
++	up_write(&list_rwsem);
++
 +	multicast = ib_sa_join_multicast(client, ib_device,
 +					 cmd->port_num, &cmd->rec,
 +					 cmd->comp_mask, GFP_KERNEL,
@@ -8685,10 +8892,14 @@ index 0000000..0b4f3b9
 +		ret = PTR_ERR(multicast);
 +		print_err("ib_sa_join_multicast returned %d\n", ret);
 +		mutex_unlock(&data->lock);
++		down_write(&list_rwsem);
++		list_del(&data->list);
++		up_write(&list_rwsem);
 +		kfree(data);
 +		data = NULL;
 +		goto send_resp;
 +	}
++	data->mcast = multicast;
 +
 +	len += sizeof(*resp);
 +	resp = (struct ibp_sa_join_multicast_resp *) msg->data;
@@ -8730,6 +8941,11 @@ index 0000000..0b4f3b9
 +	len = sizeof(*msg);
 +
 +	ib_sa_free_multicast(multicast);
++
++	down_write(&list_rwsem);
++	list_del(&data->list);
++	up_write(&list_rwsem);
++
 +	kfree(data);
 +
 +	IBP_INIT_RESP(msg, len, RESPONSE, hdr->request, ret);
@@ -8808,11 +9024,9 @@ index 0000000..0b4f3b9
 +
 +	return ret;
 +}
-diff --git a/drivers/infiniband/ibp/sa/sa_table.h b/drivers/infiniband/ibp/sa/sa_table.h
-new file mode 100644
-index 0000000..b0844cd
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/sa_table.h
+diff -ruN a/drivers/infiniband/ibp/sa/sa_table.h b/drivers/infiniband/ibp/sa/sa_table.h
+--- a/drivers/infiniband/ibp/sa/sa_table.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/sa_table.h	2014-09-05 10:10:48.000000000 -0700
 @@ -0,0 +1,131 @@
 +/*"
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -8945,12 +9159,10 @@ index 0000000..b0844cd
 +	  .offset_bits  = 16,
 +	  .size_bits    = 48 },
 +};
-diff --git a/drivers/infiniband/ibp/sa/server.c b/drivers/infiniband/ibp/sa/server.c
-new file mode 100644
-index 0000000..cde1764
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/server.c
-@@ -0,0 +1,193 @@
+diff -ruN a/drivers/infiniband/ibp/sa/server.c b/drivers/infiniband/ibp/sa/server.c
+--- a/drivers/infiniband/ibp/sa/server.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/server.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,221 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -9002,6 +9214,8 @@ index 0000000..cde1764
 +
 +struct rw_semaphore				list_rwsem;
 +
++LIST_HEAD(client_list);
++
 +static struct task_struct			*listen_thread;
 +
 +static struct ibp_client *ibp_create_client(scif_epd_t ep, uint16_t node)
@@ -9035,6 +9249,10 @@ index 0000000..cde1764
 +		goto err2;
 +	}
 +
++	down_write(&list_rwsem);
++	list_add(&client->list, &client_list);
++	up_write(&list_rwsem);
++
 +	client->ibp_sa_client_thread = kthread_run(ibp_process_recvs,
 +						   client, DRV_NAME);
 +	if (!client->ibp_sa_client_thread) {
@@ -9044,6 +9262,10 @@ index 0000000..cde1764
 +
 +	return client;
 +err3:
++	down_write(&list_rwsem);
++	list_del(&client->list);
++	up_write(&list_rwsem);
++
 +	destroy_workqueue(client->workqueue);
 +err2:
 +	free_page((uintptr_t)client->tx_buf);
@@ -9135,21 +9357,37 @@ index 0000000..cde1764
 +
 +static void __exit ibp_sa_server_exit(void)
 +{
++	struct ibp_client		*client, *next;
++	struct completion		done;
++
 +	kthread_stop(listen_thread);
 +
-+	cleanup_sa_lists();
++	down_write(&list_rwsem);
++	list_for_each_entry_safe(client, next, &client_list, list) {
++		init_completion(&done);
++		client->done = &done;
++
++		/* Close scif ep to unblock the client thread scif_recv */
++		scif_close(client->ep);
++
++		up_write(&list_rwsem);
++
++		/* Wait for client thread to finish */
++		wait_for_completion(&done);
++
++		down_write(&list_rwsem);
++	}
++	up_write(&list_rwsem);
 +
 +	print_info(DRV_DESC " unloaded\n");
 +}
 +
 +module_init(ibp_sa_server_init);
 +module_exit(ibp_sa_server_exit);
-diff --git a/drivers/infiniband/ibp/sa/server.h b/drivers/infiniband/ibp/sa/server.h
-new file mode 100644
-index 0000000..12f13a4
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/server.h
-@@ -0,0 +1,166 @@
+diff -ruN a/drivers/infiniband/ibp/sa/server.h b/drivers/infiniband/ibp/sa/server.h
+--- a/drivers/infiniband/ibp/sa/server.h	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/server.h	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,172 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -9198,6 +9436,11 @@ index 0000000..12f13a4
 +#define DRV_NAME	"ibp_sa_server"
 +
 +extern int timeout;
++extern struct rw_semaphore	list_rwsem;
++extern struct list_head		client_list;
++extern struct list_head		sa_entry_list;
++extern struct list_head		query_list;
++extern struct list_head		mcast_list;
 +
 +struct ib_sa_sm_ah {
 +	struct ib_ah		*ah;
@@ -9223,9 +9466,11 @@ index 0000000..12f13a4
 +};
 +
 +struct ibp_client {
++	struct list_head	list;
 +	scif_epd_t		ep;
 +	void			*rx_buf;
 +	void			*tx_buf;
++	struct completion	*done;
 +	struct workqueue_struct	*workqueue;
 +	struct task_struct	*ibp_sa_client_thread;
 +};
@@ -9256,6 +9501,8 @@ index 0000000..12f13a4
 +	struct mutex		lock;
 +	int			ret;
 +	struct ibp_client       *client;
++	struct ib_sa_multicast	*mcast;
++	struct list_head	list;
 +	u64			entry;
 +	u64			mcentry;
 +};
@@ -9272,8 +9519,6 @@ index 0000000..12f13a4
 +	int			length;
 +	struct callback_msg	msg;
 +};
-+
-+extern struct rw_semaphore	list_rwsem;
 +
 +#define IBP_INIT_MSG(msg, size, op)				\
 +	do {							\
@@ -9294,7 +9539,6 @@ index 0000000..12f13a4
 +	} while (0)
 +
 +int ibp_process_recvs(void *p);
-+void cleanup_sa_lists(void);
 +
 +int ibp_cmd_sa_path_rec_get(struct ibp_client *client,
 +			    struct ibp_msg_header *hdr);
@@ -9316,12 +9560,10 @@ index 0000000..12f13a4
 +				struct ibp_msg_header *hdr);
 +
 +#endif /* SERVER_H */
-diff --git a/drivers/infiniband/ibp/sa/server_msg.c b/drivers/infiniband/ibp/sa/server_msg.c
-new file mode 100644
-index 0000000..03733e3
---- /dev/null
-+++ b/drivers/infiniband/ibp/sa/server_msg.c
-@@ -0,0 +1,152 @@
+diff -ruN a/drivers/infiniband/ibp/sa/server_msg.c b/drivers/infiniband/ibp/sa/server_msg.c
+--- a/drivers/infiniband/ibp/sa/server_msg.c	1969-12-31 16:00:00.000000000 -0800
++++ b/drivers/infiniband/ibp/sa/server_msg.c	2014-09-05 10:10:48.000000000 -0700
+@@ -0,0 +1,185 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -9409,6 +9651,48 @@ index 0000000..03733e3
 +	return ibp_send(client->ep, msg, len);
 +}
 +
++static void
++ibp_sa_destroy_client(struct ibp_client *client)
++{
++	struct join_mcast_cb_data	*mcast, *next_mcast;
++	struct sa_query_entry		*query, *next_query;
++	struct sa_entry			*sa, *next_sa;
++
++	down_write(&list_rwsem);
++	list_del(&client->list);
++	list_for_each_entry_safe(mcast, next_mcast, &mcast_list, list)
++		if (mcast->client == client) {
++			ib_sa_free_multicast(mcast->mcast);
++			list_del(&mcast->list);
++			kfree(mcast);
++		}
++	list_for_each_entry_safe(query, next_query, &query_list, list)
++		if (query->ibp_client == client) {
++			ib_sa_cancel_query(query->id, query->query);
++			list_del(&query->list);
++			kfree(query);
++		}
++	list_for_each_entry_safe(sa, next_sa, &sa_entry_list, list)
++		if (sa->client == client) {
++			ib_sa_unregister_client(&sa->ib_client);
++			list_del(&sa->list);
++			kfree(sa);
++		}
++	up_write(&list_rwsem);
++
++	destroy_workqueue(client->workqueue);
++
++	free_page((uintptr_t)client->tx_buf);
++	free_page((uintptr_t)client->rx_buf);
++
++	if (client->done)
++		complete(client->done);
++	else
++		scif_close(client->ep);
++
++	kfree(client);
++}
++
 +static int
 +(*ibp_msg_table[])(struct ibp_client *c, struct ibp_msg_header *h) = {
 +	[IBP_SA_PATH_REC_GET]		= ibp_cmd_sa_path_rec_get,
@@ -9461,19 +9745,7 @@ index 0000000..03733e3
 +			break;
 +	}
 +
-+	if (ret != -ENOTCONN)
-+		scif_close(client->ep);
-+
-+	destroy_workqueue(client->workqueue);
-+	msleep(100); // allow workqueue to finish before doing frees
-+
-+	free_page((uintptr_t)client->tx_buf);
-+	free_page((uintptr_t)client->rx_buf);
-+
-+	kfree(client);
++	ibp_sa_destroy_client(client);
 +
 +	return ret;
 +}
--- 
-1.8.3.1
-
