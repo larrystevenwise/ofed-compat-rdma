@@ -1,0 +1,118 @@
+From ea9834f106b4df2c1c1e04247d5c181e13225a2f Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Fri, 19 Sep 2014 07:49:58 +0530
+Subject: [PATCH] be2net : Backport support for rhel 6.6
+
+Fixing compilation issues seen while building be2net in OFED 3.12-1
+
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/net/ethernet/emulex/benet/be_compat.c  |   22 ++++++++++++++++++++++
+ drivers/net/ethernet/emulex/benet/be_compat.h  |    4 ++++
+ drivers/net/ethernet/emulex/benet/be_ethtool.c |   12 ++++++------
+ drivers/net/ethernet/emulex/benet/be_main.c    |    4 ++--
+ 4 files changed, 34 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/ethernet/emulex/benet/be_compat.c b/drivers/net/ethernet/emulex/benet/be_compat.c
+index 6e8f6c6..fad9b93 100644
+--- a/drivers/net/ethernet/emulex/benet/be_compat.c
++++ b/drivers/net/ethernet/emulex/benet/be_compat.c
+@@ -70,3 +70,25 @@ int pci_sriov_get_totalvfs(struct pci_dev *pdev)
+ 
+ #endif
+ #endif /* CONFIG_PCI_IOV */
++
++#if LINUX_VERSION_CODE > KERNEL_VERSION(3, 0, 0)
++unsigned long u64_stats_fetch_begin_compat(struct u64_stats_sync *sync)
++{
++	return u64_stats_fetch_begin_bh(sync);
++}
++bool u64_stats_fetch_retry_compat(const struct u64_stats_sync *syncp,
++				  unsigned int start)
++{
++	return u64_stats_fetch_retry_bh(syncp, start);
++}
++#else
++unsigned long u64_stats_fetch_begin_compat(struct u64_stats_sync *sync)
++{
++	return 0;
++}
++bool u64_stats_fetch_retry_compat(const struct u64_stats_sync *syncp,
++				  unsigned int start)
++{
++	return false;
++}
++#endif
+diff --git a/drivers/net/ethernet/emulex/benet/be_compat.h b/drivers/net/ethernet/emulex/benet/be_compat.h
+index d30267e..7a3f6d1 100644
+--- a/drivers/net/ethernet/emulex/benet/be_compat.h
++++ b/drivers/net/ethernet/emulex/benet/be_compat.h
+@@ -101,4 +101,8 @@ int pci_sriov_get_totalvfs(struct pci_dev *pdev);
+ #define DUPLEX_UNKNOWN 0xFF
+ #endif
+ 
++unsigned long u64_stats_fetch_begin_compat(struct u64_stats_sync *sync);
++bool u64_stats_fetch_retry_compat(const struct u64_stats_sync *syncp,
++				  unsigned int start);
++
+ #endif                          /* BE_COMPAT_H */
+diff --git a/drivers/net/ethernet/emulex/benet/be_ethtool.c b/drivers/net/ethernet/emulex/benet/be_ethtool.c
+index a739c20..b9b7154 100644
+--- a/drivers/net/ethernet/emulex/benet/be_ethtool.c
++++ b/drivers/net/ethernet/emulex/benet/be_ethtool.c
+@@ -347,10 +347,10 @@ be_get_ethtool_stats(struct net_device *netdev,
+ 		struct be_rx_stats *stats = rx_stats(rxo);
+ 
+ 		do {
+-			start = u64_stats_fetch_begin_bh(&stats->sync);
++			start = u64_stats_fetch_begin_compat(&stats->sync);
+ 			data[base] = stats->rx_bytes;
+ 			data[base + 1] = stats->rx_pkts;
+-		} while (u64_stats_fetch_retry_bh(&stats->sync, start));
++		} while (u64_stats_fetch_retry_compat(&stats->sync, start));
+ 
+ 		for (i = 2; i < ETHTOOL_RXSTATS_NUM; i++) {
+ 			p = (u8 *)stats + et_rx_stats[i].offset;
+@@ -363,19 +363,19 @@ be_get_ethtool_stats(struct net_device *netdev,
+ 		struct be_tx_stats *stats = tx_stats(txo);
+ 
+ 		do {
+-			start = u64_stats_fetch_begin_bh(&stats->sync_compl);
++			start = u64_stats_fetch_begin_compat(&stats->sync_compl);
+ 			data[base] = stats->tx_compl;
+-		} while (u64_stats_fetch_retry_bh(&stats->sync_compl, start));
++		} while (u64_stats_fetch_retry_compat(&stats->sync_compl, start));
+ 
+ 		do {
+-			start = u64_stats_fetch_begin_bh(&stats->sync);
++			start = u64_stats_fetch_begin_compat(&stats->sync);
+ 			for (i = 1; i < ETHTOOL_TXSTATS_NUM; i++) {
+ 				p = (u8 *)stats + et_tx_stats[i].offset;
+ 				data[base + i] =
+ 					(et_tx_stats[i].size == sizeof(u64)) ?
+ 						*(u64 *)p : *(u32 *)p;
+ 			}
+-		} while (u64_stats_fetch_retry_bh(&stats->sync, start));
++		} while (u64_stats_fetch_retry_compat(&stats->sync, start));
+ 		base += ETHTOOL_TXSTATS_NUM;
+ 	}
+ }
+diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
+index 78b934e..eaa3567 100644
+--- a/drivers/net/ethernet/emulex/benet/be_main.c
++++ b/drivers/net/ethernet/emulex/benet/be_main.c
+@@ -1393,9 +1393,9 @@ static void be_eqd_update(struct be_adapter *adapter, struct be_eq_obj *eqo)
+ 		return;
+ 
+ 	do {
+-		start = u64_stats_fetch_begin_bh(&stats->sync);
++		start = u64_stats_fetch_begin_compat(&stats->sync);
+ 		pkts = stats->rx_pkts;
+-	} while (u64_stats_fetch_retry_bh(&stats->sync, start));
++	} while (u64_stats_fetch_retry_compat(&stats->sync, start));
+ 
+ 	stats->rx_pps = (unsigned long)(pkts - stats->rx_pkts_prev) / (delta / HZ);
+ 	stats->rx_pkts_prev = pkts;
+-- 
+1.7.9.5
+
