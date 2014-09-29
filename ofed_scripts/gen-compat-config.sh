@@ -271,3 +271,7 @@ if (grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/uapi/linux/if_link.h
     grep -qw __IFLA_VF_LINK_STATE_MAX ${KLIB_BUILD}/include/linux/if_link.h > /dev/null 2>&1 || grep -qw __IFLA_VF_LINK_STATE_MAX /lib/modules/${KVERSION}/source/include/linux/if_link.h > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_IFLA_VF_LINK_STATE_MAX y
 fi
+
+if (grep -wq "ETH_FLAG_TXVLAN" ${KLIB_BUILD}/include/linux/ethtool.h > /dev/null 2>&1 || grep -wq "ETH_FLAG_TXVLAN" /lib/modules/${KVERSION}/source/include/linux/ethtool.h > /dev/null 2>&1); then
+    set_config CONFIG_COMPAT_IS_ETH_FLAG_TXVLAN y
+fi
