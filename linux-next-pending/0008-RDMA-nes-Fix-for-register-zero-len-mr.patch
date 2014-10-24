@@ -1,0 +1,40 @@
+RDMA/nes: Fix for a crash when registering a user mr with zero length
+
+Note: The return value ibmr has been previously initialized to ERR_PTR(-EINVAL),
+independent of this patch. 
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_verbs.c |    9 ++++-----
+ 1 files changed, 4 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_verbs.c b/drivers/infiniband/hw/nes/nes_verbs.c
+index 5b53ca5..e08d175 100644
+--- a/drivers/infiniband/hw/nes/nes_verbs.c
++++ b/drivers/infiniband/hw/nes/nes_verbs.c
+@@ -2331,6 +2331,10 @@ static struct ib_mr *nes_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 	u8 single_page = 1;
+ 	u8 stag_key;
+ 
++	if (length == 0) {
++		nes_debug(NES_DBG_MR, "Unable to register zero length region\n");
++		return ibmr;
++	}
+ 	region = ib_umem_get(pd->uobject->context, start, length, acc, 0);
+ 	if (IS_ERR(region)) {
+ 		return (struct ib_mr *)region;
+@@ -2565,11 +2569,6 @@ static struct ib_mr *nes_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
+ 			return ibmr;
+ 		case IWNES_MEMREG_TYPE_QP:
+ 		case IWNES_MEMREG_TYPE_CQ:
+-			if (!region->length) {
+-				nes_debug(NES_DBG_MR, "Unable to register zero length region for CQ\n");
+-				ib_umem_release(region);
+-				return ERR_PTR(-EINVAL);
+-			}
+ 			nespbl = kzalloc(sizeof(*nespbl), GFP_KERNEL);
+ 			if (!nespbl) {
+ 				nes_debug(NES_DBG_MR, "Unable to allocate PBL\n");
+-- 
+1.7.1
+
