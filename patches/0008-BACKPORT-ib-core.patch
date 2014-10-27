@@ -1,0 +1,36 @@
+From: Alaa Hleihel <alaa@mellanox.com>
+Subject: [PATCH] BACKPORT: ib-core
+
+Signed-off-by: Alaa Hleihel <alaa@mellanox.com>
+---
+ drivers/infiniband/core/cma.c |    8 ++++++++
+ 1 files changed, 8 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/cma.c
++++ b/drivers/infiniband/core/cma.c
+@@ -2329,7 +2329,11 @@ static int cma_alloc_any_port(struct idr *ps, struct rdma_id_private *id_priv)
+ 	int low, high, remaining;
+ 	unsigned int rover;
+ 
++#ifdef HAVE_INET_GET_LOCAL_PORT_RANGE_3_PARAMS
+ 	inet_get_local_port_range(&init_net, &low, &high);
++#else
++	inet_get_local_port_range(&low, &high);
++#endif
+ 	remaining = (high - low) + 1;
+ 	rover = prandom_u32() % remaining + low;
+ retry:
+@@ -3236,7 +3240,11 @@ static int cma_join_ib_multicast(struct rdma_id_private *id_priv,
+ 						id_priv->id.port_num, &rec,
+ 						comp_mask, GFP_KERNEL,
+ 						cma_ib_mc_handler, mc);
++#ifdef HAVE_PTR_ERR_OR_ZERO
+ 	return PTR_ERR_OR_ZERO(mc->multicast.ib);
++#else
++	return PTR_RET(mc->multicast.ib);
++#endif
+ }
+ 
+ static void iboe_mcast_work_handler(struct work_struct *work)
