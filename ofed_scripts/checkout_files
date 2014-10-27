@@ -14,5 +14,4 @@ net/sunrpc/xprtrdma
 drivers/scsi/Makefile
 drivers/scsi/scsi_priv.h
 drivers/scsi/scsi_transport_srp.c
-drivers/scsi/scsi_transport_srp_internal.h
 include/scsi/scsi_transport_srp.h
