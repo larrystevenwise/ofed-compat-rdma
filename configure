@@ -1504,6 +1504,14 @@ EOFAUTOCONF
 
         echo "Created ${AUTOCONF_H}:"
         cat ${AUTOCONF_H}
+
+        if [ ! -x compat/autogen.sh ]; then
+            exit 0
+        fi
+
+        cd compat
+        ex ./autogen.sh
+        ex ./configure --with-linux-obj=$KSRC --with-linux=$KSRC
 }
 
 main $@
