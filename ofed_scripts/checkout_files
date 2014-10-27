@@ -1,4 +1,3 @@
-Documentation/infiniband/
 drivers/infiniband/
 drivers/net/ethernet/chelsio/cxgb3/
 drivers/net/ethernet/chelsio/cxgb4/
