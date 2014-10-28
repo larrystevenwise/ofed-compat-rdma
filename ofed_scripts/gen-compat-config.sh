@@ -17,7 +17,7 @@ fi
 KERNEL_VERSION=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^\([0-9]\)\..*/\1/p')
 
 # 3.0 kernel stuff
-COMPAT_LATEST_VERSION="11"
+COMPAT_LATEST_VERSION="18"
 KERNEL_SUBLEVEL="-1"
 
 function set_config {
