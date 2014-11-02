@@ -51,7 +51,7 @@ all: kernel
 install: install_kernel
 install_kernel: install_modules
 
-autoconf_h=$(shell /bin/ls -1 $(KSRC)/include/*/autoconf.h 2> /dev/null | head -1)
+autoconf_h=$(shell /bin/ls -1 $(KSRC_OBJ)/include/*/autoconf.h 2> /dev/null | head -1)
 kconfig_h=$(shell /bin/ls -1 $(KSRC)/include/*/kconfig.h 2> /dev/null | head -1)
 
 ifneq ($(kconfig_h),)
@@ -70,9 +70,9 @@ kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 	@echo "Building kernel modules"
 	@echo "Kernel version: $(KVERSION)"
 	@echo "Modules directory: $(INSTALL_MOD_PATH)/$(MODULES_DIR)"
-	@echo "Kernel sources: $(KSRC)"
+	@echo "Kernel sources: $(KSRC_OBJ)"
 	env CWD=$(CWD) BACKPORT_INCLUDES=$(BACKPORT_INCLUDES) \
-		$(MAKE) -C $(KSRC) SUBDIRS="$(CWD)" \
+		$(MAKE) -C $(KSRC_OBJ) SUBDIRS="$(CWD)" \
 		V=$(V) KBUILD_NOCMDDEP=1 $(WITH_MAKE_PARAMS) \
 		CONFIG_MEMTRACK=$(CONFIG_MEMTRACK) \
 		CONFIG_DEBUG_INFO=$(CONFIG_DEBUG_INFO) \
@@ -177,7 +177,7 @@ kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 install_modules:
 	@echo "Installing kernel modules"
 
-	$(MAKE) -C $(KSRC) SUBDIRS="$(CWD)" \
+	$(MAKE) -C $(KSRC_OBJ) SUBDIRS="$(CWD)" \
 		INSTALL_MOD_PATH=$(INSTALL_MOD_PATH) \
 		INSTALL_MOD_DIR=$(INSTALL_MOD_DIR) \
 		$(WITH_MAKE_PARAMS) modules_install;
@@ -186,7 +186,7 @@ install_modules:
 clean: clean_kernel
 
 clean_kernel:
-	$(MAKE) -C $(KSRC) SUBDIRS="$(CWD)" $(WITH_MAKE_PARAMS) clean
+	$(MAKE) -C $(KSRC_OBJ) SUBDIRS="$(CWD)" $(WITH_MAKE_PARAMS) clean
 	@/bin/rm -f $(clean-files)
 
 clean-files := Module.symvers modules.order Module.markers compat/modules.order

@@ -39,7 +39,9 @@ Usage:  `basename $0` [options]
     --build_root=BUILD_ROOT  root directory to build RPM packages
     --kernel-version=VERSION  make for this kernel [$(uname -r)]
     --modules-dir=DIR  modules directory [/lib/modules/$(uname -r)]
-    --kernel-sources=DIR  make for this kernel [/lib/modules/$(uname -r)/build]
+    --kernel-sources=DIR  make for this kernel [/lib/modules/$(uname -r)/source]
+    --with-linux=DIR  kernel sources directory [/lib/modules/$(uname -r)/source]
+    --with-linux-obj=DIR  kernel obj directory [/lib/modules/$(uname -r)/build]
 
     Kernel modules configuration:
 
@@ -233,7 +235,7 @@ check_kerver()
 
 function check_autofconf {
 	VAR=$1
-	VALUE=$(tac ${KSRC}/include/*/autoconf.h | grep -m1 ${VAR} | sed -ne 's/.*\([01]\)$/\1/gp')
+	VALUE=$(tac ${KSRC_OBJ}/include/*/autoconf.h | grep -m1 ${VAR} | sed -ne 's/.*\([01]\)$/\1/gp')
 
 	eval "export $VAR=$VALUE"
 }
@@ -277,6 +279,14 @@ main()
                         ;;
                         -kernel-sources=* | --kernel-sources=* | --kernel-src=* | --kern-src=* | --ker-src=*)
                                 KSRC=`expr "x$1" : 'x[^=]*=\(.*\)'`
+                        ;;
+                        --with-linux)
+                                shift
+                                KSRC=$1
+                        ;;
+                        --with-linux-obj)
+                                shift
+                                KSRC_OBJ=$1
                         ;;
                         -with-quilt | --with-quilt)
                                 ofed_patch_params="$ofed_patch_params $1"
@@ -671,7 +681,8 @@ main()
 KVERSION=${KVERSION:-$(uname -r)}
 MIN_KVERSION="2.6.5"
 MODULES_DIR=${MODULES_DIR:-/lib/modules/${KVERSION}/updates}
-KSRC=${KSRC:-/lib/modules/${KVERSION}/build}
+KSRC=${KSRC:-/lib/modules/${KVERSION}/source}
+KSRC_OBJ=${KSRC_OBJ:-/lib/modules/$KVERSION/build}
 
 ARCH=${ARCH:-$(uname -m)}
 
@@ -822,7 +833,8 @@ KVERSION=${KVERSION}
 ARCH=${ARCH}
 MODULES_DIR=${MODULES_DIR}
 KSRC=${KSRC}
-KLIB_BUILD=${KSRC}
+KSRC_OBJ=${KSRC_OBJ}
+KLIB_BUILD=${KSRC_OBJ}
 
 AUTOCONF_H=${AUTOCONF_H}
 
@@ -1511,7 +1523,7 @@ EOFAUTOCONF
 
         cd compat
         ex ./autogen.sh
-        ex ./configure --with-linux-obj=$KSRC --with-linux=$KSRC
+        ex ./configure --with-linux-obj=$KSRC_OBJ --with-linux=$KSRC
 }
 
 main $@
