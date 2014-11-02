@@ -5,11 +5,11 @@ Leave only SRP related staff
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/scsi/Makefile | 187 --------------------------------------------------
- 1 file changed, 187 deletions(-)
+ drivers/scsi/Makefile |  182 -------------------------------------------------
+ 1 files changed, 0 insertions(+), 182 deletions(-)
 
 diff --git a/drivers/scsi/Makefile b/drivers/scsi/Makefile
-index 59f1ce6..1e8b606 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/scsi/Makefile
 +++ b/drivers/scsi/Makefile
 @@ -14,186 +14,4 @@
