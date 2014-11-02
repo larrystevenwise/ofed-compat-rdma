@@ -75,7 +75,8 @@
 %{!?RDMA_CONF_DIR: %define RDMA_CONF_DIR /etc/infiniband}
 %{!?MLXNET_CONF_DIR: %define MLXNET_CONF_DIR /etc/mlxethernet}
 
-%{!?K_SRC: %define K_SRC /lib/modules/%{KVERSION}/build}
+%{!?K_SRC: %define K_SRC /lib/modules/%{KVERSION}/source}
+%{!?K_SRC_OBJ: %define K_SRC_OBJ /lib/modules/%{KVERSION}/build}
 
 %{!?KERNEL_SOURCES: %define KERNEL_SOURCES /lib/modules/%{KVERSION}/source}
 
@@ -143,7 +144,7 @@ mkdir -p $RPM_BUILD_DIR/src
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version} $RPM_BUILD_DIR/src/
 %endif
 
-./configure --prefix=%{_prefix} --kernel-version %{KVERSION} --kernel-sources %{K_SRC} --modules-dir %{LIB_MOD_DIR} %{configure_options}
+./configure --prefix=%{_prefix} --kernel-version %{KVERSION} --with-linux %{K_SRC} --with-linux-obj %{K_SRC_OBJ} --modules-dir %{LIB_MOD_DIR} %{configure_options}
 
 %if %{build_kernel_ib_devel}
 # Copy InfniBand include files after applying backport patches (if required)

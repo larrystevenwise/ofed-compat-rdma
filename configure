@@ -284,9 +284,17 @@ main()
                                 shift
                                 KSRC=$1
                         ;;
+                        --with-linux=*)
+                                shift
+                                KSRC=`expr "x$1" : 'x[^=]*=\(.*\)'`
+                        ;;
                         --with-linux-obj)
                                 shift
                                 KSRC_OBJ=$1
+                        ;;
+                        --with-linux-obj=*)
+                                shift
+                                KSRC_OBJ=`expr "x$1" : 'x[^=]*=\(.*\)'`
                         ;;
                         -with-quilt | --with-quilt)
                                 ofed_patch_params="$ofed_patch_params $1"
