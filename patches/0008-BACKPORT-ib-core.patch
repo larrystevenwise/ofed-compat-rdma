@@ -3,14 +3,47 @@ Subject: [PATCH] BACKPORT: ib-core
 
 Signed-off-by: Alaa Hleihel <alaa@mellanox.com>
 ---
- drivers/infiniband/core/cma.c |    8 ++++++++
- 1 files changed, 8 insertions(+), 0 deletions(-)
+ drivers/infiniband/core/cma.c |   19 +++++++++++++++++++
+ 1 files changed, 19 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/cma.c
 +++ b/drivers/infiniband/core/cma.c
-@@ -2329,7 +2329,11 @@ static int cma_alloc_any_port(struct idr *ps, struct rdma_id_private *id_priv)
+@@ -1864,6 +1864,7 @@ static int cma_resolve_iw_route(struct rdma_id_private *id_priv, int timeout_ms)
+ 	return 0;
+ }
+ 
++#if defined(HAVE_VLAN_DEV_GET_EGRESS_QOS_MASK) && defined(HAVE_NETDEV_GET_PRIO_TC_MAP)
+ static int iboe_tos_to_sl(struct net_device *ndev, int tos)
+ {
+ 	int prio;
+@@ -1883,6 +1884,7 @@ static int iboe_tos_to_sl(struct net_device *ndev, int tos)
+ #endif
+ 	return 0;
+ }
++#endif
+ 
+ static int cma_resolve_iboe_route(struct rdma_id_private *id_priv)
+ {
+@@ -1928,7 +1930,16 @@ static int cma_resolve_iboe_route(struct rdma_id_private *id_priv)
+ 	route->path_rec->reversible = 1;
+ 	route->path_rec->pkey = cpu_to_be16(0xffff);
+ 	route->path_rec->mtu_selector = IB_SA_EQ;
++#if defined(HAVE_VLAN_DEV_GET_EGRESS_QOS_MASK) && defined(HAVE_NETDEV_GET_PRIO_TC_MAP)
+ 	route->path_rec->sl = iboe_tos_to_sl(ndev, id_priv->tos);
++#elif defined(HAVE_NETDEV_GET_PRIO_TC_MAP)
++	route->path_rec->sl = netdev_get_prio_tc_map(
++			ndev->priv_flags & IFF_802_1Q_VLAN ?
++				vlan_dev_real_dev(ndev) : ndev,
++			rt_tos2priority(id_priv->tos));
++#else
++	route->path_rec->sl = id_priv->tos >> 5;
++#endif
+ 	route->path_rec->mtu = iboe_get_mtu(ndev->mtu);
+ 	route->path_rec->rate_selector = IB_SA_EQ;
+ 	route->path_rec->rate = iboe_get_rate(ndev);
+@@ -2329,7 +2340,11 @@ static int cma_alloc_any_port(struct idr *ps, struct rdma_id_private *id_priv)
  	int low, high, remaining;
  	unsigned int rover;
  
@@ -22,7 +55,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	remaining = (high - low) + 1;
  	rover = prandom_u32() % remaining + low;
  retry:
-@@ -3236,7 +3240,11 @@ static int cma_join_ib_multicast(struct rdma_id_private *id_priv,
+@@ -3236,7 +3251,11 @@ static int cma_join_ib_multicast(struct rdma_id_private *id_priv,
  						id_priv->id.port_num, &rec,
  						comp_mask, GFP_KERNEL,
  						cma_ib_mc_handler, mc);
