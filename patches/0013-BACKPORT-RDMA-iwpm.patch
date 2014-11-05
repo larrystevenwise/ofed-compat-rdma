@@ -1,4 +1,5 @@
-Subject: [PATCH] RDMA/iwpm: Backports for OFED-3.18
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Subject: [PATCH] BACKPORT: RDMA/iwpm
 
 Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
 ---
@@ -6,7 +7,7 @@ Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
  1 files changed, 24 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/core/iwpm_util.c b/drivers/infiniband/core/iwpm_util.c
-index 69e9f84..5e01389 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/iwpm_util.c
 +++ b/drivers/infiniband/core/iwpm_util.c
 @@ -131,6 +131,9 @@ int iwpm_remove_mapinfo(struct sockaddr_storage *local_sockaddr,
@@ -82,6 +83,3 @@ index 69e9f84..5e01389 100644
  			if (map_info->nl_client != nl_client)
  				continue;
  			nlh = NULL;
--- 
-1.7.1
-
