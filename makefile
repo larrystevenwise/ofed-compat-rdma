@@ -144,8 +144,8 @@ kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 		-include $(autoconf_h) \
 		-include $(CWD)/include/linux/autoconf.h \
 		$(KCONFIG_H) \
-		-include $(CWD)/include/linux/compat-2.6.h \
 		-include $(CWD)/compat/config.h \
+		-include $(CWD)/include/linux/compat-2.6.h \
 		$(BACKPORT_INCLUDES) \
 		$(KERNEL_MEMTRACK_CFLAGS) \
 		$(KERNEL_NFS_FS_CFLAGS) \
