@@ -1,0 +1,76 @@
+diff -up a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c	2014-11-17 09:31:15.662359767 -0600
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c	2014-11-17 09:55:26.747281690 -0600
+@@ -3094,10 +3094,29 @@ static int cxgb_enable_msix(struct adapt
+ 	for (i = 0; i < vectors; ++i)
+ 		entries[i].entry = i;
+ 
++#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
+ 	vectors = pci_enable_msix_range(adap->pdev, entries,
+ 					adap->params.nports + 1, vectors);
+ 	if (vectors < 0)
+ 		return vectors;
++#else
++{
++	int err;
++
++	while ((err = pci_enable_msix(adap->pdev, entries, vectors)) > 0)
++		vectors = err;
++
++	if (err < 0)
++		pci_disable_msix(adap->pdev);
++		return err;
++
++	if (vectors < (adap->params.nports + 1)) {
++		pci_disable_msix(adap->pdev);
++		err = -1;
++		return err;
++	}
++}
++#endif
+ 
+ 	for (i = 0; i < vectors; ++i)
+ 		adap->msix_info[i].vec = entries[i].vector;
+diff -up a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c	2014-11-17 09:31:15.662359767 -0600
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c	2014-11-17 10:08:06.085240834 -0600
+@@ -185,7 +185,11 @@ static struct net_device *get_iff_from_m
+ 		if (ether_addr_equal(dev->dev_addr, mac)) {
+ 			rcu_read_lock();
+ 			if (vlan && vlan != VLAN_VID_MASK) {
++#ifdef HAVE___VLAN_FIND_DEV_DEEP_RCU
+ 				dev = __vlan_find_dev_deep_rcu(dev, htons(ETH_P_8021Q), vlan);
++#else
++				dev = __vlan_find_dev_deep(dev, htons(ETH_P_8021Q), vlan);
++#endif
+ 			} else if (netif_is_bond_slave(dev)) {
+ 				struct net_device *upper_dev;
+ 
+diff -up a/drivers/net/ethernet/chelsio/cxgb3/sge.c b/drivers/net/ethernet/chelsio/cxgb3/sge.c
+--- a/drivers/net/ethernet/chelsio/cxgb3/sge.c	2014-11-17 09:31:15.664359767 -0600
++++ b/drivers/net/ethernet/chelsio/cxgb3/sge.c	2014-11-17 09:57:35.364274770 -0600
+@@ -298,7 +298,12 @@ static void free_tx_desc(struct adapter
+ 			if (need_unmap)
+ 				unmap_skb(d->skb, q, cidx, pdev);
+ 			if (d->eop) {
++#ifdef HAVE_DEV_CONSUME_SKB_ANY
+ 				dev_consume_skb_any(d->skb);
++#else
++				dev_kfree_skb_any(d->skb);
++#endif
++
+ 				d->skb = NULL;
+ 			}
+ 		}
+@@ -1188,7 +1193,11 @@ static void write_tx_pkt_wr(struct adapt
+ 			cpl->wr.wr_lo = htonl(V_WR_LEN(flits) | V_WR_GEN(gen) |
+ 					      V_WR_TID(q->token));
+ 			wr_gen2(d, gen);
++#ifdef HAVE_DEV_CONSUME_SKB_ANY
+ 			dev_consume_skb_any(skb);
++#else
++			dev_kfree_skb_any(skb);
++#endif
+ 			return;
+ 		}
+ 
