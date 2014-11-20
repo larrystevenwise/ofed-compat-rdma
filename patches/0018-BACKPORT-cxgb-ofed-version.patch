@@ -21,7 +21,7 @@ diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ether
 index 578f7cd..ea34737 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -77,7 +77,7 @@
+@@ -75,7 +75,7 @@
  #ifdef DRV_VERSION
  #undef DRV_VERSION
  #endif
