@@ -236,7 +236,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  #ifdef CONFIG_MLX4_EN_VXLAN
  static void mlx4_en_add_vxlan_offloads(struct work_struct *work)
-@@ -2369,7 +2387,9 @@ static const struct net_device_ops mlx4_netdev_ops = {
+@@ -2387,7 +2405,9 @@ static const struct net_device_ops mlx4_netdev_ops = {
  #ifdef CONFIG_NET_RX_BUSY_POLL
  	.ndo_busy_poll		= mlx4_en_low_latency_recv,
  #endif
@@ -246,7 +246,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  #ifdef CONFIG_MLX4_EN_VXLAN
  	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
  	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
-@@ -2392,7 +2412,9 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
+@@ -2411,7 +2431,9 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
  	.ndo_set_vf_mac		= mlx4_en_set_vf_mac,
  	.ndo_set_vf_vlan	= mlx4_en_set_vf_vlan,
  	.ndo_set_vf_spoofchk	= mlx4_en_set_vf_spoofchk,
@@ -256,17 +256,17 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.ndo_get_vf_config	= mlx4_en_get_vf_config,
  #ifdef CONFIG_NET_POLL_CONTROLLER
  	.ndo_poll_controller	= mlx4_en_netpoll,
-@@ -2402,7 +2424,9 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
+@@ -2421,7 +2443,9 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
  #ifdef CONFIG_RFS_ACCEL
  	.ndo_rx_flow_steer	= mlx4_en_filter_rfs,
  #endif
 +#ifdef HAVE_NETDEV_PHYS_PORT_ID
  	.ndo_get_phys_port_id	= mlx4_en_get_phys_port_id,
 +#endif
- };
- 
- int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
-@@ -2423,7 +2447,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+ #ifdef CONFIG_MLX4_EN_VXLAN
+ 	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
+ 	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
+@@ -2447,7 +2471,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
  	netif_set_real_num_rx_queues(dev, prof->rx_ring_num);
  
  	SET_NETDEV_DEV(dev, &mdev->dev->pdev->dev);
@@ -512,7 +512,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/* Track current inflight packets for performance analysis */
  	AVG_PERF_COUNTER(priv->pstats.inflight_avg,
-@@ -914,7 +941,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -917,7 +944,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		netif_tx_stop_queue(ring->tx_queue);
  		ring->queue_stopped++;
  	}
@@ -524,7 +524,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	real_size = (real_size / 16) & 0x3f;
  
-@@ -953,8 +984,10 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -956,8 +987,10 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  			wmb();
  			iowrite32(ring->doorbell_qpn,
  				  ring->bf.uar->map + MLX4_SEND_DOORBELL);

@@ -1,0 +1,29 @@
+From: Steve Wise <swise@opengridcomputing.com>
+Subject: [PATCH] Backport for cxgbi on RHEL7
+
+Just needed to tweak the Kbuild files.
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/scsi/cxgbi/cxgb3i/Kbuild |    2 +-
+ drivers/scsi/cxgbi/cxgb4i/Kbuild |    2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/scsi/cxgbi/cxgb3i/Kbuild b/drivers/scsi/cxgbi/cxgb3i/Kbuild
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/cxgb3i/Kbuild
++++ b/drivers/scsi/cxgbi/cxgb3i/Kbuild
+@@ -1,3 +1,3 @@
+-EXTRA_CFLAGS += -I$(srctree)/drivers/net/ethernet/chelsio/cxgb3
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb3
+ 
+ obj-$(CONFIG_SCSI_CXGB3_ISCSI) += cxgb3i.o
+diff --git a/drivers/scsi/cxgbi/cxgb4i/Kbuild b/drivers/scsi/cxgbi/cxgb4i/Kbuild
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/cxgb4i/Kbuild
++++ b/drivers/scsi/cxgbi/cxgb4i/Kbuild
+@@ -1,3 +1,3 @@
+-EXTRA_CFLAGS += -I$(srctree)/drivers/net/ethernet/chelsio/cxgb4
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb4
+ 
+ obj-$(CONFIG_SCSI_CXGB4_ISCSI) += cxgb4i.o
