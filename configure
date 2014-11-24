@@ -285,7 +285,6 @@ main()
                                 KSRC=$1
                         ;;
                         --with-linux=*)
-                                shift
                                 KSRC=`expr "x$1" : 'x[^=]*=\(.*\)'`
                         ;;
                         --with-linux-obj)
@@ -293,7 +292,6 @@ main()
                                 KSRC_OBJ=$1
                         ;;
                         --with-linux-obj=*)
-                                shift
                                 KSRC_OBJ=`expr "x$1" : 'x[^=]*=\(.*\)'`
                         ;;
                         -with-quilt | --with-quilt)
