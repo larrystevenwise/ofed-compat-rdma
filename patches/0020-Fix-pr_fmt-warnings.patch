@@ -1,0 +1,131 @@
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Tue, 2 Dec 2014 15:56:37 -0600
+Subject: [PATCH] Fix pr_fmt warnings
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/infiniband/core/mad.c                      |    3 +++
+ drivers/infiniband/core/user_mad.c                 |    3 +++
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |    3 +++
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c |    3 +++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |    3 +++
+ drivers/scsi/cxgbi/cxgb3i/cxgb3i.c                 |    3 +++
+ drivers/scsi/cxgbi/cxgb4i/cxgb4i.c                 |    3 +++
+ drivers/scsi/cxgbi/libcxgbi.c                      |    3 +++
+ 8 files changed, 24 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/core/mad.c b/drivers/infiniband/core/mad.c
+index 74c30f4..abd464b 100644
+--- a/drivers/infiniband/core/mad.c
++++ b/drivers/infiniband/core/mad.c
+@@ -34,6 +34,9 @@
+  *
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/dma-mapping.h>
+diff --git a/drivers/infiniband/core/user_mad.c b/drivers/infiniband/core/user_mad.c
+index 1d5cc79..5afe4af 100644
+--- a/drivers/infiniband/core/user_mad.c
++++ b/drivers/infiniband/core/user_mad.c
+@@ -33,6 +33,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) "user_mad: " fmt
+ 
+ #include <linux/module.h>
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index 4e3c59a..d2d8cc5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -30,6 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/module.h>
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+index 54eedd9..aae67f0 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+@@ -30,6 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/list.h>
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 71e3f86..3df02db 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -32,6 +32,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/bitmap.h>
+diff --git a/drivers/scsi/cxgbi/cxgb3i/cxgb3i.c b/drivers/scsi/cxgbi/cxgb3i/cxgb3i.c
+index 49692a1..3bda559 100644
+--- a/drivers/scsi/cxgbi/cxgb3i/cxgb3i.c
++++ b/drivers/scsi/cxgbi/cxgb3i/cxgb3i.c
+@@ -12,6 +12,9 @@
+  *		Karen Xie (kxie@chelsio.com)
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
+ 
+ #include <linux/module.h>
+diff --git a/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c b/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
+index 1508125..e1fac5f 100644
+--- a/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
++++ b/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
+@@ -11,6 +11,9 @@
+  *		Rakesh Ranjan (rranjan@chelsio.com)
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ":%s: " fmt, __func__
+ 
+ #include <linux/module.h>
+diff --git a/drivers/scsi/cxgbi/libcxgbi.c b/drivers/scsi/cxgbi/libcxgbi.c
+index 7da59c3..bc41b19 100644
+--- a/drivers/scsi/cxgbi/libcxgbi.c
++++ b/drivers/scsi/cxgbi/libcxgbi.c
+@@ -11,6 +11,9 @@
+  * Written by: Rakesh Ranjan (rranjan@chelsio.com)
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt)	KBUILD_MODNAME ":%s: " fmt, __func__
+ 
+ #include <linux/skbuff.h>
+-- 
+1.7.1
+
