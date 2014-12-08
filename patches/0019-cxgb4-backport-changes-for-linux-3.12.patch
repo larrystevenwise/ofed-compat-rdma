@@ -55,7 +55,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static inline int is_offload(const struct adapter *adap)
-@@ -3004,6 +3019,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+@@ -3008,6 +3023,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
  	return err;
  }
  
@@ -63,7 +63,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static u32 get_rss_table_size(struct net_device *dev)
  {
  	const struct port_info *pi = netdev_priv(dev);
-@@ -3032,6 +3048,7 @@ static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key)
+@@ -3036,6 +3052,7 @@ static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key)
  		return write_rss(pi, pi->rss);
  	return 0;
  }
@@ -71,7 +71,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
  		     u32 *rules)
-@@ -3122,9 +3139,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+@@ -3126,9 +3143,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
  	.get_wol           = get_wol,
  	.set_wol           = set_wol,
  	.get_rxnfc         = get_rxnfc,
@@ -83,7 +83,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.flash_device      = set_flash,
  };
  
-@@ -4423,20 +4442,30 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
+@@ -4427,20 +4446,30 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
  	struct inet6_ifaddr *ifa = data;
  	struct net_device *event_dev;
  	int ret = NOTIFY_DONE;
@@ -114,7 +114,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			if (!first_pdev) {
  				ret = clip_add(slave->dev, ifa, event);
  				/* If clip_add is success then only initialize
-@@ -4449,6 +4478,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
+@@ -4453,6 +4482,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
  				   to_pci_dev(slave->dev->dev.parent))
  					ret = clip_add(slave->dev, ifa, event);
  		}
@@ -125,7 +125,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	} else
  		ret = clip_add(ifa->idev->dev, ifa, event);
  
-@@ -4459,6 +4492,7 @@ static struct notifier_block cxgb4_inet6addr_notifier = {
+@@ -4463,6 +4496,7 @@ static struct notifier_block cxgb4_inet6addr_notifier = {
  	.notifier_call = cxgb4_inet6addr_handler
  };
  
@@ -133,7 +133,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  /* Retrieves IPv6 addresses from a root device (bond, vlan) associated with
   * a physical device.
   * The physical device reference is needed to send the actul CLIP command.
-@@ -4504,7 +4538,11 @@ static int update_root_dev_clip(struct net_device *dev)
+@@ -4508,7 +4542,11 @@ static int update_root_dev_clip(struct net_device *dev)
  	}
  
  	for (i = 0; i < VLAN_N_VID; i++) {
@@ -145,7 +145,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		if (!root_dev)
  			continue;
  
-@@ -6443,9 +6481,25 @@ static int enable_msix(struct adapter *adap)
+@@ -6447,9 +6485,25 @@ static int enable_msix(struct adapter *adap)
  #else
  	need = adap->params.nports + EXTRA_VECS + ofld_need;
  #endif

@@ -1,7 +1,5 @@
-From dc3cc69f6acb3891404cd46300a2934511b605ef Mon Sep 17 00:00:00 2001
 From: Selvin Xavier <selvin.xavier@emulex.com>
-Date: Sat, 6 Dec 2014 15:16:41 +0530
-Subject: [PATCH 1/2] be2net: backport patch 
+Subject: [PATCH] be2net: backport patch
 
 Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
 ---
@@ -10,14 +8,14 @@ Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
  drivers/net/ethernet/emulex/benet/be_cmds.c    |    6 +-
  drivers/net/ethernet/emulex/benet/be_compat.c  |   74 +++++++
  drivers/net/ethernet/emulex/benet/be_compat.h  |  126 +++++++++++
- drivers/net/ethernet/emulex/benet/be_ethtool.c |   43 +++-
+ drivers/net/ethernet/emulex/benet/be_ethtool.c |   43 ++++-
  drivers/net/ethernet/emulex/benet/be_main.c    |  271 +++++++++++++++++++++---
  7 files changed, 492 insertions(+), 40 deletions(-)
  create mode 100644 drivers/net/ethernet/emulex/benet/be_compat.c
  create mode 100644 drivers/net/ethernet/emulex/benet/be_compat.h
 
 diff --git a/drivers/net/ethernet/emulex/benet/Makefile b/drivers/net/ethernet/emulex/benet/Makefile
-index 1a91b27..a32863b 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/Makefile
 +++ b/drivers/net/ethernet/emulex/benet/Makefile
 @@ -4,4 +4,4 @@
@@ -27,7 +25,7 @@ index 1a91b27..a32863b 100644
 -be2net-y :=  be_main.o be_cmds.o be_ethtool.o be_roce.o
 +be2net-y :=  be_main.o be_cmds.o be_ethtool.o be_roce.o be_compat.o
 diff --git a/drivers/net/ethernet/emulex/benet/be.h b/drivers/net/ethernet/emulex/benet/be.h
-index 9a2d752..fff6982 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be.h
 +++ b/drivers/net/ethernet/emulex/benet/be.h
 @@ -20,6 +20,7 @@
@@ -73,7 +71,7 @@ index 9a2d752..fff6982 100644
  
  #define be_physfn(adapter)		(!adapter->virtfn)
 diff --git a/drivers/net/ethernet/emulex/benet/be_cmds.c b/drivers/net/ethernet/emulex/benet/be_cmds.c
-index fead5c6..1d12f49 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be_cmds.c
 +++ b/drivers/net/ethernet/emulex/benet/be_cmds.c
 @@ -1920,7 +1920,11 @@ int be_cmd_rx_filter(struct be_adapter *adapter, u32 flags, u32 value)
@@ -310,7 +308,7 @@ index 0000000..e6a94f7
 +
 +#endif                          /* BE_COMPAT_H */
 diff --git a/drivers/net/ethernet/emulex/benet/be_ethtool.c b/drivers/net/ethernet/emulex/benet/be_ethtool.c
-index e42a791..04628fa 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be_ethtool.c
 +++ b/drivers/net/ethernet/emulex/benet/be_ethtool.c
 @@ -380,7 +380,11 @@ static void be_get_ethtool_stats(struct net_device *netdev,
@@ -456,7 +454,7 @@ index e42a791..04628fa 100644
  	.get_module_eeprom = be_get_module_eeprom
  };
 diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
-index 3e8475c..916c4a3 100644
+index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/emulex/benet/be_main.c
 +++ b/drivers/net/ethernet/emulex/benet/be_main.c
 @@ -143,8 +143,8 @@ static int be_queue_alloc(struct be_adapter *adapter, struct be_queue_info *q,
@@ -974,7 +972,7 @@ index 3e8475c..916c4a3 100644
  static int be_ndo_bridge_setlink(struct net_device *dev, struct nlmsghdr *nlh)
  {
  	struct be_adapter *adapter = netdev_priv(dev);
-@@ -4363,6 +4563,8 @@ static int be_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
+@@ -4368,6 +4568,8 @@ static int be_ndo_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
  				       BRIDGE_MODE_VEPA : BRIDGE_MODE_VEB);
  }
  
@@ -983,7 +981,7 @@ index 3e8475c..916c4a3 100644
  #ifdef CONFIG_BE2NET_VXLAN
  static void be_add_vxlan_port(struct net_device *netdev, sa_family_t sa_family,
  			      __be16 port)
-@@ -4421,11 +4623,6 @@ static void be_del_vxlan_port(struct net_device *netdev, sa_family_t sa_family,
+@@ -4426,11 +4628,6 @@ static void be_del_vxlan_port(struct net_device *netdev, sa_family_t sa_family,
  		 "Disabled VxLAN offloads for UDP port %d\n",
  		 be16_to_cpu(port));
  }
@@ -995,7 +993,7 @@ index 3e8475c..916c4a3 100644
  #endif
  
  static const struct net_device_ops be_netdev_ops = {
-@@ -4435,27 +4632,37 @@ static const struct net_device_ops be_netdev_ops = {
+@@ -4440,27 +4637,37 @@ static const struct net_device_ops be_netdev_ops = {
  	.ndo_set_rx_mode	= be_set_rx_mode,
  	.ndo_set_mac_address	= be_mac_addr_set,
  	.ndo_change_mtu		= be_change_mtu,
@@ -1034,7 +1032,7 @@ index 3e8475c..916c4a3 100644
  #endif
  };
  
-@@ -4481,7 +4688,9 @@ static void be_netdev_init(struct net_device *netdev)
+@@ -4486,7 +4693,9 @@ static void be_netdev_init(struct net_device *netdev)
  	netdev->vlan_features |= NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO6 |
  		NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
  
@@ -1044,7 +1042,7 @@ index 3e8475c..916c4a3 100644
  
  	netdev->flags |= IFF_MULTICAST;
  
-@@ -4594,7 +4803,7 @@ static int be_ctrl_init(struct be_adapter *adapter)
+@@ -4599,7 +4808,7 @@ static int be_ctrl_init(struct be_adapter *adapter)
  	rx_filter->size = sizeof(struct be_cmd_req_rx_filter);
  	rx_filter->va = dma_zalloc_coherent(&adapter->pdev->dev,
  					    rx_filter->size, &rx_filter->dma,
@@ -1053,7 +1051,7 @@ index 3e8475c..916c4a3 100644
  	if (!rx_filter->va) {
  		status = -ENOMEM;
  		goto free_mbox;
-@@ -4643,7 +4852,7 @@ static int be_stats_init(struct be_adapter *adapter)
+@@ -4648,7 +4857,7 @@ static int be_stats_init(struct be_adapter *adapter)
  		cmd->size = sizeof(struct be_cmd_req_get_stats_v2);
  
  	cmd->va = dma_zalloc_coherent(&adapter->pdev->dev, cmd->size, &cmd->dma,
@@ -1062,6 +1060,3 @@ index 3e8475c..916c4a3 100644
  	if (!cmd->va)
  		return -ENOMEM;
  	return 0;
--- 
-1.7.9.5
-
