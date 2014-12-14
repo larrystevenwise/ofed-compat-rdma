@@ -12,14 +12,16 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/cma.c         |   45 ++++++++++++++
  drivers/infiniband/core/fmr_pool.c    |    7 ++
  drivers/infiniband/core/netlink.c     |   20 ++++++
- drivers/infiniband/core/sa_query.c    |   15 +++++
+ drivers/infiniband/core/sa_query.c    |   19 ++++++
  drivers/infiniband/core/ucm.c         |   38 ++++++++++++
  drivers/infiniband/core/ucma.c        |   76 ++++++++++++++++++++++++
  drivers/infiniband/core/umem.c        |   16 +++++
  drivers/infiniband/core/user_mad.c    |   16 +++++
  drivers/infiniband/core/uverbs_cmd.c  |   51 ++++++++++++++++
  drivers/infiniband/core/uverbs_main.c |   40 +++++++++++++
- 12 files changed, 452 insertions(+), 0 deletions(-)
+ include/rdma/ib_pack.h                |    4 +
+ include/rdma/ib_verbs.h               |    4 +
+ 14 files changed, 464 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -449,7 +451,19 @@ diff --git a/drivers/infiniband/core/sa_query.c b/drivers/infiniband/core/sa_que
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/sa_query.c
 +++ b/drivers/infiniband/core/sa_query.c
-@@ -618,10 +618,13 @@ static void init_mad(struct ib_sa_mad *mad, struct ib_mad_agent *agent)
+@@ -42,7 +42,11 @@
+ #include <linux/kref.h>
+ #include <linux/idr.h>
+ #include <linux/workqueue.h>
++#ifdef HAVE_UAPI_LINUX_IF_ETHER_H
+ #include <uapi/linux/if_ether.h>
++#else
++#include <linux/if_ether.h>
++#endif
+ #include <rdma/ib_pack.h>
+ #include <rdma/ib_cache.h>
+ #include "sa.h"
+@@ -618,10 +622,13 @@ static void init_mad(struct ib_sa_mad *mad, struct ib_mad_agent *agent)
  
  static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
  {
@@ -463,7 +477,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (preload)
  		idr_preload(gfp_mask);
  	spin_lock_irqsave(&idr_lock, flags);
-@@ -633,6 +636,18 @@ static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
+@@ -633,6 +640,18 @@ static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
  		idr_preload_end();
  	if (id < 0)
  		return id;
@@ -1064,3 +1078,35 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (ret) {
  		printk(KERN_ERR "user_verbs: couldn't create abi_version attribute\n");
  		goto out_class;
+diff --git a/include/rdma/ib_pack.h b/include/rdma/ib_pack.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/include/rdma/ib_pack.h
++++ b/include/rdma/ib_pack.h
+@@ -34,7 +34,11 @@
+ #define IB_PACK_H
+ 
+ #include <rdma/ib_verbs.h>
++#ifdef HAVE_UAPI_LINUX_IF_ETHER_H
+ #include <uapi/linux/if_ether.h>
++#else
++#include <linux/if_ether.h>
++#endif
+ 
+ enum {
+ 	IB_LRH_BYTES  = 8,
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -48,7 +48,11 @@
+ #include <linux/rwsem.h>
+ #include <linux/scatterlist.h>
+ #include <linux/workqueue.h>
++#ifdef HAVE_UAPI_LINUX_IF_ETHER_H
+ #include <uapi/linux/if_ether.h>
++#else
++#include <linux/if_ether.h>
++#endif
+ 
+ #include <linux/atomic.h>
+ #include <asm/uaccess.h>
