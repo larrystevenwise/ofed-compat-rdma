@@ -42,6 +42,7 @@ Usage:  `basename $0` [options]
     --kernel-sources=DIR  make for this kernel [/lib/modules/$(uname -r)/source]
     --with-linux=DIR  kernel sources directory [/lib/modules/$(uname -r)/source]
     --with-linux-obj=DIR  kernel obj directory [/lib/modules/$(uname -r)/build]
+    --skip-autoconf
 
     Kernel modules configuration:
 
@@ -272,6 +273,9 @@ main()
                         ;;
                         -modules-dir=* | --modules-dir=* | --mod-dir=*)
                                 MODULES_DIR=`expr "x$1" : 'x[^=]*=\(.*\)'`
+                        ;;
+                        --skip-autoconf)
+                        SKIP_AUTOCONF=1
                         ;;
                         -kernel-sources | --kernel-sources | --kernel-src | --kern-src | --ker-src)
                                 shift
@@ -714,6 +718,7 @@ if [ $ARCH != "x86_64" ]; then
     CONFIG_INFINIBAND_QIB=
 fi
 
+SKIP_AUTOCONF=${SKIP_AUTOCONF:-0}
 CONFIG_MEMTRACK=${CONFIG_MEMTRACK:-''}
 CONFIG_DEBUG_INFO=${CONFIG_DEBUG_INFO:-'y'}
 CONFIG_INFINIBAND=${CONFIG_INFINIBAND:-''}
@@ -1527,9 +1532,11 @@ EOFAUTOCONF
             exit 0
         fi
 
-        cd compat
-        ex ./autogen.sh
-        ex ./configure --with-linux-obj=$KSRC_OBJ --with-linux=$KSRC
+	if [ $SKIP_AUTOCONF -eq 0 ]; then
+	        cd compat
+	        ex ./autogen.sh
+	        ex ./configure --with-linux-obj=$KSRC_OBJ --with-linux=$KSRC
+	fi
 }
 
 main $@
