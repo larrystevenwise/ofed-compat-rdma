@@ -419,12 +419,12 @@ index xxxxxxx..xxxxxxx xxxxxx
  				};
 +#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
 +
-+#ifndef HAVE_NETLINK_DUMP_START_6P
- 				return netlink_dump_start(nls, skb, nlh, &c);
-+#else
++#if defined(HAVE_NETLINK_DUMP_START_6P) || defined(HAVE_NETLINK_DUMP_START_5P)
 +				return netlink_dump_start(nls, skb, nlh,
 +							  client->cb_table[op].dump,
 +							  NULL, 0);
++#else
+ 				return netlink_dump_start(nls, skb, nlh, &c);
 +#endif
  			}
  		}
