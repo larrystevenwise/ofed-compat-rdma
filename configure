@@ -136,6 +136,9 @@ Usage:  `basename $0` [options]
     --with-iser-mod    make CONFIG_INFINIBAND_ISER=m [no]
     --without-iser-mod    [yes]
 
+    --with-isert-mod    make CONFIG_INFINIBAND_ISERT=m [no]
+    --without-isert-mod    [yes]
+
     --with-ehca-mod    make CONFIG_INFINIBAND_EHCA=m [no]
     --without-ehca-mod    [yes]
 
@@ -548,6 +551,9 @@ main()
                         --with-iser-mod)
                             CONFIG_INFINIBAND_ISER="m"
                         ;;
+                        --without-isert-mod)
+                            CONFIG_INFINIBAND_ISERT=
+                        ;;
                         --with-iscsi-mod)
                             CONFIG_SCSI_ISCSI_ATTRS="m"
                             CONFIG_ISCSI_TCP="m"
@@ -751,6 +757,7 @@ CONFIG_INFINIBAND_SCIF=${CONFIG_INFINIBAND_SCIF:-''}
 
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG:-''}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER:-''}
+CONFIG_INFINIBAND_ISERT=${CONFIG_INFINIBAND_ISERT:-''}
 CONFIG_SCSI_ISCSI_ATTRS=${CONFIG_SCSI_ISCSI_ATTRS:-''}
 CONFIG_ISCSI_TCP=${CONFIG_ISCSI_TCP:-''}
 CONFIG_INFINIBAND_EHCA=${CONFIG_INFINIBAND_EHCA:-''}
@@ -882,6 +889,7 @@ CONFIG_IBP_DEBUG=${CONFIG_IBP_DEBUG}
 CONFIG_INFINIBAND_SCIF=${CONFIG_INFINIBAND_SCIF}
 
 CONFIG_INFINIBAND_IPOIB_DEBUG=${CONFIG_INFINIBAND_IPOIB_DEBUG}
+CONFIG_INFINIBAND_ISERT=${CONFIG_INFINIBAND_ISERT}
 CONFIG_INFINIBAND_ISER=${CONFIG_INFINIBAND_ISER}
 CONFIG_SCSI_ISCSI_ATTRS=${CONFIG_SCSI_ISCSI_ATTRS}
 CONFIG_ISCSI_TCP=${CONFIG_ISCSI_TCP}
@@ -1083,6 +1091,11 @@ else
         DEFINE_INFINIBAND_ISER="#undef CONFIG_INFINIBAND_ISER"
         DEFINE_SCSI_ISCSI_ATTRS="#undef CONFIG_SCSI_ISCSI_ATTRS"
         DEFINE_ISCSI_TCP="#undef CONFIG_ISCSI_TCP"
+fi
+if [ "X${CONFIG_INFINIBAND_ISERT}" == "Xm" ]; then
+        DEFINE_INFINIBAND_ISERT="#undef CONFIG_INFINIBAND_ISERT\n#define CONFIG_INFINIBAND_ISERT 1"
+else
+        DEFINE_INFINIBAND_ISERT="#undef CONFIG_INFINIBAND_ISERT"
 fi
 if [ "X${CONFIG_INFINIBAND_EHCA}" == "Xm" ]; then
         DEFINE_INFINIBAND_EHCA="#undef CONFIG_INFINIBAND_EHCA\n#define CONFIG_INFINIBAND_EHCA 1"
@@ -1318,6 +1331,7 @@ $(echo -e "${DEFINE_NFSD_V4}" | grep -v undef)
 $(echo -e "${DEFINE_NFSD_RDMA}" | grep -v undef)
 
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_ISERT}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_ISER}" | grep -v undef)
 $(echo -e "${DEFINE_SCSI_ISCSI_ATTRS}" | grep -v undef)
 $(echo -e "${DEFINE_ISCSI_TCP}" | grep -v undef)
@@ -1387,6 +1401,7 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 
 #undef CONFIG_INFINIBAND_IPOIB_DEBUG
 #undef CONFIG_INFINIBAND_ISER
+#undef CONFIG_INFINIBAND_ISERT
 #undef CONFIG_INFINIBAND_EHCA
 #undef CONFIG_INFINIBAND_EHCA_SCALING
 #undef CONFIG_RDS
@@ -1484,6 +1499,7 @@ $(echo -e "${DEFINE_NFSD_V4}")
 $(echo -e "${DEFINE_NFSD_RDMA}")
 
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_DEBUG}")
+$(echo -e "${DEFINE_INFINIBAND_ISERT}")
 $(echo -e "${DEFINE_INFINIBAND_ISER}")
 $(echo -e "${DEFINE_SCSI_ISCSI_ATTRS}")
 $(echo -e "${DEFINE_ISCSI_TCP}")
