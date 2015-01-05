@@ -11,7 +11,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/cm.c          |   23 +++++++
  drivers/infiniband/core/cma.c         |   45 ++++++++++++++
  drivers/infiniband/core/fmr_pool.c    |    7 ++
- drivers/infiniband/core/netlink.c     |   20 ++++++
+ drivers/infiniband/core/netlink.c     |   23 +++++++
  drivers/infiniband/core/sa_query.c    |   19 ++++++
  drivers/infiniband/core/ucm.c         |   38 ++++++++++++
  drivers/infiniband/core/ucma.c        |   76 ++++++++++++++++++++++++
@@ -21,7 +21,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/uverbs_main.c |   40 +++++++++++++
  include/rdma/ib_pack.h                |    4 +
  include/rdma/ib_verbs.h               |    4 +
- 14 files changed, 464 insertions(+), 0 deletions(-)
+ 14 files changed, 467 insertions(+), 0 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -406,7 +406,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  #define pr_fmt(fmt) "%s:%s: " fmt, KBUILD_MODNAME, __func__
  
  #include <linux/export.h>
-@@ -152,11 +155,19 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
+@@ -152,11 +155,22 @@ static int ibnl_rcv_msg(struct sk_buff *skb, struct nlmsghdr *nlh)
  				return -EINVAL;
  
  			{
@@ -417,16 +417,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  					.module = client->cb_table[op].module,
 +#endif
  				};
++#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
++
++#ifndef HAVE_NETLINK_DUMP_START_6P
  				return netlink_dump_start(nls, skb, nlh, &c);
 +#else
 +				return netlink_dump_start(nls, skb, nlh,
 +							  client->cb_table[op].dump,
 +							  NULL, 0);
-+#endif /* (LINUX_VERSION_CODE >= KERNEL_VERSION(3,4,0)) */
++#endif
  			}
  		}
  	}
-@@ -188,11 +199,20 @@ EXPORT_SYMBOL(ibnl_multicast);
+@@ -188,11 +202,20 @@ EXPORT_SYMBOL(ibnl_multicast);
  
  int __init ibnl_init(void)
  {
