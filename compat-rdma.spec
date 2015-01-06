@@ -102,7 +102,7 @@
 Name: %{_name}
 Version: %{_version}
 Release: %{_release}
-License: GPL/BSD
+License: GPLv2 or BSD
 Url: http://openfabrics.org/
 Group: System Environment/Base
 Source: %{_name}-%{_version}.tgz
@@ -115,6 +115,7 @@ Requires: grep
 Requires: perl
 Requires: procps
 Requires: module-init-tools
+Requires: lsof
 Summary: Infiniband Driver and ULPs kernel modules
 %description
 InfiniBand "verbs", Access Layer  and ULPs
@@ -219,6 +220,11 @@ echo
 EOFINFO
 
 chmod +x ${INFO} > /dev/null 2>&1
+
+%if 0%{?suse_version} == 1315
+install -d $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
+install -m 0644 $RPM_BUILD_DIR/$NAME-$VERSION/source/ofed_scripts/openibd.service $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
+%endif
 
 # Copy infiniband configuration
 install -d $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
@@ -584,6 +590,10 @@ fi
        echo "OCRDMA_LOAD=yes" >> %{RDMA_CONF_DIR}/openib.conf
 %endif
 
+%if 0%{?suse_version} == 1315
+/usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+%endif
+
 fi # 1 : closed
 # END of post
 
@@ -623,6 +633,10 @@ if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
         # Clean /etc/modprobe.d/ofed.conf   
         # Remove previous configuration if exist
         /sbin/depmod %{KVERSION}
+%if 0%{?suse_version} == 1315
+/usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
+%endif
+
 
 # Clean udev.rules
 %if ! %{include_udev_rules}
@@ -652,6 +666,9 @@ fi
 %endif
 %{RDMA_CONF_DIR}/info
 /etc/init.d/openibd
+%if 0%{?suse_version} == 1315
+%{_prefix}/lib/systemd/system/openibd.service
+%endif
 /sbin/sysctl_perf_tuning
 %if %{include_udev_rules}
 /etc/udev/rules.d/90-ib.rules
