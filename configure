@@ -280,6 +280,9 @@ main()
                         --skip-autoconf)
                         SKIP_AUTOCONF=1
                         ;;
+                        --force-autogen)
+                        FORCE_AUTOGEN=1
+                        ;;
                         -kernel-sources | --kernel-sources | --kernel-src | --kern-src | --ker-src)
                                 shift
                                 KSRC=$1
@@ -727,6 +730,7 @@ if [ $ARCH != "x86_64" ]; then
 fi
 
 SKIP_AUTOCONF=${SKIP_AUTOCONF:-0}
+FORCE_AUTOGEN=${FORCE_AUTOGEN:-0}
 CONFIG_MEMTRACK=${CONFIG_MEMTRACK:-''}
 CONFIG_DEBUG_INFO=${CONFIG_DEBUG_INFO:-'y'}
 CONFIG_INFINIBAND=${CONFIG_INFINIBAND:-''}
@@ -1435,7 +1439,9 @@ EOFAUTOCONF
 
 	if [ $SKIP_AUTOCONF -eq 0 ]; then
 	        cd compat
-	        ex ./autogen.sh
+		if [[ ! -x configure || $FORCE_AUTOGEN -eq 1 ]]; then
+		        ex ./autogen.sh
+		fi
 	        ex ./configure --with-linux-obj=$KSRC_OBJ --with-linux=$KSRC
 	fi
 }
