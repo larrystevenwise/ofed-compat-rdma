@@ -223,7 +223,7 @@ chmod +x ${INFO} > /dev/null 2>&1
 
 %if 0%{?suse_version} == 1315
 install -d $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
-install -m 0644 $RPM_BUILD_DIR/$NAME-$VERSION/source/ofed_scripts/openibd.service $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
+install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openibd.service $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
 %endif
 
 # Copy infiniband configuration
