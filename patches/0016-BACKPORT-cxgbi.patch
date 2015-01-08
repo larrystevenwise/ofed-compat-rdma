@@ -1,0 +1,196 @@
+From: Steve Wise <swise@opengridcomputing.com>
+Subject: [PATCH] BACKPORT: cxgbi
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/scsi/cxgbi/cxgb3i/Kbuild   |    2 +-
+ drivers/scsi/cxgbi/cxgb4i/Kbuild   |    2 +-
+ drivers/scsi/cxgbi/cxgb4i/cxgb4i.c |   10 ++++++++
+ drivers/scsi/cxgbi/libcxgbi.c      |   42 ++++++++++++++++++++++++++++++++++++
+ drivers/scsi/cxgbi/libcxgbi.h      |    4 +++
+ 5 files changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/scsi/cxgbi/cxgb3i/Kbuild b/drivers/scsi/cxgbi/cxgb3i/Kbuild
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/cxgb3i/Kbuild
++++ b/drivers/scsi/cxgbi/cxgb3i/Kbuild
+@@ -1,3 +1,3 @@
+-EXTRA_CFLAGS += -I$(srctree)/drivers/net/ethernet/chelsio/cxgb3
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb3
+ 
+ obj-$(CONFIG_SCSI_CXGB3_ISCSI) += cxgb3i.o
+diff --git a/drivers/scsi/cxgbi/cxgb4i/Kbuild b/drivers/scsi/cxgbi/cxgb4i/Kbuild
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/cxgb4i/Kbuild
++++ b/drivers/scsi/cxgbi/cxgb4i/Kbuild
+@@ -1,3 +1,3 @@
+-EXTRA_CFLAGS += -I$(srctree)/drivers/net/ethernet/chelsio/cxgb4
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb4
+ 
+ obj-$(CONFIG_SCSI_CXGB4_ISCSI) += cxgb4i.o
+diff --git a/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c b/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
++++ b/drivers/scsi/cxgbi/cxgb4i/cxgb4i.c
+@@ -107,7 +107,9 @@ static struct iscsi_transport cxgb4i_iscsi_transport = {
+ 	.caps		= CAP_RECOVERY_L0 | CAP_MULTI_R2T | CAP_HDRDGST |
+ 				CAP_DATADGST | CAP_DIGEST_OFFLOAD |
+ 				CAP_PADDING_OFFLOAD | CAP_TEXT_NEGO,
++#ifdef HAVE_ISCSI_ATTR_IS_VISIBLE
+ 	.attr_is_visible	= cxgbi_attr_is_visible,
++#endif
+ 	.get_host_param	= cxgbi_get_host_param,
+ 	.set_host_param	= cxgbi_set_host_param,
+ 	/* session management */
+@@ -1307,7 +1309,11 @@ static int init_act_open(struct cxgbi_sock *csk)
+ 		goto rel_resource;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	n = dst_neigh_lookup(csk->dst, daddr);
++#else
++        n = dst_get_neighbour(csk->dst);
++#endif
+ 
+ 	if (!n) {
+ 		pr_err("%s, can't get neighbour of csk->dst.\n", ndev->name);
+@@ -1380,13 +1386,17 @@ static int init_act_open(struct cxgbi_sock *csk)
+ 	else
+ 		send_act_open_req6(csk, skb, csk->l2t);
+ #endif
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh_release(n);
++#endif
+ 
+ 	return 0;
+ 
+ rel_resource:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	if (n)
+ 		neigh_release(n);
++#endif
+ 	if (skb)
+ 		__kfree_skb(skb);
+ 	return -EINVAL;
+diff --git a/drivers/scsi/cxgbi/libcxgbi.c b/drivers/scsi/cxgbi/libcxgbi.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/libcxgbi.c
++++ b/drivers/scsi/cxgbi/libcxgbi.c
+@@ -613,7 +613,11 @@ static struct cxgbi_sock *cxgbi_check_route(struct sockaddr *dst_addr)
+ 		goto err_out;
+ 	}
+ 	dst = &rt->dst;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	n = dst_neigh_lookup(dst, &daddr->sin_addr.s_addr);
++#else
++	n = dst_get_neighbour(dst);
++#endif
+ 	if (!n) {
+ 		err = -ENODEV;
+ 		goto rel_rt;
+@@ -663,12 +667,16 @@ static struct cxgbi_sock *cxgbi_check_route(struct sockaddr *dst_addr)
+ 	csk->daddr.sin_family = daddr->sin_family;
+ 	csk->saddr.sin_family = daddr->sin_family;
+ 	csk->saddr.sin_addr.s_addr = fl4.saddr;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh_release(n);
++#endif
+ 
+ 	return csk;
+ 
+ rel_neigh:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh_release(n);
++#endif
+ 
+ rel_rt:
+ 	ip_rt_put(rt);
+@@ -717,7 +725,11 @@ static struct cxgbi_sock *cxgbi_check_route6(struct sockaddr *dst_addr)
+ 
+ 	dst = &rt->dst;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	n = dst_neigh_lookup(dst, &daddr6->sin6_addr);
++#else
++	n = dst_get_neighbour(dst);
++#endif
+ 
+ 	if (!n) {
+ 		pr_info("%pI6, port %u, dst no neighbour.\n",
+@@ -781,14 +793,22 @@ static struct cxgbi_sock *cxgbi_check_route6(struct sockaddr *dst_addr)
+ 	csk->saddr6.sin6_family = daddr6->sin6_family;
+ 	csk->saddr6.sin6_addr = pref_saddr;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	neigh_release(n);
++#endif
+ 	return csk;
+ 
+ rel_rt:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
+ 	if (n)
+ 		neigh_release(n);
++#endif
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 8, 0)
+ 	ip6_rt_put(rt);
++#else
++	dst_release(&rt->dst);
++#endif
+ 	if (csk)
+ 		cxgbi_sock_closed(csk);
+ err_out:
+@@ -2414,7 +2434,25 @@ int cxgbi_set_conn_param(struct iscsi_cls_conn *cls_conn,
+ 							conn->datadgst_en, 0);
+ 		break;
+ 	case ISCSI_PARAM_MAX_R2T:
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 4, 0)
+ 		return iscsi_tcp_set_max_r2t(conn, buf);
++#else
++	{
++		struct iscsi_session *session = conn->session;
++		int value;
++
++		err = 0;
++		sscanf(buf, "%d", &value);
++		if (value <= 0 || !is_power_of_2(value))
++			return -EINVAL;
++		if (session->max_r2t == value)
++			break;
++		iscsi_tcp_r2tpool_free(session);
++		err = iscsi_set_param(cls_conn, param, buf, buflen);
++		if (!err && iscsi_tcp_r2tpool_alloc(session))
++			return -ENOMEM;
++	}
++#endif
+ 	case ISCSI_PARAM_MAX_RECV_DLENGTH:
+ 		err = iscsi_set_param(cls_conn, param, buf, buflen);
+ 		if (!err)
+@@ -2850,7 +2888,11 @@ void cxgbi_iscsi_cleanup(struct iscsi_transport *itp,
+ }
+ EXPORT_SYMBOL_GPL(cxgbi_iscsi_cleanup);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ umode_t cxgbi_attr_is_visible(int param_type, int param)
++#else
++mode_t cxgbi_attr_is_visible(int param_type, int param)
++#endif
+ {
+ 	switch (param_type) {
+ 	case ISCSI_HOST_PARAM:
+diff --git a/drivers/scsi/cxgbi/libcxgbi.h b/drivers/scsi/cxgbi/libcxgbi.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/cxgbi/libcxgbi.h
++++ b/drivers/scsi/cxgbi/libcxgbi.h
+@@ -724,7 +724,11 @@ int cxgbi_conn_xmit_pdu(struct iscsi_task *);
+ 
+ void cxgbi_cleanup_task(struct iscsi_task *task);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ umode_t cxgbi_attr_is_visible(int param_type, int param);
++#else
++mode_t cxgbi_attr_is_visible(int param_type, int param);
++#endif
+ void cxgbi_get_conn_stats(struct iscsi_cls_conn *, struct iscsi_stats *);
+ int cxgbi_set_conn_param(struct iscsi_cls_conn *,
+ 			enum iscsi_param, char *, int);
