@@ -1,0 +1,68 @@
+From: Steve Wise <swise@opengridcomputing.com>
+Subject: [PATCH] BACKPORT: iw_cm
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/infiniband/core/iwcm.c |   21 +++++++++++++++++++++
+ 1 files changed, 21 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/core/iwcm.c b/drivers/infiniband/core/iwcm.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/iwcm.c
++++ b/drivers/infiniband/core/iwcm.c
+@@ -68,6 +68,7 @@ struct iwcm_work {
+ 
+ static unsigned int default_backlog = 256;
+ 
++#ifndef CONFIG_SYSCTL_SYSCALL_CHECK
+ static struct ctl_table_header *iwcm_ctl_table_hdr;
+ static struct ctl_table iwcm_ctl_table[] = {
+ 	{
+@@ -79,6 +80,14 @@ static struct ctl_table iwcm_ctl_table[] = {
+ 	},
+ 	{ }
+ };
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3,5,0)
++static struct ctl_path iwcm_ctl_path[] = {
++	{ .procname = "net" },
++	{ .procname = "iw_cm" },
++	{ }
++};
++#endif
++#endif
+ 
+ /*
+  * The following services provide a mechanism for pre-allocating iwcm_work
+@@ -1048,20 +1057,32 @@ static int __init iw_cm_init(void)
+ 	if (!iwcm_wq)
+ 		return -ENOMEM;
+ 
++#ifndef CONFIG_SYSCTL_SYSCALL_CHECK
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
+ 	iwcm_ctl_table_hdr = register_net_sysctl(&init_net, "net/iw_cm",
+ 						 iwcm_ctl_table);
++#else
++	iwcm_ctl_table_hdr = register_sysctl_paths(iwcm_ctl_path, iwcm_ctl_table);
++#endif
+ 	if (!iwcm_ctl_table_hdr) {
+ 		pr_err("iw_cm: couldn't register sysctl paths\n");
+ 		destroy_workqueue(iwcm_wq);
+ 		return -ENOMEM;
+ 	}
++#endif
+ 
+ 	return 0;
+ }
+ 
+ static void __exit iw_cm_cleanup(void)
+ {
++#ifndef CONFIG_SYSCTL_SYSCALL_CHECK
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
+ 	unregister_net_sysctl_table(iwcm_ctl_table_hdr);
++#else
++	unregister_net_table(iwcm_ctl_table_hdr);
++#endif
++#endif
+ 	destroy_workqueue(iwcm_wq);
+ }
+ 
