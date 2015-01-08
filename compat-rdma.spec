@@ -35,9 +35,6 @@
 %{!?KVERSION: %define KVERSION %(uname -r)}
 %define krelver %(echo -n %{KVERSION} | sed -e 's/-/_/g')
 
-%{!?build_kernel_ib: %define build_kernel_ib 0}
-%{!?build_kernel_ib_devel: %define build_kernel_ib_devel 0}
-
 # Set default to use scif.h and scif symvers from MPSS installation
 # Use the release-3.x paths
 %{!?scif_h: %define scif_h %(echo -n '/usr/src/kernels/%{KVERSION}/include/modules/scif.h')}
@@ -139,25 +136,19 @@ Core, HW and ULPs kernel modules sources
 rm -rf $RPM_BUILD_ROOT
 cd $RPM_BUILD_DIR/%{_name}-%{_version}
 
-%if %{build_kernel_ib_devel}
 # Save clean sources for compat-rdma-devel
 mkdir -p $RPM_BUILD_DIR/src
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version} $RPM_BUILD_DIR/src/
-%endif
 
 ./configure --prefix=%{_prefix} --kernel-version %{KVERSION} --with-linux %{K_SRC} --with-linux-obj %{K_SRC_OBJ} --modules-dir %{LIB_MOD_DIR} %{configure_options}
 
-%if %{build_kernel_ib_devel}
 # Copy InfniBand include files after applying backport patches (if required)
 mkdir -p $RPM_BUILD_DIR/src/%{_name}
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/include/ $RPM_BUILD_DIR/src/%{_name}
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/configure.mk.kernel $RPM_BUILD_DIR/src/%{_name}
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/config.mk  $RPM_BUILD_DIR/src/%{_name}
 sed -i -e "s@\${CWD}@%{_prefix}/src/%{_name}@g" $RPM_BUILD_DIR/src/%{_name}/config.mk
-%endif
 
-
-%if %{build_kernel_ib}
 %if %{build_ibp_server} || %{build_ibscif} || %{build_qib}
 test ! -d ./include/modules && mkdir ./include/modules
 test -f %{scif_h} && cp %{scif_h} ./include/modules
@@ -170,10 +161,8 @@ fi
 %endif
 export INSTALL_MOD_DIR=updates
 make kernel
-%endif
 
 %install
-%if %{build_kernel_ib_devel}
 mkdir -p $RPM_BUILD_ROOT/%{_prefix}/src
 cp -a $RPM_BUILD_DIR/src/%{_name}-%{_version} $RPM_BUILD_ROOT/%{_prefix}/src
 cp -a $RPM_BUILD_DIR/src/%{_name} $RPM_BUILD_ROOT/%{_prefix}/src
@@ -183,15 +172,11 @@ rm -rf $RPM_BUILD_DIR/src
 cd $RPM_BUILD_ROOT/%{_prefix}/src/
 ln -s %{_name} openib
 cd -
-%endif
 
-%if %{build_kernel_ib}
 make install_kernel MODULES_DIR=%{LIB_MOD_DIR} INSTALL_MOD_PATH=$RPM_BUILD_ROOT INSTALL_MOD_DIR=updates KERNELRELEASE=%{KVERSION}
 cp -a compat.config $RPM_BUILD_ROOT/%{_prefix}/src/%{_name}
 cp -a include/linux/compat_autoconf.h $RPM_BUILD_ROOT/%{_prefix}/src/%{_name}/include/linux
-%endif
 
-%if %{build_kernel_ib_devel}
 modsyms=`find $RPM_BUILD_DIR/%{_name}-%{_version} -name Module.symvers -o -name Modules.symvers`
 if [ -n "$modsyms" ]; then
 	for modsym in $modsyms
@@ -202,7 +187,6 @@ else
 	./ofed_scripts/create_Module.symvers.sh
 	cp ./Module.symvers $RPM_BUILD_ROOT/%{_prefix}/src/%{_name}/Module.symvers
 fi
-%endif
 	
 INFO=${RPM_BUILD_ROOT}%{RDMA_CONF_DIR}/info
 /bin/rm -f ${INFO}
@@ -310,65 +294,7 @@ rm -rf $RPM_BUILD_DIR/%{_name}-%{_version}
 
 %post
 if [ $1 -ge 1 ]; then # 1 : This package is being installed or reinstalled
-count_ib_ports()
-{
-    local cnt=0
-    local tmp_cnt=0
-    
-    tmp_cnt=$(/sbin/lspci -n | grep "15b3:" | wc -l | tr -d '[:space:]') # Mellanox HCAs
-    cnt=$[ $cnt + 2*${tmp_cnt} ]
-    
-    tmp_cnt=$(/sbin/lspci -n | grep -E "1fc1:|1077:7220" | wc -l | tr -d '[:space:]') # QLogic SDR and DDR HCA
-    cnt=$[ $cnt + ${tmp_cnt} ]
-    
-    tmp_cnt=$(/sbin/lspci -n | grep -E "1077:7322" | wc -l | tr -d '[:space:]') # QLogic QDR HCA
-    cnt=$[ $cnt + 2*${tmp_cnt} ]
-    return $cnt
-}
-
-count_ib_ports
-ports_num=$?
-
-# Set default number of ports to 2 if no HCAs found
-if [ $ports_num -eq 0 ]; then
-    ports_num=2
-fi    
-#############################################################################################################
-#                                       Modules configuration                                               #
-#############################################################################################################
-
-%if ! %{include_udev_rules}
-    if [ -e /etc/udev/udev.rules ]; then
-        perl -ni -e 'if (/\# Infiniband devices \#$/) { $filter = 1 }' -e 'if (!$filter) { print }' -e 'if (/\# End Infiniband devices \#$/){ $filter = 0 }' /etc/udev/udev.rules
-        cat >> /etc/udev/udev.rules << EOF
-# Infiniband devices #
-KERNEL="umad*", NAME="infiniband/%k"
-KERNEL="issm*", NAME="infiniband/%k"
-KERNEL="ucm*", NAME="infiniband/%k", MODE="0666"
-KERNEL="uverbs*", NAME="infiniband/%k", MODE="0666"
-KERNEL="uat", NAME="infiniband/%k", MODE="0666"
-KERNEL="ucma", NAME="infiniband/%k", MODE="0666"
-KERNEL="rdma_cm", NAME="infiniband/%k", MODE="0666"
-# End Infiniband devices #
-EOF
-    fi
-%endif
-
-%if %{modprobe_update}
-%if %{build_ipoib}
-for (( i=0 ; i < $ports_num ; i++ ))
-do
-cat >> /etc/modprobe.d/ib_ipoib.conf << EOF
-alias ib${i} ib_ipoib
-EOF
-done
-%endif
-%endif
-
     /sbin/depmod %{KVERSION}
-
-#############################################################################################################
-
 
 if [[ -f /etc/redhat-release || -f /etc/rocks-release ]]; then        
 perl -i -ne 'if (m@^#!/bin/bash@) {
@@ -459,7 +385,6 @@ if [ -f /etc/debian_version ]; then
         fi
 fi
 
-%if %{build_kernel_ib}
     echo >> %{RDMA_CONF_DIR}/openib.conf
     echo "# Load UCM module" >> %{RDMA_CONF_DIR}/openib.conf
     echo "UCM_LOAD=no" >> %{RDMA_CONF_DIR}/openib.conf
@@ -475,7 +400,6 @@ fi
     echo >> %{RDMA_CONF_DIR}/openib.conf
     echo "# Run sysctl performance tuning script" >> %{RDMA_CONF_DIR}/openib.conf
     echo "RUN_SYSCTL=yes" >> %{RDMA_CONF_DIR}/openib.conf
-%endif
 
 %if %{build_mthca}
        echo >> %{RDMA_CONF_DIR}/openib.conf                                                
