@@ -12,12 +12,12 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |   62 +++++++-
  drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |  199 +++++++++++++++++++++++
  drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   84 ++++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   61 +++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   53 ++++++-
  drivers/net/ethernet/mellanox/mlx4/eq.c         |   10 ++
  drivers/net/ethernet/mellanox/mlx4/main.c       |   24 +++
  drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   21 +++-
  include/linux/mlx4/cq.h                         |    5 +
- 14 files changed, 519 insertions(+), 5 deletions(-)
+ 14 files changed, 511 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -1220,31 +1220,7 @@ diff --git a/drivers/net/ethernet/mellanox/mlx4/en_tx.c b/drivers/net/ethernet/m
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx4/en_tx.c
 +++ b/drivers/net/ethernet/mellanox/mlx4/en_tx.c
-@@ -151,7 +151,11 @@ err_bounce:
- 	kfree(ring->bounce_buf);
- 	ring->bounce_buf = NULL;
- err_info:
-+#ifdef HAVE_KVFREE
- 	kvfree(ring->tx_info);
-+#else
-+	vfree(ring->tx_info);
-+#endif
- 	ring->tx_info = NULL;
- err_ring:
- 	kfree(ring);
-@@ -174,7 +178,11 @@ void mlx4_en_destroy_tx_ring(struct mlx4_en_priv *priv,
- 	mlx4_free_hwq_res(mdev->dev, &ring->wqres, ring->buf_size);
- 	kfree(ring->bounce_buf);
- 	ring->bounce_buf = NULL;
-+#ifdef HAVE_KVFREE
- 	kvfree(ring->tx_info);
-+#else
-+	vfree(ring->tx_info);
-+#endif
- 	ring->tx_info = NULL;
- 	kfree(ring);
- 	*pring = NULL;
-@@ -328,7 +336,11 @@ static u32 mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
+@@ -328,7 +328,11 @@ static u32 mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
  			}
  		}
  	}
@@ -1256,7 +1232,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	return tx_info->nr_txbb;
  }
  
-@@ -392,7 +404,13 @@ static bool mlx4_en_process_tx_cq(struct net_device *dev,
+@@ -392,7 +396,13 @@ static bool mlx4_en_process_tx_cq(struct net_device *dev,
  	if (!priv->port_up)
  		return true;
  
@@ -1270,7 +1246,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	index = cons_index & size_mask;
  	cqe = mlx4_en_get_cqe(buf, index, priv->cqe_size) + factor;
-@@ -582,9 +600,11 @@ static int get_real_size(const struct sk_buff *skb,
+@@ -582,9 +592,11 @@ static int get_real_size(const struct sk_buff *skb,
  
  	if (shinfo->gso_size) {
  		*inline_ok = false;
@@ -1282,7 +1258,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			*lso_header_size = skb_transport_offset(skb) + tcp_hdrlen(skb);
  		real_size = CTRL_SIZE + shinfo->nr_frags * DS_SIZE +
  			ALIGN(*lso_header_size + 4, DS_SIZE);
-@@ -664,20 +684,36 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc,
+@@ -664,20 +676,36 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc,
  	}
  }
  
@@ -1319,7 +1295,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static void mlx4_bf_copy(void __iomem *dst, const void *src,
-@@ -737,8 +773,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -737,8 +765,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  	if (vlan_tx_tag_present(skb))
  		vlan_tag = vlan_tx_tag_get(skb);
  
@@ -1334,7 +1310,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/* Track current inflight packets for performance analysis */
  	AVG_PERF_COUNTER(priv->pstats.inflight_avg,
-@@ -827,8 +868,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -827,8 +860,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  	 */
  	tx_info->ts_requested = 0;
  	if (unlikely(ring->hwtstamp_tx_type == HWTSTAMP_TX_ON &&
@@ -1348,7 +1324,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		tx_info->ts_requested = 1;
  	}
  
-@@ -836,11 +882,16 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -836,11 +874,16 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  	 * whether LSO is used */
  	tx_desc->ctrl.srcrb_flags = priv->ctrl_flags;
  	if (likely(skb->ip_summed == CHECKSUM_PARTIAL)) {
@@ -1365,7 +1341,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		ring->tx_csum++;
  	}
  
-@@ -894,6 +945,7 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -894,6 +937,7 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		build_inline_wqe(tx_desc, skb, shinfo, real_size, &vlan_tag,
  				 tx_ind, fragptr);
  
@@ -1373,7 +1349,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (skb->encapsulation) {
  		struct iphdr *ipv4 = (struct iphdr *)skb_inner_network_header(skb);
  		if (ipv4->protocol == IPPROTO_TCP || ipv4->protocol == IPPROTO_UDP)
-@@ -901,6 +953,7 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -901,6 +945,7 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		else
  			op_own |= cpu_to_be32(MLX4_WQE_CTRL_IIP);
  	}
@@ -1381,7 +1357,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	ring->prod += nr_txbb;
  
-@@ -917,7 +970,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -917,7 +962,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		netif_tx_stop_queue(ring->tx_queue);
  		ring->queue_stopped++;
  	}
@@ -1393,7 +1369,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	real_size = (real_size / 16) & 0x3f;
  
-@@ -956,8 +1013,10 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -956,8 +1005,10 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  			wmb();
  			iowrite32(ring->doorbell_qpn,
  				  ring->bf.uar->map + MLX4_SEND_DOORBELL);
