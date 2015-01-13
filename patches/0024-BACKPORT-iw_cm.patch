@@ -60,7 +60,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,5,0)
  	unregister_net_sysctl_table(iwcm_ctl_table_hdr);
 +#else
-+	unregister_net_table(iwcm_ctl_table_hdr);
++	unregister_sysctl_table(iwcm_ctl_table_hdr);
 +#endif
 +#endif
  	destroy_workqueue(iwcm_wq);
