@@ -3,19 +3,55 @@ Subject: [PATCH] BACKPORT: cxgb4
 
 Signed-off-by: Steve Wise <swise@opengridcomputing.com>
 ---
- drivers/infiniband/hw/cxgb4/cm.c                |   29 +++++++++
- drivers/infiniband/hw/cxgb4/iw_cxgb4.h          |   18 +++++
+ drivers/infiniband/hw/cxgb4/cm.c                |   77 ++++++++++
+ drivers/infiniband/hw/cxgb4/iw_cxgb4.h          |   18 +++
  drivers/infiniband/hw/cxgb4/mem.c               |    2 +
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   76 +++++++++++++++++++++++
- drivers/net/ethernet/chelsio/cxgb4/sge.c        |   28 ++++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |    9 +-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  185 +++++++++++++++++++++++
+ drivers/net/ethernet/chelsio/cxgb4/sge.c        |  113 ++++++++++++++-
  drivers/net/ethernet/chelsio/cxgb4/t4_hw.c      |    2 +
- 6 files changed, 155 insertions(+), 0 deletions(-)
+ 7 files changed, 403 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/cxgb4/cm.c
 +++ b/drivers/infiniband/hw/cxgb4/cm.c
-@@ -412,16 +412,24 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
+@@ -378,6 +378,7 @@ static struct dst_entry *find_route6(struct c4iw_dev *dev, __u8 *local_ip,
+ 	struct dst_entry *dst = NULL;
+ 
+ 	if (IS_ENABLED(CONFIG_IPV6)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		struct flowi6 fl6;
+ 
+ 		memset(&fl6, 0, sizeof(fl6));
+@@ -386,6 +387,18 @@ static struct dst_entry *find_route6(struct c4iw_dev *dev, __u8 *local_ip,
+ 		if (ipv6_addr_type(&fl6.daddr) & IPV6_ADDR_LINKLOCAL)
+ 			fl6.flowi6_oif = sin6_scope_id;
+ 		dst = ip6_route_output(&init_net, NULL, &fl6);
++#else
++		struct flowi fl;
++
++		memset(&fl, 0, sizeof(fl));
++		fl.proto = IPPROTO_TCP;
++		ipv6_addr_copy(&fl.fl6_src, (struct in6_addr *)local_ip);
++		ipv6_addr_copy(&fl.fl6_dst, (struct in6_addr *)peer_ip);
++		fl.fl_ip_dport = peer_port;
++		fl.fl_ip_sport = local_port;
++
++		dst = ip6_route_output(&init_net, NULL, &fl);
++#endif
+ 		if (!dst)
+ 			goto out;
+ 		if (!our_interface(dev, ip6_dst_idev(dst)->dev) &&
+@@ -404,6 +417,7 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
+ 				 __be16 peer_port, u8 tos)
+ {
+ 	struct rtable *rt;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 	struct flowi4 fl4;
+ 	struct neighbour *n;
+ 
+@@ -412,17 +426,52 @@ static struct dst_entry *find_route(struct c4iw_dev *dev, __be32 local_ip,
  				   tos, 0);
  	if (IS_ERR(rt))
  		return NULL;
@@ -38,9 +74,37 @@ index xxxxxxx..xxxxxxx xxxxxx
  	neigh_release(n);
 +#endif
  	return &rt->dst;
++#else
++	struct flowi fl = {
++		.oif = 0,
++		.nl_u = {
++			.ip4_u = {
++				.daddr = peer_ip,
++				.saddr = local_ip,
++				.tos = tos}
++		},
++		.proto = IPPROTO_TCP,
++		.uli_u = {
++			.ports = {
++				.sport = local_port,
++				.dport = peer_port}
++		}
++	};
++
++	if (ip_route_output_flow(&init_net, &rt, &fl, NULL, 0))
++		return NULL;
++
++	if (!our_interface(dev, rt->u.dst.neighbour->dev) &&
++			!(rt->u.dst.neighbour->dev->flags & IFF_LOOPBACK)) {
++		dst_release(&rt->u.dst);
++		return NULL;
++	}
++	return &rt->u.dst;
++#endif
  }
  
-@@ -1860,7 +1868,11 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
+ static void arp_failure_discard(void *handle, struct sk_buff *skb)
+@@ -1860,7 +1909,11 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
  	int err, step;
  	struct net_device *pdev;
  
@@ -52,7 +116,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (!n)
  		return -ENODEV;
  
-@@ -1928,7 +1940,9 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
+@@ -1928,7 +1981,9 @@ static int import_ep(struct c4iw_ep *ep, int iptype, __u8 *peer_ip,
  out:
  	rcu_read_unlock();
  
@@ -62,7 +126,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	return err;
  }
-@@ -3491,7 +3505,16 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
+@@ -2902,7 +2957,11 @@ static int get_lladdr(struct net_device *dev, struct in6_addr *addr,
+ 		struct inet6_ifaddr *ifp;
+ 
+ 		read_lock_bh(&idev->lock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 		list_for_each_entry(ifp, &idev->addr_list, if_list) {
++#else
++		for (ifp=idev->addr_list; ifp; ifp=ifp->if_next) {
++#endif
+ 			if (ifp->scope == IFA_LINK &&
+ 			    !(ifp->flags & banned_flags)) {
+ 				memcpy(addr, &ifp->addr, 16);
+@@ -3491,7 +3550,19 @@ static void build_cpl_pass_accept_req(struct sk_buff *skb, int stid , u8 tos)
  	 */
  	memset(&tmp_opt, 0, sizeof(tmp_opt));
  	tcp_clear_options(&tmp_opt);
@@ -70,16 +146,19 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0)
  	tcp_parse_options(skb, &tmp_opt, 0, NULL);
 +#else
-+
 +	tcp_parse_options(skb, &tmp_opt, NULL, 0, NULL);
 +#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 9, 0) */
 +#else
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 33)
 +	tcp_parse_options(skb, &tmp_opt, NULL, 0);
++#else
++	tcp_parse_options(skb, &tmp_opt, 0);
++#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 33) */
 +#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 6, 0) */
  
  	req = (struct cpl_pass_accept_req *)__skb_push(skb, sizeof(*req));
  	memset(req, 0, sizeof(*req));
-@@ -3660,7 +3683,11 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+@@ -3660,7 +3731,11 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
  		       __func__);
  		goto reject;
  	}
@@ -91,7 +170,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	if (!neigh) {
  		pr_err("%s - failed to allocate neigh!\n",
-@@ -3682,7 +3709,9 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
+@@ -3682,7 +3757,9 @@ static int rx_pkt(struct c4iw_dev *dev, struct sk_buff *skb)
  		pi = (struct port_info *)netdev_priv(pdev);
  		tx_chan = cxgb4_port_chan(pdev);
  	}
@@ -150,6 +229,33 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  #include "iw_cxgb4.h"
  
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -381,6 +381,9 @@ struct sge_rspq;
+ 
+ struct port_info {
+ 	struct adapter *adapter;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 1, 0)
++	struct vlan_group *vlan_grp;
++#endif
+ 	u16    viid;
+ 	s16    xact_addr_filt;        /* index of exact MAC address filter */
+ 	u16    rss_size;              /* size of VI's RSS table slice */
+@@ -436,7 +439,11 @@ struct sge_fl {                     /* SGE free-buffer queue state */
+ 
+ /* A packet gather list */
+ struct pkt_gl {
+-	struct page_frag frags[MAX_SKB_FRAGS];
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
++ 	struct page_frag frags[MAX_SKB_FRAGS];
++#else
++	skb_frag_t frags[MAX_SKB_FRAGS];
++#endif
+ 	void *va;                         /* virtual address of first byte */
+ 	unsigned int nfrags;              /* # of fragments */
+ 	unsigned int tot_len;             /* total length of fragments */
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
@@ -164,7 +270,38 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  #ifdef DRV_VERSION
  #undef DRV_VERSION
-@@ -1438,8 +1440,17 @@ static int del_filter_wr(struct adapter *adapter, int fidx)
+@@ -584,9 +586,14 @@ static int set_addr_filters(const struct net_device *dev, bool sleep)
+ 	int ret, naddr = 0;
+ 	const struct netdev_hw_addr *ha;
+ 	int uc_cnt = netdev_uc_count(dev);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 	int mc_cnt = netdev_mc_count(dev);
++#endif
+ 	const struct port_info *pi = netdev_priv(dev);
+ 	unsigned int mb = pi->adapter->fn;
++#if LINUX_VERSION_CODE < KERNEL_VERSION(2, 6, 35)
++	const struct dev_addr_list *d;
++#endif	
+ 
+ 	/* first do the secondary unicast addresses */
+ 	netdev_for_each_uc_addr(ha, dev) {
+@@ -603,9 +610,15 @@ static int set_addr_filters(const struct net_device *dev, bool sleep)
+ 	}
+ 
+ 	/* next set up the multicast addresses */
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 	netdev_for_each_mc_addr(ha, dev) {
+ 		addr[naddr++] = ha->addr;
+ 		if (--mc_cnt == 0 || naddr >= ARRAY_SIZE(addr)) {
++#else
++	netdev_for_each_mc_addr(d, dev) {
++		addr[naddr++] = d->dmi_addr;
++		if (naddr >= ARRAY_SIZE(addr) || d->next == NULL) {
++#endif
+ 			ret = t4_alloc_mac_filt(pi->adapter, mb, pi->viid, free,
+ 					naddr, addr, filt_idx, &mhash, sleep);
+ 			if (ret < 0)
+@@ -1438,8 +1451,17 @@ static int del_filter_wr(struct adapter *adapter, int fidx)
  	return 0;
  }
  
@@ -182,7 +319,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	int txq;
  
-@@ -1477,7 +1488,11 @@ static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
+@@ -1477,7 +1499,11 @@ static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
  		return txq;
  	}
  
@@ -194,15 +331,41 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static inline int is_offload(const struct adapter *adap)
-@@ -3008,6 +3023,7 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+@@ -2398,6 +2424,7 @@ static int restart_autoneg(struct net_device *dev)
+ 	return 0;
+ }
+ 
++#ifdef HAVE_SET_PHYS_ID
+ static int identify_port(struct net_device *dev,
+ 			 enum ethtool_phys_id_state state)
+ {
+@@ -2413,6 +2440,7 @@ static int identify_port(struct net_device *dev,
+ 
+ 	return t4_identify_port(adap, adap->fn, netdev2pinfo(dev)->viid, val);
+ }
++#endif
+ 
+ static unsigned int from_fw_linkcaps(unsigned int type, unsigned int caps)
+ {
+@@ -2991,6 +3019,7 @@ static int set_wol(struct net_device *dev, struct ethtool_wolinfo *wol)
  	return err;
  }
+ 
++#ifdef HAVE_NDO_SET_FEATURES
+ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+ {
+ 	const struct port_info *pi = netdev_priv(dev);
+@@ -3007,7 +3036,9 @@ static int cxgb_set_features(struct net_device *dev, netdev_features_t features)
+ 		dev->features = features ^ NETIF_F_HW_VLAN_CTAG_RX;
+ 	return err;
+ }
++#endif
  
 +#ifdef HAVE_GET_SET_RXFH
  static u32 get_rss_table_size(struct net_device *dev)
  {
  	const struct port_info *pi = netdev_priv(dev);
-@@ -3036,9 +3052,15 @@ static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key)
+@@ -3036,9 +3067,15 @@ static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key)
  		return write_rss(pi, pi->rss);
  	return 0;
  }
@@ -218,7 +381,17 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	const struct port_info *pi = netdev_priv(dev);
  
-@@ -3126,9 +3148,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+@@ -3117,7 +3154,9 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.set_pauseparam    = set_pauseparam,
+ 	.get_link          = ethtool_op_get_link,
+ 	.get_strings       = get_strings,
++#ifdef HAVE_SET_PHYS_ID
+ 	.set_phys_id       = identify_port,
++#endif
+ 	.nway_reset        = restart_autoneg,
+ 	.get_sset_count    = get_sset_count,
+ 	.get_ethtool_stats = get_stats,
+@@ -3126,9 +3165,11 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
  	.get_wol           = get_wol,
  	.set_wol           = set_wol,
  	.get_rxnfc         = get_rxnfc,
@@ -230,7 +403,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.flash_device      = set_flash,
  };
  
-@@ -4427,20 +4451,34 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
+@@ -4427,20 +4468,34 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
  	struct inet6_ifaddr *ifa = data;
  	struct net_device *event_dev;
  	int ret = NOTIFY_DONE;
@@ -265,7 +438,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			if (!first_pdev) {
  				ret = clip_add(slave->dev, ifa, event);
  				/* If clip_add is success then only initialize
-@@ -4453,6 +4491,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
+@@ -4453,6 +4508,10 @@ static int cxgb4_inet6addr_handler(struct notifier_block *this,
  				   to_pci_dev(slave->dev->dev.parent))
  					ret = clip_add(slave->dev, ifa, event);
  		}
@@ -276,7 +449,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	} else
  		ret = clip_add(ifa->idev->dev, ifa, event);
  
-@@ -4463,6 +4505,7 @@ static struct notifier_block cxgb4_inet6addr_notifier = {
+@@ -4463,6 +4522,7 @@ static struct notifier_block cxgb4_inet6addr_notifier = {
  	.notifier_call = cxgb4_inet6addr_handler
  };
  
@@ -284,7 +457,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  /* Retrieves IPv6 addresses from a root device (bond, vlan) associated with
   * a physical device.
   * The physical device reference is needed to send the actul CLIP command.
-@@ -4500,7 +4543,16 @@ static int update_root_dev_clip(struct net_device *dev)
+@@ -4478,7 +4538,11 @@ static int update_dev_clip(struct net_device *root_dev, struct net_device *dev)
+ 		return ret;
+ 
+ 	read_lock_bh(&idev->lock);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(2, 6, 35)
+ 	list_for_each_entry(ifa, &idev->addr_list, if_list) {
++#else
++	for (ifa=idev->addr_list; ifa; ifa=ifa->if_next) {
++#endif
+ 		ret = cxgb4_clip_get(dev,
+ 				(const struct in6_addr *)ifa->addr.s6_addr);
+ 		if (ret < 0)
+@@ -4500,7 +4564,16 @@ static int update_root_dev_clip(struct net_device *dev)
  		return ret;
  
  	/* Parse all bond and vlan devices layered on top of the physical dev */
@@ -301,7 +486,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (root_dev) {
  		ret = update_dev_clip(root_dev, dev);
  		if (ret)
-@@ -4508,7 +4560,15 @@ static int update_root_dev_clip(struct net_device *dev)
+@@ -4508,7 +4581,26 @@ static int update_root_dev_clip(struct net_device *dev)
  	}
  
  	for (i = 0; i < VLAN_N_VID; i++) {
@@ -311,13 +496,127 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE__VLAN_FIND_DEV_DEEP_3P
 +		root_dev = __vlan_find_dev_deep(dev, htons(ETH_P_8021Q), i);
 +#else
++#ifdef HAVE__VLAN_FIND_DEV_DEEP
 +		root_dev = __vlan_find_dev_deep(dev, i);
++#else
++	{
++		struct port_info *p = netdev_priv(dev);
++
++		if (p->vlan_grp)
++			root_dev = vlan_group_get_device(p->vlan_grp, i);
++		else
++			root_dev = NULL;
++	}
++#endif
 +#endif
 +#endif
  		if (!root_dev)
  			continue;
  
-@@ -6447,9 +6507,25 @@ static int enable_msix(struct adapter *adap)
+@@ -4776,6 +4868,7 @@ int cxgb4_remove_server_filter(const struct net_device *dev, unsigned int stid,
+ }
+ EXPORT_SYMBOL(cxgb4_remove_server_filter);
+ 
++#ifdef HAVE_NDO_GET_STATS64
+ static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
+ 						struct rtnl_link_stats64 *ns)
+ {
+@@ -4825,6 +4918,49 @@ static struct rtnl_link_stats64 *cxgb_get_stats(struct net_device *dev,
+ 		ns->rx_length_errors + stats.rx_len_err + ns->rx_fifo_errors;
+ 	return ns;
+ }
++#else
++static struct net_device_stats *cxgb_get_stats(struct net_device *dev)
++{
++	struct port_stats stats;
++	struct port_info *p = netdev_priv(dev);
++	struct adapter *adapter = p->adapter;
++	struct net_device_stats *ns = &dev->stats;
++
++	spin_lock(&adapter->stats_lock);
++	t4_get_port_stats(adapter, p->tx_chan, &stats);
++	spin_unlock(&adapter->stats_lock);
++
++	ns->tx_bytes   = stats.tx_octets;
++	ns->tx_packets = stats.tx_frames;
++	ns->rx_bytes   = stats.rx_octets;
++	ns->rx_packets = stats.rx_frames;
++	ns->multicast  = stats.rx_mcast_frames;
++
++	/* detailed rx_errors */
++	ns->rx_length_errors = stats.rx_jabber + stats.rx_too_long +
++		stats.rx_runt;
++	ns->rx_over_errors   = 0;
++	ns->rx_crc_errors    = stats.rx_fcs_err;
++	ns->rx_frame_errors  = stats.rx_symbol_err;
++	ns->rx_fifo_errors   = stats.rx_ovflow0 + stats.rx_ovflow1 +
++		stats.rx_ovflow2 + stats.rx_ovflow3 +
++		stats.rx_trunc0 + stats.rx_trunc1 +
++		stats.rx_trunc2 + stats.rx_trunc3;
++	ns->rx_missed_errors = 0;
++
++	/* detailed tx_errors */
++	ns->tx_aborted_errors   = 0;
++	ns->tx_carrier_errors   = 0;
++	ns->tx_fifo_errors      = 0;
++	ns->tx_heartbeat_errors = 0;
++	ns->tx_window_errors    = 0;
++
++	ns->tx_errors = stats.tx_error_frames;
++	ns->rx_errors = stats.rx_symbol_err + stats.rx_fcs_err +
++		ns->rx_length_errors + stats.rx_len_err + ns->rx_fifo_errors;
++	return ns;
++}
++#endif
+ 
+ static int cxgb_ioctl(struct net_device *dev, struct ifreq *req, int cmd)
+ {
+@@ -4904,6 +5040,18 @@ static int cxgb_set_mac_addr(struct net_device *dev, void *p)
+ 	return 0;
+ }
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
++static void vlan_rx_register(struct net_device *dev, struct vlan_group *grp)
++{
++        struct port_info *pi = netdev_priv(dev);
++        struct adapter *adapter = pi->adapter;
++
++        pi->vlan_grp = grp;
++        t4_set_rxmode(adapter, adapter->mbox, pi->viid, -1, -1, -1, -1,
++                      grp != NULL, 0);
++}
++#endif
++
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ static void cxgb_netpoll(struct net_device *dev)
+ {
+@@ -4926,16 +5074,25 @@ static const struct net_device_ops cxgb4_netdev_ops = {
+ 	.ndo_stop             = cxgb_close,
+ 	.ndo_start_xmit       = t4_eth_xmit,
+ 	.ndo_select_queue     =	cxgb_select_queue,
++#ifdef HAVE_NDO_GET_STATS64
+ 	.ndo_get_stats64      = cxgb_get_stats,
++#else
++	.ndo_get_stats        = cxgb_get_stats,
++#endif
+ 	.ndo_set_rx_mode      = cxgb_set_rxmode,
+ 	.ndo_set_mac_address  = cxgb_set_mac_addr,
++#ifdef HAVE_NDO_SET_FEATURES
+ 	.ndo_set_features     = cxgb_set_features,
++#endif
+ 	.ndo_validate_addr    = eth_validate_addr,
+ 	.ndo_do_ioctl         = cxgb_ioctl,
+ 	.ndo_change_mtu       = cxgb_change_mtu,
+ #ifdef CONFIG_NET_POLL_CONTROLLER
+ 	.ndo_poll_controller  = cxgb_netpoll,
+ #endif
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3,1,0)
++        .ndo_vlan_rx_register   = vlan_rx_register,
++#endif
+ };
+ 
+ void t4_fatal_err(struct adapter *adap)
+@@ -6447,9 +6604,25 @@ static int enable_msix(struct adapter *adap)
  #else
  	need = adap->params.nports + EXTRA_VECS + ofld_need;
  #endif
@@ -343,11 +642,53 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/*
  	 * Distribute available vectors to the various queue groups.
+@@ -6713,13 +6886,25 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		pi->port_id = i;
+ 		netdev->irq = pdev->irq;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
+ 		netdev->hw_features = NETIF_F_SG | TSO_FLAGS |
+ 			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM |
+ 			NETIF_F_RXCSUM | NETIF_F_RXHASH |
+ 			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0)
+ 		if (highdma)
+ 			netdev->hw_features |= NETIF_F_HIGHDMA;
+ 		netdev->features |= netdev->hw_features;
++#else
++		netdev->features |= netdev->hw_features | highdma;
++#endif /* LINUX_VERSION_CODE >= KERNEL_VERSION(3, 3, 0) */
++#else
++		netdev->features |= NETIF_F_SG | TSO_FLAGS;
++		netdev->features |= NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
++		netdev->features |= NETIF_F_GRO | NETIF_F_RXHASH | highdma;
++		netdev->features |= NETIF_F_HW_VLAN_TX | NETIF_F_HW_VLAN_RX |
++			NETIF_F_HW_VLAN_CTAG_TX | NETIF_F_HW_VLAN_CTAG_RX;
++#endif
+ 		netdev->vlan_features = netdev->features & VLAN_FEAT;
+ 
+ 		netdev->priv_flags |= IFF_UNICAST_FLT;
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
-@@ -386,7 +386,11 @@ static void free_tx_desc(struct adapter *adap, struct sge_txq *q,
+@@ -144,6 +144,15 @@
+  */
+ #define MAX_CTRL_WR_LEN SGE_MAX_WR_LEN
+ 
++#if LINUX_VERSION_CODE < KERNEL_VERSION(3, 2, 0)
++enum {
++	/* packet alignment in FL buffers */
++	FL_ALIGN = L1_CACHE_BYTES < 32 ? 32 : L1_CACHE_BYTES,
++	/* egress status entry size */
++	STAT_LEN = L1_CACHE_BYTES > 64 ? 128 : 64
++};
++#endif
++
+ struct tx_sw_desc {                /* SW state per Tx descriptor */
+ 	struct sk_buff *skb;
+ 	struct ulptx_sgl *sgl;
+@@ -386,7 +395,11 @@ static void free_tx_desc(struct adapter *adap, struct sge_txq *q,
  		if (d->skb) {                       /* an SGL is present */
  			if (unmap)
  				unmap_sgl(dev, d->skb, d->sgl, q);
@@ -359,7 +700,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			d->skb = NULL;
  		}
  		++d;
-@@ -615,7 +619,11 @@ static unsigned int refill_fl(struct adapter *adap, struct sge_fl *q, int n,
+@@ -615,7 +628,11 @@ static unsigned int refill_fl(struct adapter *adap, struct sge_fl *q, int n,
  
  alloc_small_pages:
  	while (n--) {
@@ -371,7 +712,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		if (unlikely(!pg)) {
  			q->alloc_failed++;
  			break;
-@@ -1158,7 +1166,11 @@ out_free:	dev_kfree_skb_any(skb);
+@@ -1158,7 +1175,11 @@ out_free:	dev_kfree_skb_any(skb);
  
  	if (immediate) {
  		inline_tx_skb(skb, &q->q, cpl + 1);
@@ -383,7 +724,81 @@ index xxxxxxx..xxxxxxx xxxxxx
  	} else {
  		int last_desc;
  
-@@ -1712,11 +1724,19 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
+@@ -1587,9 +1608,14 @@ int cxgb4_ofld_send(struct net_device *dev, struct sk_buff *skb)
+ }
+ EXPORT_SYMBOL(cxgb4_ofld_send);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ static inline void copy_frags(struct sk_buff *skb,
++#else
++static inline void copy_frags(struct skb_shared_info *ssi,
++#endif
+ 			      const struct pkt_gl *gl, unsigned int offset)
+ {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 	int i;
+ 
+ 	/* usually there's just one frag */
+@@ -1604,6 +1630,22 @@ static inline void copy_frags(struct sk_buff *skb,
+ 
+ 	/* get a reference to the last page, we don't own it */
+ 	get_page(gl->frags[gl->nfrags - 1].page);
++#else
++	unsigned int n;
++
++	/* usually there's just one frag */
++	ssi->frags[0].page = gl->frags[0].page;
++	ssi->frags[0].page_offset = gl->frags[0].page_offset + offset;
++	skb_frag_size_set(&ssi->frags[0],
++			skb_frag_size(&gl->frags[0]) - offset);
++	ssi->nr_frags = gl->nfrags;
++	n = gl->nfrags - 1;
++	if (n)
++		memcpy(&ssi->frags[1], &gl->frags[1], n * sizeof(skb_frag_t));
++
++	/* get a reference to the last page, we don't own it */
++	get_page(gl->frags[n].page);
++#endif
+ }
+ 
+ /**
+@@ -1638,7 +1680,11 @@ struct sk_buff *cxgb4_pktgl_to_skb(const struct pkt_gl *gl,
+ 		__skb_put(skb, pull_len);
+ 		skb_copy_to_linear_data(skb, gl->va, pull_len);
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 		copy_frags(skb, gl, pull_len);
++#else
++		copy_frags(skb_shinfo(skb), gl, pull_len);
++#endif
+ 		skb->len = gl->tot_len;
+ 		skb->data_len = skb->len - pull_len;
+ 		skb->truesize += skb->data_len;
+@@ -1657,7 +1703,11 @@ EXPORT_SYMBOL(cxgb4_pktgl_to_skb);
+ static void t4_pktgl_free(const struct pkt_gl *gl)
+ {
+ 	int n;
+-	const struct page_frag *p;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
++ 	const struct page_frag *p;
++#else
++	const skb_frag_t *p;
++#endif
+ 
+ 	for (p = gl->frags, n = gl->nfrags - 1; n--; p++)
+ 		put_page(p->page);
+@@ -1705,18 +1755,30 @@ static void do_gro(struct sge_eth_rxq *rxq, const struct pkt_gl *gl,
+ 		return;
+ 	}
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 	copy_frags(skb, gl, s->pktshift);
++#else
++	copy_frags(skb_shinfo(skb), gl, s->pktshift);
++#endif
+ 	skb->len = gl->tot_len - s->pktshift;
+ 	skb->data_len = skb->len;
+ 	skb->truesize += skb->data_len;
  	skb->ip_summed = CHECKSUM_UNNECESSARY;
  	skb_record_rx_queue(skb, rxq->rspq.idx);
  	if (rxq->rspq.netdev->features & NETIF_F_RXHASH)
@@ -403,7 +818,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		rxq->stats.vlan_ex++;
  	}
  	ret = napi_gro_frags(&rxq->rspq.napi);
-@@ -1770,8 +1790,12 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
+@@ -1770,8 +1832,12 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
  	skb->protocol = eth_type_trans(skb, q->netdev);
  	skb_record_rx_queue(skb, q->idx);
  	if (skb->dev->features & NETIF_F_RXHASH)
@@ -416,18 +831,102 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	rxq->stats.pkts++;
  
-@@ -1789,7 +1813,11 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
+@@ -1789,8 +1855,26 @@ int t4_ethrx_handler(struct sge_rspq *q, const __be64 *rsp,
  		skb_checksum_none_assert(skb);
  
  	if (unlikely(pkt->vlan_ex)) {
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 0, 0)
 +#ifdef HAVE__VLAN_HWACCEL_PUT_TAG_3P
  		__vlan_hwaccel_put_tag(skb, htons(ETH_P_8021Q), ntohs(pkt->vlan));
 +#else
 +		__vlan_hwaccel_put_tag(skb, ntohs(pkt->vlan));
 +#endif
  		rxq->stats.vlan_ex++;
++#else
++{
++		struct port_info *pi = netdev_priv(skb->dev);
++		struct vlan_group *grp = pi->vlan_grp;
++
++                if (likely(grp))
++                        vlan_hwaccel_receive_skb(skb, grp, ntohs(pkt->vlan));
++                else
++                        dev_kfree_skb_any(skb);
++		rxq->stats.vlan_ex++;
++		return 0;
++}
++#endif
  	}
  	netif_receive_skb(skb);
+ 	return 0;
+@@ -1878,7 +1962,9 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 	const struct rsp_ctrl *rc;
+ 	struct sge_eth_rxq *rxq = container_of(q, struct sge_eth_rxq, rspq);
+ 	struct adapter *adapter = q->adap;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 	struct sge *s = &adapter->sge;
++#endif
+ 
+ 	while (likely(budget_left)) {
+ 		rc = (void *)q->cur_desc + (q->iqe_len - sizeof(*rc));
+@@ -1888,7 +1974,11 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 		rmb();
+ 		rsp_type = RSPD_TYPE(rc->type_gen);
+ 		if (likely(rsp_type == RSP_TYPE_FLBUF)) {
+-			struct page_frag *fp;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
++ 			struct page_frag *fp;
++#else
++			skb_frag_t *fp;
++#endif
+ 			struct pkt_gl si;
+ 			const struct rx_sw_desc *rsd;
+ 			u32 len = ntohl(rc->pldbuflen_qid), bufsz, frags;
+@@ -1907,9 +1997,15 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 				rsd = &rxq->fl.sdesc[rxq->fl.cidx];
+ 				bufsz = get_buf_size(adapter, rsd);
+ 				fp->page = rsd->page;
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 				fp->offset = q->offset;
+ 				fp->size = min(bufsz, len);
+ 				len -= fp->size;
++#else
++				fp->page_offset = q->offset;
++				skb_frag_size_set(fp, min(bufsz, len));
++				len -= skb_frag_size(fp);
++#endif
+ 				if (!len)
+ 					break;
+ 				unmap_rx_buf(q->adap, &rxq->fl);
+@@ -1921,16 +2017,29 @@ static int process_responses(struct sge_rspq *q, int budget)
+ 			 */
+ 			dma_sync_single_for_cpu(q->adap->pdev_dev,
+ 						get_buf_addr(rsd),
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 						fp->size, DMA_FROM_DEVICE);
++#else
++						skb_frag_size(fp),
++						DMA_FROM_DEVICE);
++#endif
+ 
+ 			si.va = page_address(si.frags[0].page) +
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 				si.frags[0].offset;
++#else
++				si.frags[0].page_offset;
++#endif
+ 			prefetch(si.va);
+ 
+ 			si.nfrags = frags + 1;
+ 			ret = q->handler(q, q->cur_desc, &si);
+ 			if (likely(ret == 0))
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 2, 0)
+ 				q->offset += ALIGN(fp->size, s->fl_align);
++#else
++				q->offset += ALIGN(skb_frag_size(fp), FL_ALIGN);
++#endif
+ 			else
+ 				restore_rx_bufs(&si, &rxq->fl, frags);
+ 		} else if (likely(rsp_type == RSP_TYPE_CPL)) {
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
