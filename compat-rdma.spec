@@ -28,10 +28,6 @@
 
 %{!?configure_options: %define configure_options %{nil}}
 
-# %{!?MEMTRACK: %define MEMTRACK 0}
-%define MEMTRACK %(if ( echo %{configure_options} | grep "with-memtrack" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
-%define MADEYE %(if ( echo %{configure_options} | grep "with-madeye-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
-
 %{!?KVERSION: %define KVERSION %(uname -r)}
 %define krelver %(echo -n %{KVERSION} | sed -e 's/-/_/g')
 
@@ -76,12 +72,6 @@
 %{!?K_SRC_OBJ: %define K_SRC_OBJ /lib/modules/%{KVERSION}/build}
 
 %{!?KERNEL_SOURCES: %define KERNEL_SOURCES /lib/modules/%{KVERSION}/source}
-
-# Do not include srp.h if it exist in the kernel
-%define include_srp_h %(if [ -e %{KERNEL_SOURCES}/include/scsi/srp.h ]; then echo -n 0; else echo -n 1; fi )
-%define include_rdma %(if [ -d %{KERNEL_SOURCES}/include/rdma ]; then echo -n 1; else echo -n 0; fi )
-
-%define include_udev_rules %(eval `grep udev_rules /etc/udev/udev.conf | grep -v '^#'` ; if test -d $udev_rules; then echo -n 1; else echo -n 0; fi)
 
 # Disable debugging
 %define debug_package %{nil}
@@ -266,23 +256,9 @@ install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/docs/lustre-phi.txt $RPM_
 %endif
 %endif
 
-%if %{build_sdp}
-%if %{modprobe_update}
-install -d $RPM_BUILD_ROOT/etc/modprobe.d
-install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ib_sdp.conf $RPM_BUILD_ROOT/etc/modprobe.d
-%endif
-%endif
-
-%if %{include_udev_rules}
 install -d $RPM_BUILD_ROOT/etc/udev/rules.d
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/90-ib.rules $RPM_BUILD_ROOT/etc/udev/rules.d
-case "$(udevinfo -V 2> /dev/null | awk '{print $NF}' 2> /dev/null)" in
-0[1-4]*)
-sed -i -e 's/KERNEL==/KERNEL=/g'  $RPM_BUILD_ROOT/etc/udev/rules.d/90-ib.rules
-;;
-esac
-%endif
-	
+
 %clean
 #Remove installed driver after rpm build finished
 rm -rf $RPM_BUILD_ROOT
@@ -560,20 +536,6 @@ if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
 %if 0%{?suse_version} == 1315
 /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 %endif
-
-
-# Clean udev.rules
-%if ! %{include_udev_rules}
-    if [ -e /etc/udev/udev.rules ]; then
-        perl -ni -e 'if (/\# Infiniband devices \#$/) { $filter = 1 }' -e 'if (!$filter) { print }' -e 'if (/\# End Infiniband devices \#$/){ $filter = 0 }' /etc/udev/udev.rules
-    fi
-%endif
-
-# Clean sysctl.conf
-if [ -f /etc/sysctl.conf ]; then
-perl -ni -e 'if (/\#\# OFED Network tuning parameters \#\#$/) { $filter = 1 }' -e 'if (!$filter) { print }' -e 'if (/\#\# END of OFED parameters \#\#$/){ $filter = 0 }' /etc/sysctl.conf
-fi
-
 fi
 
 %postun -n compat-rdma-devel
@@ -594,9 +556,7 @@ fi
 %{_prefix}/lib/systemd/system/openibd.service
 %endif
 /sbin/sysctl_perf_tuning
-%if %{include_udev_rules}
 /etc/udev/rules.d/90-ib.rules
-%endif
 %{LIB_MOD_DIR}
 %if %{build_qib}
 %config(noreplace) %{RDMA_CONF_DIR}/truescale.cmds
@@ -613,11 +573,6 @@ fi
 %if %{build_ibp_server} || %{build_ibscif}
 %config(noreplace) %{_sysconfdir}/mpss/ipoib.conf
 /usr/share/doc/%{_name}-%{_version}/lustre-phi.txt
-%endif
-%endif
-%if %{build_sdp}
-%if %{modprobe_update}
-/etc/modprobe.d/ib_sdp.conf
 %endif
 %endif
 %if %{build_mlx4} || %{build_mlx5}
