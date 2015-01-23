@@ -37,9 +37,8 @@
 %{!?scif_symvers: %define scif_symvers %(echo -n '/lib/modules/%{KVERSION}/scif.symvers')}
 
 # Select packages to build
-%{!?modprobe_update: %define modprobe_update %(if ( echo %{configure_options} | grep "without-modprobe" > /dev/null ); then echo -n '0'; else echo -n '1'; fi)}
-
 # Kernel module packages to be included into compat-rdma
+
 %define build_mthca %(if ( echo %{configure_options} | grep "with-mthca-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_qib %(if ( echo %{configure_options} | grep "with-qib-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_ipath %(if ( echo %{configure_options} | grep "with-ipath_inf-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
@@ -244,10 +243,8 @@ install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/truescale.cmds 
 %endif
 
 %if %{build_ipoib}
-%if %{modprobe_update}
 install -d $RPM_BUILD_ROOT/etc/modprobe.d
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ib_ipoib.conf $RPM_BUILD_ROOT/etc/modprobe.d
-%endif
 %if %{build_ibp_server} || %{build_ibscif}
 install -d $RPM_BUILD_ROOT/etc/sysconfig/mic
 install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ipoib.conf $RPM_BUILD_ROOT/etc/mpss/ipoib.conf
@@ -430,14 +427,10 @@ fi
 %config(noreplace) %{RDMA_CONF_DIR}/truescale.cmds
 %endif
 %if %{build_ibp_server} || %{build_ibscif}
-%if %{modprobe_update}
 %config(noreplace) %{_sysconfdir}/modprobe.d/ibscif.conf
 %endif
-%endif
 %if %{build_ipoib}
-%if %{modprobe_update}
 /etc/modprobe.d/ib_ipoib.conf
-%endif
 %if %{build_ibp_server} || %{build_ibscif}
 %config(noreplace) %{_sysconfdir}/mpss/ipoib.conf
 /usr/share/doc/%{_name}-%{_version}/lustre-phi.txt

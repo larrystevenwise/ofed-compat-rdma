@@ -707,8 +707,6 @@ main()
                             CONFIG_SUNRPC_XPRT_RDMA_CLIENT=
                             CONFIG_SUNRPC_XPRT_RDMA_SERVER=
                         ;;
-                        --with-modprobe|--without-modprobe)
-                        ;;
                         -h | --help)
                                 usage
                                 exit 0
