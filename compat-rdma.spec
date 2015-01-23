@@ -93,7 +93,6 @@ License: GPLv2 or BSD
 Url: http://openfabrics.org/
 Group: System Environment/Base
 Source: %{_name}-%{_version}.tgz
-BuildRoot: %{?build_root:%{build_root}}%{!?build_root:/var/tmp/OFED}
 Vendor: OpenFabrics
 Requires: coreutils
 Requires: kernel
@@ -150,7 +149,7 @@ if [ -f /usr/local/include/scst/Module.symvers ]; then
 fi
 %endif
 export INSTALL_MOD_DIR=updates
-make kernel
+make %{?_smp_flags} kernel
 
 %install
 mkdir -p $RPM_BUILD_ROOT/%{_prefix}/src
@@ -260,9 +259,7 @@ install -d $RPM_BUILD_ROOT/etc/udev/rules.d
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/90-ib.rules $RPM_BUILD_ROOT/etc/udev/rules.d
 
 %clean
-#Remove installed driver after rpm build finished
-rm -rf $RPM_BUILD_ROOT
-rm -rf $RPM_BUILD_DIR/%{_name}-%{_version}
+rm -rf %{buildroot}
 
 %pre
 
