@@ -1,0 +1,294 @@
+diff -durp a/drivers/infiniband/hw/qib/qib_fs.c b/drivers/infiniband/hw/qib/qib_fs.c
+--- a/drivers/infiniband/hw/qib/qib_fs.c
++++ b/drivers/infiniband/hw/qib/qib_fs.c
+@@ -59,7 +59,9 @@ static int qibfs_mknod(struct inode *dir
+ 		goto bail;
+ 	}
+ 
++#ifdef HAVE_GET_NEXT_INO
+ 	inode->i_ino = get_next_ino();
++#endif
+ 	inode->i_mode = mode;
+ 	inode->i_uid = GLOBAL_ROOT_UID;
+ 	inode->i_gid = GLOBAL_ROOT_GID;
+@@ -556,6 +558,7 @@ bail:
+ 	return ret;
+ }
+ 
++#ifdef HAVE_MOUNT_METHOD
+ static struct dentry *qibfs_mount(struct file_system_type *fs_type, int flags,
+ 			const char *dev_name, void *data)
+ {
+@@ -565,6 +568,17 @@ static struct dentry *qibfs_mount(struct
+ 		qib_super = ret->d_sb;
+ 	return ret;
+ }
++#else
++static int qibfs_get_sb(struct file_system_type *fs_type, int flags,
++		const char *dev_name, void *data, struct vfsmount *mnt)
++{
++	int ret = get_sb_single(fs_type, flags, data,
++			qibfs_fill_super, mnt);
++	if (ret >= 0)
++		qib_super = mnt->mnt_sb;
++	return ret;
++}
++#endif
+ 
+ static void qibfs_kill_super(struct super_block *s)
+ {
+@@ -604,7 +618,11 @@ int qibfs_remove(struct qib_devdata *dd)
+ static struct file_system_type qibfs_fs_type = {
+ 	.owner =        THIS_MODULE,
+ 	.name =         "ipathfs",
++#ifdef HAVE_MOUNT_METHOD
+ 	.mount =        qibfs_mount,
++#else
++        .get_sb =        qibfs_get_sb,
++#endif
+ 	.kill_sb =      qibfs_kill_super,
+ };
+ MODULE_ALIAS_FS("ipathfs");
+diff -durp a/drivers/infiniband/hw/qib/qib_init.c b/drivers/infiniband/hw/qib/qib_init.c
+--- a/drivers/infiniband/hw/qib/qib_init.c
++++ b/drivers/infiniband/hw/qib/qib_init.c
+@@ -1128,14 +1128,20 @@ struct qib_devdata *qib_alloc_devdata(st
+ {
+ 	unsigned long flags;
+ 	struct qib_devdata *dd;
+-	int ret;
++	int ret = 0;
+ 
++#ifndef HAVE_IDR_ALLOC
++	if (!idr_pre_get(&qib_unit_table, GFP_KERNEL)) {
++		dd = ERR_PTR(-ENOMEM);
++		goto bail;
++	}
++#endif
+ 	dd = (struct qib_devdata *) ib_alloc_device(sizeof(*dd) + extra);
+ 	if (!dd)
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	INIT_LIST_HEAD(&dd->list);
+-
++#ifdef HAVE_IDR_ALLOC
+ 	idr_preload(GFP_KERNEL);
+ 	spin_lock_irqsave(&qib_devs_lock, flags);
+ 
+@@ -1147,7 +1153,13 @@ struct qib_devdata *qib_alloc_devdata(st
+ 
+ 	spin_unlock_irqrestore(&qib_devs_lock, flags);
+ 	idr_preload_end();
+-
++#else
++ 	spin_lock_irqsave(&qib_devs_lock, flags);
++	ret = idr_get_new(&qib_unit_table, dd, &dd->unit);
++	if (ret >= 0)
++ 		list_add(&dd->list, &qib_dev_list);
++ 	spin_unlock_irqrestore(&qib_devs_lock, flags);
++#endif
+ 	if (ret < 0) {
+ 		qib_early_err(&pdev->dev,
+ 			      "Could not allocate unit ID: error %d\n", -ret);
+@@ -1279,12 +1291,18 @@ static int __init qib_ib_init(void)
+ 	ret = qib_dev_init();
+ 	if (ret)
+ 		goto bail;
+-
++#ifndef HAVE_IDR_ALLOC
+ 	/*
+ 	 * These must be called before the driver is registered with
+ 	 * the PCI subsystem.
+ 	 */
+ 	idr_init(&qib_unit_table);
++	if (!idr_pre_get(&qib_unit_table, GFP_KERNEL)) {
++		pr_err("idr_pre_get() failed\n");
++		ret = -ENOMEM;
++		goto bail_unit;
++	}
++#endif
+ 
+ #ifdef CONFIG_INFINIBAND_QIB_DCA
+ 	dca_register_notify(&dca_notifier);
+@@ -1310,6 +1328,9 @@ bail_dev:
+ #ifdef CONFIG_DEBUG_FS
+ 	qib_dbg_exit();
+ #endif
++#ifndef HAVE_IDR_ALLOC
++bail_unit:
++#endif
+ 	idr_destroy(&qib_unit_table);
+ 	qib_dev_cleanup();
+ bail:
+diff -durp a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
+--- a/drivers/infiniband/hw/qib/qib_pcie.c
++++ b/drivers/infiniband/hw/qib/qib_pcie.c
+@@ -197,7 +197,7 @@ static void qib_msix_setup(struct qib_de
+ 			   struct qib_msix_entry *qib_msix_entry)
+ {
+ 	int ret;
+-#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ 	int nvec = *msixcnt;
+ #else
+ 	u32 tabsize = 0;
+@@ -206,7 +206,7 @@ static void qib_msix_setup(struct qib_de
+ 	struct msix_entry *msix_entry;
+ 	int i;
+ 
+-#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ 	ret = pci_msix_vec_count(dd->pcidev);
+ 	if (ret < 0)
+ 		goto do_intx;
+@@ -217,7 +217,7 @@ static void qib_msix_setup(struct qib_de
+ 	/* We can't pass qib_msix_entry array to qib_msix_setup
+ 	 * so use a dummy msix_entry array and copy the allocated
+ 	 * irq back to the qib_msix_entry array. */
+-#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ 	msix_entry = kmalloc(nvec * sizeof(*msix_entry), GFP_KERNEL);
+ 	if (!msix_entry)
+ 		goto do_intx;
+@@ -233,7 +233,7 @@ static void qib_msix_setup(struct qib_de
+ #endif
+ 		msix_entry[i] = qib_msix_entry[i].msix;
+ 
+-#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ 	ret = pci_enable_msix_range(dd->pcidev, msix_entry, 1, nvec);
+ 	if (ret < 0)
+ 		goto free_msix_entry;
+@@ -263,7 +263,7 @@ do_intx:
+ 		qib_msix_entry[i].msix = msix_entry[i];
+ 
+ 	kfree(msix_entry);
+-#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ 	*msixcnt = nvec;
+ 	return;
+ 
+@@ -327,12 +327,21 @@ int qib_pcie_params(struct qib_devdata *
+ 		goto bail;
+ 	}
+ 
++#ifdef HAVE_PCI_MSIX_CAP
+ 	pos = dd->pcidev->msix_cap;
++#else
++	pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSIX);
++#endif
++
+ 	if (nent && *nent && pos) {
+ 		qib_msix_setup(dd, pos, nent, entry);
+ 		ret = 0; /* did it, either MSIx or INTx */
+ 	} else {
++#ifdef HAVE_PCI_MSIX_CAP
+ 		pos = dd->pcidev->msi_cap;
++#else
++		pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSI);
++#endif
+ 		if (pos)
+ 			ret = qib_msi_setup(dd, pos);
+ 		else
+@@ -400,8 +409,11 @@ int qib_reinit_intr(struct qib_devdata *
+ 	/* If we aren't using MSI, don't restore it */
+ 	if (!dd->msi_lo)
+ 		goto bail;
+-
++#ifdef HAVE_PCI_MSIX_CAP
+ 	pos = dd->pcidev->msi_cap;
++#else
++	pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_MSI);
++#endif
+ 	if (!pos) {
+ 		qib_dev_err(dd,
+ 			"Can't find MSI capability, can't restore MSI settings\n");
+@@ -470,7 +482,11 @@ void qib_enable_intx(struct pci_dev *pde
+ 	if (new != cw)
+ 		pci_write_config_word(pdev, PCI_COMMAND, new);
+ 
++#ifdef HAVE_PCI_MSIX_CAP
+ 	pos = pdev->msi_cap;
++#else
++	pos = pci_find_capability(pdev, PCI_CAP_ID_MSI);
++#endif
+ 	if (pos) {
+ 		/* then turn off MSI */
+ 		pci_read_config_word(pdev, pos + PCI_MSI_FLAGS, &cw);
+@@ -478,7 +494,11 @@ void qib_enable_intx(struct pci_dev *pde
+ 		if (new != cw)
+ 			pci_write_config_word(pdev, pos + PCI_MSI_FLAGS, new);
+ 	}
++#ifdef HAVE_PCI_MSIX_CAP
+ 	pos = pdev->msix_cap;
++#else
++	pos = pci_find_capability(pdev, PCI_CAP_ID_MSIX);
++#endif
+ 	if (pos) {
+ 		/* then turn off MSIx */
+ 		pci_read_config_word(pdev, pos + PCI_MSIX_FLAGS, &cw);
+@@ -624,6 +624,10 @@ static void qib_tune_pcie_caps(struct qi
+ 	struct pci_dev *parent;
+ 	u16 rc_mpss, rc_mps, ep_mpss, ep_mps;
+ 	u16 rc_mrrs, ep_mrrs, max_mrrs;
++#ifndef HAVE_PCI_DEV_PCIE_MPSS
++	int pos = 0;
++	u16 reg16 = 0;
++#endif
+ 
+ 	/* Find out supported and configured values for parent (root) */
+ 	parent = dd->pcidev->bus->self;
+@@ -635,10 +639,26 @@ static void qib_tune_pcie_caps(struct qi
+ 	if (!pci_is_pcie(parent) || !pci_is_pcie(dd->pcidev))
+ 		return;
+ 
++#ifdef HAVE_PCI_DEV_PCIE_MPSS
+ 	rc_mpss = parent->pcie_mpss;
++#else
++	pos = pci_find_capability(parent, PCI_CAP_ID_EXP);
++	if (!pos)
++		return;
++	pci_read_config_word(parent, pos + PCI_EXP_DEVCAP, &reg16);
++	rc_mpss = reg16 & PCI_EXP_DEVCAP_PAYLOAD;
++#endif
+ 	rc_mps = ffs(pcie_get_mps(parent)) - 8;
+ 	/* Find out supported and configured values for endpoint (us) */
++#ifdef HAVE_PCI_DEV_PCIE_MPSS
+ 	ep_mpss = dd->pcidev->pcie_mpss;
++#else
++	pos = pci_find_capability(dd->pcidev, PCI_CAP_ID_EXP);
++	if (!pos)
++		return;
++	pci_read_config_word(dd->pcidev, pos + PCI_EXP_DEVCAP, &reg16);
++	ep_mpss = reg16 & PCI_EXP_DEVCAP_PAYLOAD;
++#endif
+ 	ep_mps = ffs(pcie_get_mps(dd->pcidev)) - 8;
+ 
+ 	/* Find max payload supported by root, endpoint */
+diff -durp a/drivers/infiniband/hw/qib/qib_user_pages.c b/drivers/infiniband/hw/qib/qib_user_pages.c
+--- a/drivers/infiniband/hw/qib/qib_user_pages.c
++++ b/drivers/infiniband/hw/qib/qib_user_pages.c
+@@ -74,7 +74,11 @@ static int __qib_get_user_pages(unsigned
+ 			goto bail_release;
+ 	}
+ 
++#ifdef HAVE_PINNED_VM
+ 	current->mm->pinned_vm += num_pages;
++#else
++	current->mm->locked_vm += num_pages;
++#endif
+ 
+ 	ret = 0;
+ 	goto bail;
+@@ -151,7 +155,11 @@ void qib_release_user_pages(struct page 
+ 	__qib_release_user_pages(p, num_pages, 1);
+ 
+ 	if (current->mm) {
++#ifdef HAVE_PINNED_VM
+ 		current->mm->pinned_vm -= num_pages;
++#else
++		current->mm->locked_vm -= num_pages;
++#endif
+ 		up_write(&current->mm->mmap_sem);
+ 	}
+ }
