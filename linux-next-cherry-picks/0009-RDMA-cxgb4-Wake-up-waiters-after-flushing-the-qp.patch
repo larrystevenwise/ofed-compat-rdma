@@ -1,0 +1,28 @@
+From: Steve Wise <swise@opengridcomputing.com>
+Subject: [PATCH] RDMA/cxgb4: Wake up waiters after flushing the qp
+
+When transitioning into ERROR state, the QP was getting flushed after
+waking up any waiters.  This can cause applications to miss flushed work
+requests which can stall an NFS mount.
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/infiniband/hw/cxgb4/qp.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -1538,9 +1538,9 @@ err:
+ 	set_state(qhp, C4IW_QP_STATE_ERROR);
+ 	free = 1;
+ 	abort = 1;
+-	wake_up(&qhp->wait);
+ 	BUG_ON(!ep);
+ 	flush_qp(qhp);
++	wake_up(&qhp->wait);
+ out:
+ 	mutex_unlock(&qhp->mutex);
+ 

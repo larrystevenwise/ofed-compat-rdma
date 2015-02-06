@@ -1,0 +1,39 @@
+From: Pramod Kumar <pramod@chelsio.com>
+Subject: [PATCH] RDMA/cxgb4: Configure 0B MRs to match HW implementation
+
+0B MRs need some tweaks to work correctly with HW. When writing the
+TPTE, if the MR length is zero we now:
+
+1) turn off all permissions
+2) set the length to -1
+
+While functionality/capabilities of the MR are the same with these
+changes, it resolves a dapltest 0B RDMA Read test failure.  Based on
+original work by Steve Wise <swise@opengridcomputing.com>.
+
+Signed-off-by: Pramod Kumar <pramod@chelsio.com>
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+Signed-off-by: Roland Dreier <roland@purestorage.com>
+---
+ drivers/infiniband/hw/cxgb4/mem.c |    6 ++++--
+ 1 files changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/cxgb4/mem.c
++++ b/drivers/infiniband/hw/cxgb4/mem.c
+@@ -369,9 +369,11 @@ static int register_mem(struct c4iw_dev *rhp, struct c4iw_pd *php,
+ 	int ret;
+ 
+ 	ret = write_tpt_entry(&rhp->rdev, 0, &stag, 1, mhp->attr.pdid,
+-			      FW_RI_STAG_NSMR, mhp->attr.perms,
++			      FW_RI_STAG_NSMR, mhp->attr.len ?
++			      mhp->attr.perms : 0,
+ 			      mhp->attr.mw_bind_enable, mhp->attr.zbva,
+-			      mhp->attr.va_fbo, mhp->attr.len, shift - 12,
++			      mhp->attr.va_fbo, mhp->attr.len ?
++			      mhp->attr.len : -1, shift - 12,
+ 			      mhp->attr.pbl_size, mhp->attr.pbl_addr);
+ 	if (ret)
+ 		return ret;
