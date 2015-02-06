@@ -1,0 +1,83 @@
+From: Hariprasad Shenai <hariprasad@chelsio.com>
+Subject: [PATCH] cxgb4: Add support for QSA modules
+
+Firmware 1.12.25.0 added support for QSA module, adding the driver code for it.
+Also fixes some ethtool get settings for other module types.
+
+Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |    2 +-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |   13 ++++++++++---
+ drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h   |    1 +
+ 3 files changed, 12 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -385,7 +385,7 @@ struct port_info {
+ 	s16    xact_addr_filt;        /* index of exact MAC address filter */
+ 	u16    rss_size;              /* size of VI's RSS table slice */
+ 	s8     mdio_addr;
+-	u8     port_type;
++	enum fw_port_type port_type;
+ 	u8     mod_type;
+ 	u8     port_id;
+ 	u8     tx_chan;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -2413,7 +2413,7 @@ static int identify_port(struct net_device *dev,
+ 	return t4_identify_port(adap, adap->fn, netdev2pinfo(dev)->viid, val);
+ }
+ 
+-static unsigned int from_fw_linkcaps(unsigned int type, unsigned int caps)
++static unsigned int from_fw_linkcaps(enum fw_port_type type, unsigned int caps)
+ {
+ 	unsigned int v = 0;
+ 
+@@ -2442,14 +2442,20 @@ static unsigned int from_fw_linkcaps(unsigned int type, unsigned int caps)
+ 		     SUPPORTED_10000baseKR_Full | SUPPORTED_1000baseKX_Full |
+ 		     SUPPORTED_10000baseKX4_Full;
+ 	else if (type == FW_PORT_TYPE_FIBER_XFI ||
+-		 type == FW_PORT_TYPE_FIBER_XAUI || type == FW_PORT_TYPE_SFP) {
++		 type == FW_PORT_TYPE_FIBER_XAUI ||
++		 type == FW_PORT_TYPE_SFP ||
++		 type == FW_PORT_TYPE_QSFP_10G ||
++		 type == FW_PORT_TYPE_QSA) {
+ 		v |= SUPPORTED_FIBRE;
+ 		if (caps & FW_PORT_CAP_SPEED_1G)
+ 			v |= SUPPORTED_1000baseT_Full;
+ 		if (caps & FW_PORT_CAP_SPEED_10G)
+ 			v |= SUPPORTED_10000baseT_Full;
+-	} else if (type == FW_PORT_TYPE_BP40_BA)
++	} else if (type == FW_PORT_TYPE_BP40_BA ||
++		   type == FW_PORT_TYPE_QSFP) {
+ 		v |= SUPPORTED_40000baseSR4_Full;
++		v |= SUPPORTED_FIBRE;
++	}
+ 
+ 	if (caps & FW_PORT_CAP_ANEG)
+ 		v |= SUPPORTED_Autoneg;
+@@ -2484,6 +2490,7 @@ static int get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
+ 		cmd->port = PORT_FIBRE;
+ 	else if (p->port_type == FW_PORT_TYPE_SFP ||
+ 		 p->port_type == FW_PORT_TYPE_QSFP_10G ||
++		 p->port_type == FW_PORT_TYPE_QSA ||
+ 		 p->port_type == FW_PORT_TYPE_QSFP) {
+ 		if (p->mod_type == FW_PORT_MOD_TYPE_LR ||
+ 		    p->mod_type == FW_PORT_MOD_TYPE_SR ||
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+@@ -1815,6 +1815,7 @@ enum fw_port_type {
+ 	FW_PORT_TYPE_BP4_AP,
+ 	FW_PORT_TYPE_QSFP_10G,
+ 	FW_PORT_TYPE_QSFP,
++	FW_PORT_TYPE_QSA,
+ 	FW_PORT_TYPE_BP40_BA,
+ 
+ 	FW_PORT_TYPE_NONE = FW_PORT_CMD_PTYPE_MASK
