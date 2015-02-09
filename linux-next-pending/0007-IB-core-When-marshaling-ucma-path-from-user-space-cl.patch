@@ -1,0 +1,30 @@
+From: Ilya Nelkenbaum <ilyan@mellanox.com>
+Subject: [PATCH] IB/core: When marshaling ucma path from user-space, clear unused fields
+
+When marsheling a user path to the kernel struct ib_sa_path, need
+to zero smac, dmac and set the vlan id to the "no vlan" value.
+
+This is to ensure that Ethernet attributes are not used with
+InfiniBand QPs.
+
+Fixes: dd5f03beb4f7 ("IB/core: Ethernet L2 attributes in verbs/cm structures")
+Signed-off-by: Ilya Nelkenbaum <ilyan@mellanox.com>
+Signed-off-by: Or Gerlitz <ogerlitz@mellanox.com>
+---
+ drivers/infiniband/core/ucma.c |    3 +++
+ 1 files changed, 3 insertions(+), 0 deletions(-)
+
+diff --git a/drivers/infiniband/core/ucma.c b/drivers/infiniband/core/ucma.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/ucma.c
++++ b/drivers/infiniband/core/ucma.c
+@@ -1124,6 +1124,9 @@ static int ucma_set_ib_path(struct ucma_context *ctx,
+ 	if (!optlen)
+ 		return -EINVAL;
+ 
++	memset(&sa_path, 0, sizeof(sa_path));
++	sa_path.vlan_id = 0xffff;
++
+ 	ib_sa_unpack_path(path_data->path_rec, &sa_path);
+ 	ret = rdma_set_ib_paths(ctx->cm_id, &sa_path, 1);
+ 	if (ret)
