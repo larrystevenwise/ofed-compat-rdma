@@ -148,7 +148,7 @@ if [ -f /usr/local/include/scst/Module.symvers ]; then
 fi
 %endif
 export INSTALL_MOD_DIR=updates
-make %{?_smp_flags} kernel
+make %{?_smp_mflags} kernel
 
 %install
 mkdir -p $RPM_BUILD_ROOT/%{_prefix}/src
