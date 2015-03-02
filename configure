@@ -160,17 +160,11 @@ Usage:  `basename $0` [options]
     --with-cxgb3-mod    make CONFIG_INFINIBAND_CXGB3=m [no]
     --without-cxgb3-mod    [yes]
 
-    --with-cxgb3i-mod    make CONFIG_SCSI_CXGB3_ISCSI=m [no]
-    --without-cxgb3i-mod    [yes]
-
     --with-cxgb3_debug-mod    make CONFIG_INFINIBAND_CXGB3_DEBUG=y [no]
     --without-cxgb3_debug-mod    [yes]
 
     --with-cxgb4-mod    make CONFIG_INFINIBAND_CXGB4=m [no]
     --without-cxgb4-mod    [yes]
-
-    --with-cxgb4i-mod    make CONFIG_SCSI_CXGB4_ISCSI=m [no]
-    --without-cxgb4i-mod    [yes]
 
     --with-nes-mod    make CONFIG_INFINIBAND_NES=m [no]
     --without-nes-mod    [yes]

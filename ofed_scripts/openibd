@@ -268,7 +268,7 @@ fi
 
 GEN1_UNLOAD_MODULES="ib_srp_target scsi_target ib_srp kdapltest_module ib_kdapl ib_sdp ib_useraccess ib_useraccess_cm ib_cm ib_dapl_srv ib_ip2pr ib_ipoib ib_tavor mod_thh mod_rhh ib_dm_client ib_sa_client ib_client_query ib_poll ib_mad ib_core ib_services"
 
-UNLOAD_MODULES="ib_mthca mlx5_ib mlx5_core mlx4_ib ib_ipath ipath_core ib_ehca iw_nes cxgb3i iw_cxgb3 cxgb3 iw_cxgb4 cxgb4 ocrdma"
+UNLOAD_MODULES="ib_mthca mlx5_ib mlx5_core mlx4_ib ib_ipath ipath_core ib_ehca iw_nes iw_cxgb3 cxgb3 iw_cxgb4 cxgb4 ocrdma"
 UNLOAD_MODULES="$UNLOAD_MODULES ib_qib"
 UNLOAD_MODULES="$UNLOAD_MODULES ib_ipoib ib_madeye ib_rds"
 UNLOAD_MODULES="$UNLOAD_MODULES rds_rdma rds_tcp rds ib_ucm kdapl ib_srp_target scsi_target ib_srpt ib_srp ib_iser ib_sdp"
