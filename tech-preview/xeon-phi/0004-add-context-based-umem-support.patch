@@ -1,0 +1,353 @@
+From 8b06f1090da0e12c6012d0d13d8b48c69640a6a7 Mon Sep 17 00:00:00 2001
+From: Phil Cayton <phil.cayton@intel.com>
+Date: Thu, 6 Feb 2014 14:08:02 -0800
+Subject: [PATCH 04/12] add context based umem support
+
+The ib_umem_get routine calls get_user_pages to pin pages and create the
+ib_umem structure.  Memory on MIC, however, must be mapped through SCIF for
+access across PCI.  This patch allows setup of context-based ib_umem mapping
+routines.
+
+Also update mthca to support these changes
+---
+diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
+--- a3/drivers/infiniband/core/umem.c	2015-01-05 14:12:52.117593540 -0800
++++ a4/drivers/infiniband/core/umem.c	2015-01-05 14:41:51.927520253 -0800
+@@ -57,6 +57,10 @@
+ 	for_each_sg(umem->sg_head.sgl, sg, umem->npages, i) {
+ 
+ 		page = sg_page(sg);
++
++		if (!pfn_valid(page_to_pfn(page)))
++			continue;
++
+ 		if (umem->writable && dirty)
+ 			set_page_dirty_lock(page);
+ 		put_page(page);
+@@ -68,14 +72,71 @@
+ }
+ 
+ /**
+- * ib_umem_get - Pin and DMA map userspace memory.
++ * get_remap_pages() - get pages remapped to user virtual space
++ * @mm:		mm struct of target mm
++ * @start:	starting user address
++ * @nr_pages:	number of pages to lookup
++ * @write	flag to verify if vma is writable
++ * @pages:      array that receives pointers to the pages.  Should
++ *              be at least nr_pages long. Or NULL, if caller only
++ *              intends to ensure the pages are valid.
++ * @vmas:       array of pointers to vmas corresponding to each page.
++ *              Or NULL if the caller does not require them.
++ *
++ * Pages may be system ram or io space mmapped to user virtual
++ * space via remap_pfn_range or io_remap_page_range, respectively.
++ *
++ * Returns number of pages found, which may be less than the number
++ * requested.  Returns 0 if nr_pages is 0.
++ *
++ * Must be called with mmap_sem held for read or write.
++ */
++static long get_remap_pages(struct mm_struct *mm, unsigned long start,
++			    unsigned long nr_pages, int write,
++			    struct page **pages, struct vm_area_struct **vmas)
++{
++	struct vm_area_struct *vma;
++	unsigned long pfn;
++	long i = 0;
++	int ret;
++
++	while (nr_pages) {
++		if (!(vma = find_vma(mm, start)))
++			return i ? : -EFAULT;
++		if (write && !(vma->vm_flags & VM_WRITE))
++			return i ? : -EFAULT;
++
++		do {
++			ret = follow_pfn(vma, start, &pfn);
++			if (ret)
++				return i ? : ret;
++
++			if (pages) {
++				pages[i] = pfn_to_page(pfn);
++				if (pfn_valid(pfn))
++					get_page(pages[i]);
++			}
++			if (vmas)
++				vmas[i] = vma;
++
++			start += PAGE_SIZE;
++			nr_pages--;
++			i++;
++		} while (nr_pages && start < vma->vm_end);
++	}
++
++	return i;
++}
++
++/**
++ * ib_get_umem - Pin and DMA map userspace memory.
+  * @context: userspace context to pin memory for
+  * @addr: userspace virtual address to start at
+  * @size: length of region to pin
+  * @access: IB_ACCESS_xxx flags for memory being pinned
+  * @dmasync: flush in-flight DMA when the memory region is written
+  */
+-struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
++struct ib_umem *ib_get_umem(struct ib_ucontext *context, unsigned long addr,
+ 			    size_t size, int access, int dmasync)
+ {
+ 	struct ib_umem *umem;
+@@ -101,7 +162,6 @@
+ 	if (!umem)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	umem->context   = context;
+ 	umem->length    = size;
+ 	umem->offset    = addr & ~PAGE_MASK;
+ 	umem->page_size = PAGE_SIZE;
+@@ -163,11 +223,18 @@
+ 	sg_list_start = umem->sg_head.sgl;
+ 
+ 	while (npages) {
++
+ 		ret = get_user_pages(current, current->mm, cur_base,
+ 				     min_t(unsigned long, npages,
+ 					   PAGE_SIZE / sizeof (struct page *)),
+ 				     1, !umem->writable, page_list, vma_list);
+ 
++		if (ret == -EFAULT) /* may be a remapped area; try again */
++			ret = get_remap_pages(current->mm, cur_base,
++				     min_t(unsigned long, npages,
++					   PAGE_SIZE / sizeof (struct page *)),
++				     !umem->writable, page_list, vma_list);
++
+ 		if (ret < 0)
+ 			goto out;
+ 
+@@ -219,7 +286,6 @@
+ 
+ 	return ret < 0 ? ERR_PTR(ret) : umem;
+ }
+-EXPORT_SYMBOL(ib_umem_get);
+ 
+ static void ib_umem_account(struct work_struct *work)
+ {
+@@ -237,10 +303,10 @@
+ }
+ 
+ /**
+- * ib_umem_release - release memory pinned with ib_umem_get
++ * ib_release_umem - release memory pinned with ib_umem_get
+  * @umem: umem struct to release
+  */
+-void ib_umem_release(struct ib_umem *umem)
++void ib_release_umem(struct ib_umem *umem)
+ {
+ 	struct ib_ucontext *context = umem->context;
+ 	struct mm_struct *mm;
+@@ -290,9 +356,8 @@
+ out:
+ 	kfree(umem);
+ }
+-EXPORT_SYMBOL(ib_umem_release);
+ 
+-int ib_umem_page_count(struct ib_umem *umem)
++int ib_page_count_umem(struct ib_umem *umem)
+ {
+ 	int shift;
+ 	int i;
+@@ -307,4 +372,40 @@
+ 
+ 	return n;
+ }
++
++struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
++			    size_t size, int access, int dmasync)
++{
++	struct ib_umem_ops *ops = context->umem_ops;
++	struct ib_umem *umem;
++
++	umem = (ops && ops->get) ?
++		ops->get(context, addr, size, access, dmasync) :
++		ib_get_umem(context, addr, size, access, dmasync);
++
++	if (!IS_ERR(umem))
++		umem->context = context;
++
++	return umem;
++}
++EXPORT_SYMBOL(ib_umem_get);
++
++void ib_umem_release(struct ib_umem *umem)
++{
++	struct ib_umem_ops *ops = umem->context->umem_ops;
++
++	if (ops && ops->release)
++		ops->release(umem);
++	else
++		ib_release_umem(umem);
++}
++EXPORT_SYMBOL(ib_umem_release);
++
++int ib_umem_page_count(struct ib_umem *umem)
++{
++	struct ib_umem_ops *ops = umem->context->umem_ops;
++
++	return (ops && ops->page_count) ?
++		ops->page_count(umem) : ib_page_count_umem(umem);
++}
+ EXPORT_SYMBOL(ib_umem_page_count);
+diff -urN a3/drivers/infiniband/hw/mthca/mthca_memfree.c a4/drivers/infiniband/hw/mthca/mthca_memfree.c
+--- a3/drivers/infiniband/hw/mthca/mthca_memfree.c	2015-01-05 14:12:52.112593540 -0800
++++ a4/drivers/infiniband/hw/mthca/mthca_memfree.c	2015-01-05 14:36:00.825535043 -0800
+@@ -39,6 +39,12 @@
+ 
+ #include <asm/page.h>
+ 
++/* Must use the ib_umem routines to support the IB proxy server. */
++#define	MTHCA_IB_UMEM
++#ifdef	MTHCA_IB_UMEM
++#include <rdma/ib_umem.h>
++#endif
++
+ #include "mthca_memfree.h"
+ #include "mthca_dev.h"
+ #include "mthca_cmd.h"
+@@ -56,7 +62,11 @@
+ 	struct mutex mutex;
+ 	struct {
+ 		u64                uvirt;
++#ifdef	MTHCA_IB_UMEM
++		struct ib_umem	   *umem;
++#else
+ 		struct scatterlist mem;
++#endif
+ 		int                refcount;
+ 	}                page[0];
+ };
+@@ -446,7 +456,12 @@
+ int mthca_map_user_db(struct mthca_dev *dev, struct mthca_uar *uar,
+ 		      struct mthca_user_db_table *db_tab, int index, u64 uaddr)
+ {
++#ifdef	MTHCA_IB_UMEM
++	struct mthca_ucontext *context;
++	struct ib_umem_chunk *chunk;
++#else
+ 	struct page *pages[1];
++#endif
+ 	int ret = 0;
+ 	int i;
+ 
+@@ -472,6 +487,22 @@
+ 		goto out;
+ 	}
+ 
++#ifdef	MTHCA_IB_UMEM
++	context = container_of(uar, struct mthca_ucontext, uar);
++
++	db_tab->page[i].umem = ib_umem_get(&context->ibucontext,
++					   uaddr & PAGE_MASK, PAGE_SIZE, 0, 0);
++	if (IS_ERR(db_tab->page[i].umem)) {
++		ret = PTR_ERR(db_tab->page[i].umem);
++		goto out;
++	}
++
++	chunk = list_entry(db_tab->page[i].umem->chunk_list.next,
++			   struct ib_umem_chunk, list);
++
++	ret = mthca_MAP_ICM_page(dev, sg_dma_address(&chunk->page_list[0]),
++				 mthca_uarc_virt(dev, uar, i));
++#else
+ 	ret = get_user_pages(current, current->mm, uaddr & PAGE_MASK, 1, 1, 0,
+ 			     pages, NULL);
+ 	if (ret < 0)
+@@ -488,9 +519,14 @@
+ 
+ 	ret = mthca_MAP_ICM_page(dev, sg_dma_address(&db_tab->page[i].mem),
+ 				 mthca_uarc_virt(dev, uar, i));
++#endif
+ 	if (ret) {
++#ifdef	MTHCA_IB_UMEM
++		ib_umem_release(db_tab->page[i].umem);
++#else
+ 		pci_unmap_sg(dev->pdev, &db_tab->page[i].mem, 1, PCI_DMA_TODEVICE);
+ 		put_page(sg_page(&db_tab->page[i].mem));
++#endif
+ 		goto out;
+ 	}
+ 
+@@ -505,6 +541,9 @@
+ void mthca_unmap_user_db(struct mthca_dev *dev, struct mthca_uar *uar,
+ 			 struct mthca_user_db_table *db_tab, int index)
+ {
++#ifdef	MTHCA_IB_UMEM
++	int i;
++#endif
+ 	if (!mthca_is_memfree(dev))
+ 		return;
+ 
+@@ -515,7 +554,16 @@
+ 
+ 	mutex_lock(&db_tab->mutex);
+ 
++#ifdef	MTHCA_IB_UMEM
++	i = index / MTHCA_DB_REC_PER_PAGE;
++	if (!--db_tab->page[i].refcount) {
++		mthca_UNMAP_ICM(dev, mthca_uarc_virt(dev, uar, i), 1);
++		ib_umem_release(db_tab->page[i].umem);
++		db_tab->page[i].uvirt = 0;
++	}
++#else
+ 	--db_tab->page[index / MTHCA_DB_REC_PER_PAGE].refcount;
++#endif
+ 
+ 	mutex_unlock(&db_tab->mutex);
+ }
+@@ -538,7 +586,11 @@
+ 	for (i = 0; i < npages; ++i) {
+ 		db_tab->page[i].refcount = 0;
+ 		db_tab->page[i].uvirt    = 0;
++#ifdef	MTHCA_IB_UMEM
++		db_tab->page[i].umem     = NULL;
++#else
+ 		sg_init_table(&db_tab->page[i].mem, 1);
++#endif
+ 	}
+ 
+ 	return db_tab;
+@@ -555,8 +607,12 @@
+ 	for (i = 0; i < dev->uar_table.uarc_size / MTHCA_ICM_PAGE_SIZE; ++i) {
+ 		if (db_tab->page[i].uvirt) {
+ 			mthca_UNMAP_ICM(dev, mthca_uarc_virt(dev, uar, i), 1);
++#ifdef	MTHCA_IB_UMEM
++			ib_umem_release(db_tab->page[i].umem);
++#else
+ 			pci_unmap_sg(dev->pdev, &db_tab->page[i].mem, 1, PCI_DMA_TODEVICE);
+ 			put_page(sg_page(&db_tab->page[i].mem));
++#endif
+ 		}
+ 	}
+ 
+diff -urN a3/include/rdma/ib_verbs.h a4/include/rdma/ib_verbs.h
+--- a3/include/rdma/ib_verbs.h	2015-01-05 14:18:48.871578512 -0800
++++ a4/include/rdma/ib_verbs.h	2015-01-05 14:36:00.826535043 -0800
+@@ -1122,7 +1122,18 @@
+ 	u8	page_shift;
+ };
+ 
++struct ib_ucontext;
++struct ib_umem_ops {
++	struct ib_umem	     *(*get)(struct ib_ucontext *context,
++				     unsigned long addr, size_t size,
++				     int access, int dmasync);
++	void		      (*release)(struct ib_umem *umem);
++	int		      (*page_count)(struct ib_umem *umem);
++};
++
+ struct ib_ucontext {
++	struct ib_umem_ops     *umem_ops;	/* set to NULL for default ops */
++	void		       *umem_private_data;
+ 	struct ib_device       *device;
+ 	struct list_head	pd_list;
+ 	struct list_head	mr_list;

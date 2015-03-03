@@ -60,6 +60,7 @@ foreach_card()
 			names=(${host}-${card} ${card} ${host}-${card}.${domn})
 		else
 			eval $_failure
+			errors+=1
 			continue
 		fi
 

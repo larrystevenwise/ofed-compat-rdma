@@ -1,0 +1,82 @@
+From c01faf2a8053f8968b9bac84a4cbd54a9952d472 Mon Sep 17 00:00:00 2001
+From: Phil Cayton <phil.cayton@intel.com>
+Date: Tue, 21 Jan 2014 08:59:29 -0800
+Subject: [PATCH 01/12] ib_core add mic node and scif transport types
+
+The OFED SCIF driver implements a software-emulated RDMA device to allow OFED
+based applications, such as Intel MPI, to run on Intel(R) MIC Architecture
+without the presence of a physical HCA.  OFED SCIF is only targeted for inter-
+node communication within a single platform, where a node is a coprocessor
+or the host processor.  This patch adds new node and transport types to the
+ib_core kernel module to distinguish this new RDMA interface type.
+---
+diff -urN a0/drivers/infiniband/core/sysfs.c a1/drivers/infiniband/core/sysfs.c
+--- a0/drivers/infiniband/core/sysfs.c	2015-01-05 13:35:35.692687746 -0800
++++ a1/drivers/infiniband/core/sysfs.c	2015-01-05 13:46:38.792659814 -0800
+@@ -253,6 +253,8 @@
+ 		return sprintf(buf, "%s\n", "InfiniBand");
+ 	case IB_LINK_LAYER_ETHERNET:
+ 		return sprintf(buf, "%s\n", "Ethernet");
++	case IB_LINK_LAYER_SCIF:
++		return sprintf(buf, "%s\n", "SCIF");
+ 	default:
+ 		return sprintf(buf, "%s\n", "Unknown");
+ 	}
+@@ -623,6 +625,7 @@
+ 	case RDMA_NODE_USNIC_UDP: return sprintf(buf, "%d: usNIC UDP\n", dev->node_type);
+ 	case RDMA_NODE_IB_SWITCH: return sprintf(buf, "%d: switch\n", dev->node_type);
+ 	case RDMA_NODE_IB_ROUTER: return sprintf(buf, "%d: router\n", dev->node_type);
++	case RDMA_NODE_MIC:	  return sprintf(buf, "%d: MIC\n", dev->node_type);
+ 	default:		  return sprintf(buf, "%d: <unknown>\n", dev->node_type);
+ 	}
+ }
+diff -urN a0/drivers/infiniband/core/verbs.c a1/drivers/infiniband/core/verbs.c
+--- a0/drivers/infiniband/core/verbs.c	2015-01-05 13:35:35.693687746 -0800
++++ a1/drivers/infiniband/core/verbs.c	2015-01-05 13:49:08.470653509 -0800
+@@ -121,6 +121,8 @@
+ 		return RDMA_TRANSPORT_USNIC;
+ 	case RDMA_NODE_USNIC_UDP:
+ 		return RDMA_TRANSPORT_USNIC_UDP;
++	case RDMA_NODE_MIC:
++		return RDMA_TRANSPORT_SCIF;
+ 	default:
+ 		BUG();
+ 		return 0;
+@@ -140,6 +142,8 @@
+ 	case RDMA_TRANSPORT_USNIC:
+ 	case RDMA_TRANSPORT_USNIC_UDP:
+ 		return IB_LINK_LAYER_ETHERNET;
++	case RDMA_TRANSPORT_SCIF:
++		return IB_LINK_LAYER_SCIF;
+ 	default:
+ 		return IB_LINK_LAYER_UNSPECIFIED;
+ 	}
+diff -urN a0/include/rdma/ib_verbs.h a1/include/rdma/ib_verbs.h
+--- a0/include/rdma/ib_verbs.h	2015-01-05 13:45:40.299662278 -0800
++++ a1/include/rdma/ib_verbs.h	2015-01-05 13:50:57.590648913 -0800
+@@ -75,13 +75,15 @@
+ 	RDMA_NODE_RNIC,
+ 	RDMA_NODE_USNIC,
+ 	RDMA_NODE_USNIC_UDP,
++	RDMA_NODE_MIC,
+ };
+ 
+ enum rdma_transport_type {
+ 	RDMA_TRANSPORT_IB,
+ 	RDMA_TRANSPORT_IWARP,
+ 	RDMA_TRANSPORT_USNIC,
+-	RDMA_TRANSPORT_USNIC_UDP
++	RDMA_TRANSPORT_USNIC_UDP,
++	RDMA_TRANSPORT_SCIF,
+ };
+ 
+ __attribute_const__ enum rdma_transport_type
+@@ -91,6 +93,7 @@
+ 	IB_LINK_LAYER_UNSPECIFIED,
+ 	IB_LINK_LAYER_INFINIBAND,
+ 	IB_LINK_LAYER_ETHERNET,
++	IB_LINK_LAYER_SCIF
+ };
+ 
+ enum ib_device_cap_flags {
+Binary files a0/include/rdma/.ib_verbs.h.rej.swp and a1/include/rdma/.ib_verbs.h.rej.swp differ
