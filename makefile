@@ -144,9 +144,7 @@ kernel: $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 		-D__OFED_BUILD__ \
 		$(CFLAGS) \
 		-include $(autoconf_h) \
-		-include $(CWD)/include/linux/autoconf.h \
 		$(KCONFIG_H) \
-		-include $(CWD)/compat/config.h \
 		-include $(CWD)/include/linux/compat-2.6.h \
 		$(BACKPORT_INCLUDES) \
 		$(KERNEL_MEMTRACK_CFLAGS) \

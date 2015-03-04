@@ -742,8 +742,14 @@ esac
 CWD=$(pwd)
 CONFIG="configure.mk.kernel"
 
-mkdir -p ${CWD}/include/linux
-AUTOCONF_H="${CWD}/include/linux/autoconf.h"
+
+if (/bin/ls -1 $KSRC/include/*/autoconf.h 2>/dev/null | head -1 | grep -q generated); then
+    AUTOCONF_PREFIX=generated
+else
+    AUTOCONF_PREFIX=linux
+fi
+mkdir -p ${CWD}/include/${AUTOCONF_PREFIX}
+AUTOCONF_H="${CWD}/include/${AUTOCONF_PREFIX}/autoconf.h"
 
 # disable unsupported modules on 32bit
 if [ $ARCH != "x86_64" ]; then
