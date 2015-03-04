@@ -201,6 +201,7 @@ install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openibd.service
 # Copy infiniband configuration
 install -d $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openib.conf $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
+cat $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openib.conf.tmp >> $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}/openib.conf
 
 %if %{build_ibp_server} || %{build_ibscif}
 # install overlay files and config

@@ -239,13 +239,17 @@ function check_autofconf {
 }
 
 function add_conf {
-	COMMENT=$1
-	VALUE=$2
-	OICONF=${PWD}/ofed_scripts/openib.conf
+    COMMENT=$1
+    PARAM=${2%=*}
+    VALUE=${2#*=}
+    OICONF=${PWD}/ofed_scripts/openib.conf.tmp
 
-	echo "${COMMENT}" >> "${OICONF}"
-	echo "${VALUE}" >> "${OICONF}"
-	echo >> "${OICONF}"
+    touch $OICONF
+    if ! (grep -wq "^$PARAM" $OICONF > /dev/null 2>&1); then
+        echo >> "${OICONF}"
+        echo "${COMMENT}" >> "${OICONF}"
+        echo "${PARAM}=${VALUE}" >> "${OICONF}"
+    fi
 }
 
 main()
