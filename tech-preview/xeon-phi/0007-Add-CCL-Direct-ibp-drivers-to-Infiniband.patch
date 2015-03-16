@@ -8,9 +8,9 @@ the server modules for sa and cm
 
 Signed-off-by: Phil Cayton <phil.cayton@intel.com>
 ---
-diff -urN a6/drivers/infiniband/ibp/cm/cm_ibp_abi.h a7/drivers/infiniband/ibp/cm/cm_ibp_abi.h
+diff -ruN a6/drivers/infiniband/ibp/cm/cm_ibp_abi.h a7/drivers/infiniband/ibp/cm/cm_ibp_abi.h
 --- a6/drivers/infiniband/ibp/cm/cm_ibp_abi.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/cm_ibp_abi.h	2015-02-23 10:01:30.289769309 -0800
++++ a7/drivers/infiniband/ibp/cm/cm_ibp_abi.h	2015-03-11 11:05:40.651368454 -0700
 @@ -0,0 +1,399 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -411,9 +411,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/cm_ibp_abi.h a7/drivers/infiniband/ibp/cm
 +};
 +
 +#endif /* CM_IBP_ABI_H */
-diff -urN a6/drivers/infiniband/ibp/cm/cm_server_msg.c a7/drivers/infiniband/ibp/cm/cm_server_msg.c
+diff -ruN a6/drivers/infiniband/ibp/cm/cm_server_msg.c a7/drivers/infiniband/ibp/cm/cm_server_msg.c
 --- a6/drivers/infiniband/ibp/cm/cm_server_msg.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/cm_server_msg.c	2015-02-23 10:18:09.042820508 -0800
++++ a7/drivers/infiniband/ibp/cm/cm_server_msg.c	2015-03-11 11:05:40.651368454 -0700
 @@ -0,0 +1,1058 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1473,9 +1473,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/cm_server_msg.c a7/drivers/infiniband/ibp
 +
 +	return ibp_send(client->ep, msg, len);
 +}
-diff -urN a6/drivers/infiniband/ibp/cm/common.h a7/drivers/infiniband/ibp/cm/common.h
+diff -ruN a6/drivers/infiniband/ibp/cm/common.h a7/drivers/infiniband/ibp/cm/common.h
 --- a6/drivers/infiniband/ibp/cm/common.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/common.h	2015-02-23 10:01:30.289769309 -0800
++++ a7/drivers/infiniband/ibp/cm/common.h	2015-03-11 11:05:40.651368454 -0700
 @@ -0,0 +1,106 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1583,9 +1583,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/common.h a7/drivers/infiniband/ibp/cm/com
 +int ibp_recv(scif_epd_t ep, void *buf, size_t len);
 +
 +#endif /* COMMON_H */
-diff -urN a6/drivers/infiniband/ibp/cm/ibp-abi.h a7/drivers/infiniband/ibp/cm/ibp-abi.h
+diff -ruN a6/drivers/infiniband/ibp/cm/ibp-abi.h a7/drivers/infiniband/ibp/cm/ibp-abi.h
 --- a6/drivers/infiniband/ibp/cm/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/ibp-abi.h	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/cm/ibp-abi.h	2015-03-11 11:05:40.652368454 -0700
 @@ -0,0 +1,94 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1681,9 +1681,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/ibp-abi.h a7/drivers/infiniband/ibp/cm/ib
 +};
 +
 +#endif /* IBP_ABI_H */
-diff -urN a6/drivers/infiniband/ibp/cm/ibp_exports.h a7/drivers/infiniband/ibp/cm/ibp_exports.h
+diff -ruN a6/drivers/infiniband/ibp/cm/ibp_exports.h a7/drivers/infiniband/ibp/cm/ibp_exports.h
 --- a6/drivers/infiniband/ibp/cm/ibp_exports.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/ibp_exports.h	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/cm/ibp_exports.h	2015-03-11 11:05:40.652368454 -0700
 @@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1735,14 +1735,19 @@ diff -urN a6/drivers/infiniband/ibp/cm/ibp_exports.h a7/drivers/infiniband/ibp/c
 +
 +
 +#endif /* IBP_EXPORTS_H */
-diff -urN a6/drivers/infiniband/ibp/cm/Makefile a7/drivers/infiniband/ibp/cm/Makefile
+diff -ruN a6/drivers/infiniband/ibp/cm/Makefile a7/drivers/infiniband/ibp/cm/Makefile
 --- a6/drivers/infiniband/ibp/cm/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/Makefile	2015-02-23 10:01:30.290769309 -0800
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
++++ a7/drivers/infiniband/ibp/cm/Makefile	2015-03-11 11:06:09.751367228 -0700
+@@ -0,0 +1,26 @@
++KERNEL_V := $(shell uname -r)
++
++KDIR ?= /lib/modules/$(KERNEL_V)/build
++
++SCIF_INCL := /usr/src/kernels/$(KERNEL_V)/include/modules/
 +
 +obj-$(CONFIG_IBP_SERVER) += ibp_cm_server.o
 +
++ccflags-y += -I$(SCIF_INCL)
 +ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
 +
 +ibp_cm_server-y :=	server.o		\
@@ -1760,9 +1765,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/Makefile a7/drivers/infiniband/ibp/cm/Mak
 +
 +unix:
 +	dos2unix *.[ch] Kconfig Makefile
-diff -urN a6/drivers/infiniband/ibp/cm/server.c a7/drivers/infiniband/ibp/cm/server.c
+diff -ruN a6/drivers/infiniband/ibp/cm/server.c a7/drivers/infiniband/ibp/cm/server.c
 --- a6/drivers/infiniband/ibp/cm/server.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/server.c	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/cm/server.c	2015-03-11 11:05:40.652368454 -0700
 @@ -0,0 +1,221 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -1985,9 +1990,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/server.c a7/drivers/infiniband/ibp/cm/ser
 +
 +module_init(ibp_cm_server_init);
 +module_exit(ibp_cm_server_exit);
-diff -urN a6/drivers/infiniband/ibp/cm/server.h a7/drivers/infiniband/ibp/cm/server.h
+diff -ruN a6/drivers/infiniband/ibp/cm/server.h a7/drivers/infiniband/ibp/cm/server.h
 --- a6/drivers/infiniband/ibp/cm/server.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/server.h	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/cm/server.h	2015-03-11 11:05:40.652368454 -0700
 @@ -0,0 +1,128 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -2117,9 +2122,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/server.h a7/drivers/infiniband/ibp/cm/ser
 +			    struct ibp_msg_header *hdr);
 +
 +#endif /* SERVER_H */
-diff -urN a6/drivers/infiniband/ibp/cm/server_msg.c a7/drivers/infiniband/ibp/cm/server_msg.c
+diff -ruN a6/drivers/infiniband/ibp/cm/server_msg.c a7/drivers/infiniband/ibp/cm/server_msg.c
 --- a6/drivers/infiniband/ibp/cm/server_msg.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/cm/server_msg.c	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/cm/server_msg.c	2015-03-11 11:05:40.652368454 -0700
 @@ -0,0 +1,176 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -2297,9 +2302,9 @@ diff -urN a6/drivers/infiniband/ibp/cm/server_msg.c a7/drivers/infiniband/ibp/cm
 +
 +	return ret;
 +}
-diff -urN a6/drivers/infiniband/ibp/drv/common.h a7/drivers/infiniband/ibp/drv/common.h
+diff -ruN a6/drivers/infiniband/ibp/drv/common.h a7/drivers/infiniband/ibp/drv/common.h
 --- a6/drivers/infiniband/ibp/drv/common.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/common.h	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/drv/common.h	2015-03-11 11:05:40.653368454 -0700
 @@ -0,0 +1,109 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -2410,9 +2415,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/common.h a7/drivers/infiniband/ibp/drv/c
 +void ibp_cleanup(void);
 +
 +#endif /* COMMON_H */
-diff -urN a6/drivers/infiniband/ibp/drv/ibp-abi.h a7/drivers/infiniband/ibp/drv/ibp-abi.h
+diff -ruN a6/drivers/infiniband/ibp/drv/ibp-abi.h a7/drivers/infiniband/ibp/drv/ibp-abi.h
 --- a6/drivers/infiniband/ibp/drv/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/ibp-abi.h	2015-02-23 10:01:30.290769309 -0800
++++ a7/drivers/infiniband/ibp/drv/ibp-abi.h	2015-03-11 11:05:40.653368454 -0700
 @@ -0,0 +1,649 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -3063,9 +3068,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/ibp-abi.h a7/drivers/infiniband/ibp/drv/
 +};
 +
 +#endif /* IBP_ABI_H */
-diff -urN a6/drivers/infiniband/ibp/drv/ibp.h a7/drivers/infiniband/ibp/drv/ibp.h
+diff -ruN a6/drivers/infiniband/ibp/drv/ibp.h a7/drivers/infiniband/ibp/drv/ibp.h
 --- a6/drivers/infiniband/ibp/drv/ibp.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/ibp.h	2015-02-23 10:01:30.291769309 -0800
++++ a7/drivers/infiniband/ibp/drv/ibp.h	2015-03-11 11:05:40.653368454 -0700
 @@ -0,0 +1,257 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -3324,14 +3329,19 @@ diff -urN a6/drivers/infiniband/ibp/drv/ibp.h a7/drivers/infiniband/ibp/drv/ibp.
 +			 union ib_gid *gid, u16 lid);
 +
 +#endif /* IBP_H */
-diff -urN a6/drivers/infiniband/ibp/drv/Makefile a7/drivers/infiniband/ibp/drv/Makefile
+diff -ruN a6/drivers/infiniband/ibp/drv/Makefile a7/drivers/infiniband/ibp/drv/Makefile
 --- a6/drivers/infiniband/ibp/drv/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/Makefile	2015-02-23 10:01:30.291769309 -0800
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
++++ a7/drivers/infiniband/ibp/drv/Makefile	2015-03-11 11:06:14.420367031 -0700
+@@ -0,0 +1,26 @@
++KERNEL_V := $(shell uname -r)
 +
-+obj-$(CONFIG_IBP_SERVER)	+= ibp_server.o
++KDIR ?= /lib/modules/$(KERNEL_V)/build
 +
++SCIF_INCL := /usr/src/kernels/$(KERNEL_V)/include/modules/
++
++obj-$(CONFIG_IBP_SERVER) += ibp_server.o
++
++ccflags-y += -I$(SCIF_INCL)
 +ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
 +
 +ibp_server-y :=		server.o	\
@@ -3349,9 +3359,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/Makefile a7/drivers/infiniband/ibp/drv/M
 +
 +unix:
 +	dos2unix *.[ch] Kconfig Makefile
-diff -urN a6/drivers/infiniband/ibp/drv/server.c a7/drivers/infiniband/ibp/drv/server.c
+diff -ruN a6/drivers/infiniband/ibp/drv/server.c a7/drivers/infiniband/ibp/drv/server.c
 --- a6/drivers/infiniband/ibp/drv/server.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/server.c	2015-02-23 10:01:30.291769309 -0800
++++ a7/drivers/infiniband/ibp/drv/server.c	2015-03-11 11:05:40.653368454 -0700
 @@ -0,0 +1,548 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -3901,9 +3911,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/server.c a7/drivers/infiniband/ibp/drv/s
 +
 +module_init(ibp_server_init);
 +module_exit(ibp_server_exit);
-diff -urN a6/drivers/infiniband/ibp/drv/server.h a7/drivers/infiniband/ibp/drv/server.h
+diff -ruN a6/drivers/infiniband/ibp/drv/server.h a7/drivers/infiniband/ibp/drv/server.h
 --- a6/drivers/infiniband/ibp/drv/server.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/server.h	2015-02-23 10:01:30.291769309 -0800
++++ a7/drivers/infiniband/ibp/drv/server.h	2015-03-11 11:05:40.654368454 -0700
 @@ -0,0 +1,191 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -4096,9 +4106,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/server.h a7/drivers/infiniband/ibp/drv/s
 +void ibp_put_device(struct ibp_device *device);
 +
 +#endif /* SERVER_H */
-diff -urN a6/drivers/infiniband/ibp/drv/server_msg.c a7/drivers/infiniband/ibp/drv/server_msg.c
+diff -ruN a6/drivers/infiniband/ibp/drv/server_msg.c a7/drivers/infiniband/ibp/drv/server_msg.c
 --- a6/drivers/infiniband/ibp/drv/server_msg.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/server_msg.c	2015-02-23 10:01:30.292769309 -0800
++++ a7/drivers/infiniband/ibp/drv/server_msg.c	2015-03-11 11:05:40.655368454 -0700
 @@ -0,0 +1,3098 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7198,9 +7208,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/server_msg.c a7/drivers/infiniband/ibp/d
 +out:
 +	return ret;
 +}
-diff -urN a6/drivers/infiniband/ibp/drv/stack.c a7/drivers/infiniband/ibp/drv/stack.c
+diff -ruN a6/drivers/infiniband/ibp/drv/stack.c a7/drivers/infiniband/ibp/drv/stack.c
 --- a6/drivers/infiniband/ibp/drv/stack.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/stack.c	2015-02-23 10:01:30.292769309 -0800
++++ a7/drivers/infiniband/ibp/drv/stack.c	2015-03-11 11:05:40.655368454 -0700
 @@ -0,0 +1,102 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7304,9 +7314,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/stack.c a7/drivers/infiniband/ibp/drv/st
 +
 +	return p;
 +}
-diff -urN a6/drivers/infiniband/ibp/drv/stack.h a7/drivers/infiniband/ibp/drv/stack.h
+diff -ruN a6/drivers/infiniband/ibp/drv/stack.h a7/drivers/infiniband/ibp/drv/stack.h
 --- a6/drivers/infiniband/ibp/drv/stack.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/drv/stack.h	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/drv/stack.h	2015-03-11 11:05:40.655368454 -0700
 @@ -0,0 +1,57 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7365,9 +7375,9 @@ diff -urN a6/drivers/infiniband/ibp/drv/stack.h a7/drivers/infiniband/ibp/drv/st
 +void ibp_clear_stack(struct ibp_stack *s);
 +
 +#endif /* _IBP_STACK_H_ */
-diff -urN a6/drivers/infiniband/ibp/Kconfig a7/drivers/infiniband/ibp/Kconfig
+diff -ruN a6/drivers/infiniband/ibp/Kconfig a7/drivers/infiniband/ibp/Kconfig
 --- a6/drivers/infiniband/ibp/Kconfig	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/Kconfig	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/Kconfig	2015-03-11 11:05:40.655368454 -0700
 @@ -0,0 +1,16 @@
 +config IBP_SERVER
 +	tristate "CCL Direct IB Server drivers"
@@ -7385,16 +7395,16 @@ diff -urN a6/drivers/infiniband/ibp/Kconfig a7/drivers/infiniband/ibp/Kconfig
 +	default y
 +	---help---
 +	  This option causes debug code to be compiled into the CCL Direct drivers.
-diff -urN a6/drivers/infiniband/ibp/Makefile a7/drivers/infiniband/ibp/Makefile
+diff -ruN a6/drivers/infiniband/ibp/Makefile a7/drivers/infiniband/ibp/Makefile
 --- a6/drivers/infiniband/ibp/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/Makefile	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/Makefile	2015-03-11 11:05:40.655368454 -0700
 @@ -0,0 +1,3 @@
 +obj-$(CONFIG_IBP_SERVER)		+= drv/
 +obj-$(CONFIG_IBP_SERVER)		+= cm/
 +obj-$(CONFIG_IBP_SERVER)		+= sa/
-diff -urN a6/drivers/infiniband/ibp/sa/common.h a7/drivers/infiniband/ibp/sa/common.h
+diff -ruN a6/drivers/infiniband/ibp/sa/common.h a7/drivers/infiniband/ibp/sa/common.h
 --- a6/drivers/infiniband/ibp/sa/common.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/common.h	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/sa/common.h	2015-03-11 11:05:40.656368454 -0700
 @@ -0,0 +1,108 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7504,9 +7514,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/common.h a7/drivers/infiniband/ibp/sa/com
 +int ibp_recv(scif_epd_t ep, void *buf, size_t len);
 +
 +#endif /* COMMON_H */
-diff -urN a6/drivers/infiniband/ibp/sa/ibp-abi.h a7/drivers/infiniband/ibp/sa/ibp-abi.h
+diff -ruN a6/drivers/infiniband/ibp/sa/ibp-abi.h a7/drivers/infiniband/ibp/sa/ibp-abi.h
 --- a6/drivers/infiniband/ibp/sa/ibp-abi.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/ibp-abi.h	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/sa/ibp-abi.h	2015-03-11 11:05:40.656368454 -0700
 @@ -0,0 +1,101 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7609,9 +7619,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/ibp-abi.h a7/drivers/infiniband/ibp/sa/ib
 +};
 +
 +#endif /* IBP_ABI_H */
-diff -urN a6/drivers/infiniband/ibp/sa/ibp_exports.h a7/drivers/infiniband/ibp/sa/ibp_exports.h
+diff -ruN a6/drivers/infiniband/ibp/sa/ibp_exports.h a7/drivers/infiniband/ibp/sa/ibp_exports.h
 --- a6/drivers/infiniband/ibp/sa/ibp_exports.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/ibp_exports.h	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/sa/ibp_exports.h	2015-03-11 11:05:40.656368454 -0700
 @@ -0,0 +1,49 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7662,14 +7672,19 @@ diff -urN a6/drivers/infiniband/ibp/sa/ibp_exports.h a7/drivers/infiniband/ibp/s
 +u64 ibp_resolve_ib_device(struct ib_device *ibdev);
 +
 +#endif /* IBP_EXPORTS_H */
-diff -urN a6/drivers/infiniband/ibp/sa/Makefile a7/drivers/infiniband/ibp/sa/Makefile
+diff -ruN a6/drivers/infiniband/ibp/sa/Makefile a7/drivers/infiniband/ibp/sa/Makefile
 --- a6/drivers/infiniband/ibp/sa/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/Makefile	2015-02-23 10:01:30.293769309 -0800
-@@ -0,0 +1,21 @@
-+KDIR ?= /lib/modules/`uname -r`/build
++++ a7/drivers/infiniband/ibp/sa/Makefile	2015-03-11 11:06:22.521366690 -0700
+@@ -0,0 +1,26 @@
++KERNEL_V := $(shell uname -r)
++
++KDIR ?= /lib/modules/$(KERNEL_V)/build
++
++SCIF_INCL := /usr/src/kernels/$(KERNEL_V)/include/modules/
 +
 +obj-$(CONFIG_IBP_SERVER) += ibp_sa_server.o
 +
++ccflags-y += -I$(SCIF_INCL)
 +ccflags-$(CONFIG_IBP_DEBUG) += -g -DIBP_DEBUG
 +
 +ibp_sa_server-y :=	server.o		\
@@ -7687,9 +7702,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/Makefile a7/drivers/infiniband/ibp/sa/Mak
 +
 +unix:
 +	dos2unix *.[ch] Kconfig Makefile
-diff -urN a6/drivers/infiniband/ibp/sa/sa_ibp_abi.h a7/drivers/infiniband/ibp/sa/sa_ibp_abi.h
+diff -ruN a6/drivers/infiniband/ibp/sa/sa_ibp_abi.h a7/drivers/infiniband/ibp/sa/sa_ibp_abi.h
 --- a6/drivers/infiniband/ibp/sa/sa_ibp_abi.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/sa_ibp_abi.h	2015-02-23 10:01:30.293769309 -0800
++++ a7/drivers/infiniband/ibp/sa/sa_ibp_abi.h	2015-03-11 11:05:40.656368454 -0700
 @@ -0,0 +1,251 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -7942,9 +7957,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/sa_ibp_abi.h a7/drivers/infiniband/ibp/sa
 +};
 +
 +#endif /* SA_IBP_ABI_H */
-diff -urN a6/drivers/infiniband/ibp/sa/sa_server_msg.c a7/drivers/infiniband/ibp/sa/sa_server_msg.c
+diff -ruN a6/drivers/infiniband/ibp/sa/sa_server_msg.c a7/drivers/infiniband/ibp/sa/sa_server_msg.c
 --- a6/drivers/infiniband/ibp/sa/sa_server_msg.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/sa_server_msg.c	2015-02-23 10:01:30.294769309 -0800
++++ a7/drivers/infiniband/ibp/sa/sa_server_msg.c	2015-03-11 11:05:40.657368454 -0700
 @@ -0,0 +1,970 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -8916,9 +8931,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/sa_server_msg.c a7/drivers/infiniband/ibp
 +
 +	return ret;
 +}
-diff -urN a6/drivers/infiniband/ibp/sa/sa_table.h a7/drivers/infiniband/ibp/sa/sa_table.h
+diff -ruN a6/drivers/infiniband/ibp/sa/sa_table.h a7/drivers/infiniband/ibp/sa/sa_table.h
 --- a6/drivers/infiniband/ibp/sa/sa_table.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/sa_table.h	2015-02-23 10:01:30.294769309 -0800
++++ a7/drivers/infiniband/ibp/sa/sa_table.h	2015-03-11 11:05:40.657368454 -0700
 @@ -0,0 +1,131 @@
 +/*"
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -9051,9 +9066,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/sa_table.h a7/drivers/infiniband/ibp/sa/s
 +	  .offset_bits  = 16,
 +	  .size_bits    = 48 },
 +};
-diff -urN a6/drivers/infiniband/ibp/sa/server.c a7/drivers/infiniband/ibp/sa/server.c
+diff -ruN a6/drivers/infiniband/ibp/sa/server.c a7/drivers/infiniband/ibp/sa/server.c
 --- a6/drivers/infiniband/ibp/sa/server.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/server.c	2015-02-23 10:01:30.294769309 -0800
++++ a7/drivers/infiniband/ibp/sa/server.c	2015-03-11 11:05:40.657368454 -0700
 @@ -0,0 +1,221 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -9276,9 +9291,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/server.c a7/drivers/infiniband/ibp/sa/ser
 +
 +module_init(ibp_sa_server_init);
 +module_exit(ibp_sa_server_exit);
-diff -urN a6/drivers/infiniband/ibp/sa/server.h a7/drivers/infiniband/ibp/sa/server.h
+diff -ruN a6/drivers/infiniband/ibp/sa/server.h a7/drivers/infiniband/ibp/sa/server.h
 --- a6/drivers/infiniband/ibp/sa/server.h	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/server.h	2015-02-23 10:01:30.294769309 -0800
++++ a7/drivers/infiniband/ibp/sa/server.h	2015-03-11 11:05:40.657368454 -0700
 @@ -0,0 +1,172 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
@@ -9452,9 +9467,9 @@ diff -urN a6/drivers/infiniband/ibp/sa/server.h a7/drivers/infiniband/ibp/sa/ser
 +				struct ibp_msg_header *hdr);
 +
 +#endif /* SERVER_H */
-diff -urN a6/drivers/infiniband/ibp/sa/server_msg.c a7/drivers/infiniband/ibp/sa/server_msg.c
+diff -ruN a6/drivers/infiniband/ibp/sa/server_msg.c a7/drivers/infiniband/ibp/sa/server_msg.c
 --- a6/drivers/infiniband/ibp/sa/server_msg.c	1969-12-31 16:00:00.000000000 -0800
-+++ a7/drivers/infiniband/ibp/sa/server_msg.c	2015-02-23 10:01:30.294769309 -0800
++++ a7/drivers/infiniband/ibp/sa/server_msg.c	2015-03-11 11:05:40.657368454 -0700
 @@ -0,0 +1,185 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.

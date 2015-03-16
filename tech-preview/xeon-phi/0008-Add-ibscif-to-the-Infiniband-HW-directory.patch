@@ -5,9 +5,9 @@ Subject: [PATCH 08/13] Add ibscif to the Infiniband HW directory
 
 Signed-off-by: Phil Cayton <phil.cayton@intel.com>
 ---
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_ah.c a8/drivers/infiniband/hw/scif/ibscif_ah.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_ah.c a8/drivers/infiniband/hw/scif/ibscif_ah.c
 --- a7/drivers/infiniband/hw/scif/ibscif_ah.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_ah.c	2015-02-23 10:14:37.482809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_ah.c	2015-03-10 13:56:38.840575818 -0700
 @@ -0,0 +1,50 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -59,9 +59,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_ah.c a8/drivers/infiniband/hw/sci
 +	kfree(to_ah(ibah));
 +	return 0;
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_cm.c a8/drivers/infiniband/hw/scif/ibscif_cm.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_cm.c a8/drivers/infiniband/hw/scif/ibscif_cm.c
 --- a7/drivers/infiniband/hw/scif/ibscif_cm.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_cm.c	2015-02-23 10:14:37.482809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_cm.c	2015-03-10 13:56:38.828575818 -0700
 @@ -0,0 +1,515 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -578,9 +578,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_cm.c a8/drivers/infiniband/hw/sci
 +	return 0;
 +}
 +
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_cq.c a8/drivers/infiniband/hw/scif/ibscif_cq.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_cq.c a8/drivers/infiniband/hw/scif/ibscif_cq.c
 --- a7/drivers/infiniband/hw/scif/ibscif_cq.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_cq.c	2015-02-23 10:14:37.483809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_cq.c	2015-03-10 13:56:38.838575818 -0700
 @@ -0,0 +1,313 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -895,9 +895,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_cq.c a8/drivers/infiniband/hw/sci
 +
 +	spin_unlock_bh(&cq->lock);
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_driver.h a8/drivers/infiniband/hw/scif/ibscif_driver.h
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_driver.h a8/drivers/infiniband/hw/scif/ibscif_driver.h
 --- a7/drivers/infiniband/hw/scif/ibscif_driver.h	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_driver.h	2015-02-23 10:14:37.483809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_driver.h	2015-03-10 13:56:38.840575818 -0700
 @@ -0,0 +1,787 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -1686,9 +1686,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_driver.h a8/drivers/infiniband/hw
 +int ibscif_send_cm_rtu(struct ibscif_cm *cm_ctx);
 +
 +#endif /* IBSCIF_DRIVER_H */
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_loopback.c a8/drivers/infiniband/hw/scif/ibscif_loopback.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_loopback.c a8/drivers/infiniband/hw/scif/ibscif_loopback.c
 --- a7/drivers/infiniband/hw/scif/ibscif_loopback.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_loopback.c	2015-02-23 10:14:37.484809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_loopback.c	2015-03-10 13:56:38.838575818 -0700
 @@ -0,0 +1,582 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -2272,9 +2272,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_loopback.c a8/drivers/infiniband/
 +		goto again;
 +	}
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_main.c a8/drivers/infiniband/hw/scif/ibscif_main.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_main.c a8/drivers/infiniband/hw/scif/ibscif_main.c
 --- a7/drivers/infiniband/hw/scif/ibscif_main.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_main.c	2015-02-23 10:14:37.484809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_main.c	2015-03-10 13:56:38.829575818 -0700
 @@ -0,0 +1,357 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -2633,9 +2633,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_main.c a8/drivers/infiniband/hw/s
 +
 +module_init(ibscif_init);
 +module_exit(ibscif_exit);
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_mr.c a8/drivers/infiniband/hw/scif/ibscif_mr.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_mr.c a8/drivers/infiniband/hw/scif/ibscif_mr.c
 --- a7/drivers/infiniband/hw/scif/ibscif_mr.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_mr.c	2015-02-23 10:14:37.484809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_mr.c	2015-03-10 13:56:38.828575818 -0700
 @@ -0,0 +1,559 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3196,9 +3196,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_mr.c a8/drivers/infiniband/hw/sci
 +	up(&conn->dev->mr_list_mutex);
 +}
 +
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_pd.c a8/drivers/infiniband/hw/scif/ibscif_pd.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_pd.c a8/drivers/infiniband/hw/scif/ibscif_pd.c
 --- a7/drivers/infiniband/hw/scif/ibscif_pd.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_pd.c	2015-02-23 10:14:37.484809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_pd.c	2015-03-10 13:56:38.841575818 -0700
 @@ -0,0 +1,56 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3256,9 +3256,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_pd.c a8/drivers/infiniband/hw/sci
 +	kfree(to_pd(ibpd));
 +	return 0;
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_post.c a8/drivers/infiniband/hw/scif/ibscif_post.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_post.c a8/drivers/infiniband/hw/scif/ibscif_post.c
 --- a7/drivers/infiniband/hw/scif/ibscif_post.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_post.c	2015-02-23 10:14:37.485809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_post.c	2015-03-10 13:56:38.828575818 -0700
 @@ -0,0 +1,306 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3566,9 +3566,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_post.c a8/drivers/infiniband/hw/s
 +
 +	return err;
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_procfs.c a8/drivers/infiniband/hw/scif/ibscif_procfs.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_procfs.c a8/drivers/infiniband/hw/scif/ibscif_procfs.c
 --- a7/drivers/infiniband/hw/scif/ibscif_procfs.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_procfs.c	2015-02-23 10:14:37.485809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_procfs.c	2015-03-10 13:56:38.840575818 -0700
 @@ -0,0 +1,180 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -3750,9 +3750,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_procfs.c a8/drivers/infiniband/hw
 +		remove_proc_entry("stats", dev->procfs);
 +	remove_proc_entry(dev->ibdev.name, init_net.proc_net);
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_protocol.c a8/drivers/infiniband/hw/scif/ibscif_protocol.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_protocol.c a8/drivers/infiniband/hw/scif/ibscif_protocol.c
 --- a7/drivers/infiniband/hw/scif/ibscif_protocol.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_protocol.c	2015-02-23 10:14:37.487809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_protocol.c	2015-03-10 13:56:38.839575818 -0700
 @@ -0,0 +1,2816 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -6570,9 +6570,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_protocol.c a8/drivers/infiniband/
 +	while (poll_thread_running)
 +		schedule();
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_protocol.h a8/drivers/infiniband/hw/scif/ibscif_protocol.h
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_protocol.h a8/drivers/infiniband/hw/scif/ibscif_protocol.h
 --- a7/drivers/infiniband/hw/scif/ibscif_protocol.h	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_protocol.h	2015-02-23 10:14:37.487809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_protocol.h	2015-03-10 13:56:38.840575818 -0700
 @@ -0,0 +1,395 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -6969,9 +6969,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_protocol.h a8/drivers/infiniband/
 +#define ibscif_tx_window(tx)		((u32)window_size - ibscif_tx_unacked_window(tx))
 +
 +#endif /* IBSCIF_PROTOCOL_H */
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_provider.c a8/drivers/infiniband/hw/scif/ibscif_provider.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_provider.c a8/drivers/infiniband/hw/scif/ibscif_provider.c
 --- a7/drivers/infiniband/hw/scif/ibscif_provider.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_provider.c	2015-02-23 10:14:37.488809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_provider.c	2015-03-10 13:56:38.829575818 -0700
 @@ -0,0 +1,406 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -7379,9 +7379,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_provider.c a8/drivers/infiniband/
 +	list_for_each_entry_safe(dev, next, &devlist, entry)
 +		ibscif_remove_dev(dev);
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_qp.c a8/drivers/infiniband/hw/scif/ibscif_qp.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_qp.c a8/drivers/infiniband/hw/scif/ibscif_qp.c
 --- a7/drivers/infiniband/hw/scif/ibscif_qp.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_qp.c	2015-02-23 10:14:37.488809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_qp.c	2015-03-10 13:56:38.818575819 -0700
 @@ -0,0 +1,868 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -8251,9 +8251,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_qp.c a8/drivers/infiniband/hw/sci
 +	spin_unlock_bh(&qp->lock);
 +}
 +
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_scheduler.c a8/drivers/infiniband/hw/scif/ibscif_scheduler.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_scheduler.c a8/drivers/infiniband/hw/scif/ibscif_scheduler.c
 --- a7/drivers/infiniband/hw/scif/ibscif_scheduler.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_scheduler.c	2015-02-23 10:14:37.488809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_scheduler.c	2015-03-10 13:56:38.841575818 -0700
 @@ -0,0 +1,195 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -8450,9 +8450,9 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_scheduler.c a8/drivers/infiniband
 +	list_del(&qp->iq.entry);
 +	up(&dev->mutex);
 +}
-diff -urN a7/drivers/infiniband/hw/scif/ibscif_util.c a8/drivers/infiniband/hw/scif/ibscif_util.c
+diff -ruN a7/drivers/infiniband/hw/scif/ibscif_util.c a8/drivers/infiniband/hw/scif/ibscif_util.c
 --- a7/drivers/infiniband/hw/scif/ibscif_util.c	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/ibscif_util.c	2015-02-23 10:14:37.488809663 -0800
++++ a8/drivers/infiniband/hw/scif/ibscif_util.c	2015-03-10 13:56:38.828575818 -0700
 @@ -0,0 +1,623 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
@@ -9077,21 +9077,27 @@ diff -urN a7/drivers/infiniband/hw/scif/ibscif_util.c a8/drivers/infiniband/hw/s
 +	}
 +}
 +
-diff -urN a7/drivers/infiniband/hw/scif/Kconfig a8/drivers/infiniband/hw/scif/Kconfig
+diff -ruN a7/drivers/infiniband/hw/scif/Kconfig a8/drivers/infiniband/hw/scif/Kconfig
 --- a7/drivers/infiniband/hw/scif/Kconfig	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/Kconfig	2015-02-23 10:14:37.489809663 -0800
++++ a8/drivers/infiniband/hw/scif/Kconfig	2015-03-10 13:56:38.839575818 -0700
 @@ -0,0 +1,4 @@
 +config INFINIBAND_SCIF
 +	tristate "SCIF RDMA driver support"
 +	---help---
 +	  RDMA over SCIF driver.
-diff -urN a7/drivers/infiniband/hw/scif/Makefile a8/drivers/infiniband/hw/scif/Makefile
+diff -ruN a7/drivers/infiniband/hw/scif/Makefile a8/drivers/infiniband/hw/scif/Makefile
 --- a7/drivers/infiniband/hw/scif/Makefile	1969-12-31 16:00:00.000000000 -0800
-+++ a8/drivers/infiniband/hw/scif/Makefile	2015-02-23 10:14:37.489809663 -0800
-@@ -0,0 +1,41 @@
-+ifneq ($(KERNELRELEASE),)
++++ a8/drivers/infiniband/hw/scif/Makefile	2015-03-11 10:17:34.663490022 -0700
+@@ -0,0 +1,39 @@
++KERNEL_V := $(shell uname -r)
 +
-+# Original Make begins
++KDIR ?= /lib/modules/$(KERNEL_V)/build
++
++SCIF_INCL := /usr/src/kernels/$(KERNEL_V)/include/modules/
++SCIF_SYMS := /lib/modules/$(KERNEL_V)/scif.symvers
++
++ccflags-y += -I$(SCIF_INCL)
++EXTRA_LDFLAGS += -L$(SCIF_SYMS)
 +
 +obj-$(CONFIG_INFINIBAND_SCIF) += ibscif.o
 +
@@ -9110,23 +9116,15 @@ diff -urN a7/drivers/infiniband/hw/scif/Makefile a8/drivers/infiniband/hw/scif/M
 +		ibscif_scheduler.o	\
 +		ibscif_util.o
 +
-+# Original Makefile ends
++default:
++	$(MAKE) -C $(KDIR) M=`pwd`
 +
-+else
-+
-+ifeq ($(KVER),)
-+  ifeq ($(KDIR),)
-+    KDIR := /lib/modules/$(shell uname -r)/build
-+  endif
-+else
-+  KDIR := /lib/modules/$(KVER)/build
-+endif
-+
-+all:
-+	$(MAKE) -C $(KDIR) SUBDIRS=$(shell pwd) CONFIG_INFINIBAND_SCIF=m
++modules_install:
++	$(MAKE) -C $(KDIR) M=`pwd` modules_install
 +
 +clean:
-+	rm -rf *.o *.ko *.mod.c .*.cmd Module.* .tmp_versions
++	rm -rf *.ko *.o .*.ko.cmd .*.o.cmd *.mod.c Module.* modules.order .tmp_versions
 +
-+endif
++unix:
++	dos2unix *.[ch] Kconfig Makefile
 +
