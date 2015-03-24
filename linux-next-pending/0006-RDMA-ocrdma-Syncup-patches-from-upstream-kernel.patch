@@ -1,7 +1,7 @@
-From f1eb7580709585a031d0a778c6fd654ce9a23e0e Mon Sep 17 00:00:00 2001
+From 274bc78ae9060e2dd389029dbb8d972379270160 Mon Sep 17 00:00:00 2001
 From: Mitesh Ahuja <mitesh.ahuja@emulex.com>
-Date: Thu, 18 Dec 2014 02:25:27 -0800
-Subject: [PATCH] RDMA/ocrdma: Syncup patches from upstream kernel.
+Date: Wed, 25 Mar 2015 04:33:19 +0530
+Subject: [PATCH 2/2] RDMA/ocrdma: Syncup patches from upstream kernel
 
 ---
  drivers/infiniband/hw/ocrdma/ocrdma.h       |   38 +++-
@@ -10,7 +10,7 @@ Subject: [PATCH] RDMA/ocrdma: Syncup patches from upstream kernel.
  drivers/infiniband/hw/ocrdma/ocrdma_hw.c    |  313 +++++++++++++++++++++++----
  drivers/infiniband/hw/ocrdma/ocrdma_hw.h    |    2 +
  drivers/infiniband/hw/ocrdma/ocrdma_main.c  |   12 +-
- drivers/infiniband/hw/ocrdma/ocrdma_sli.h   |   68 ++++++-
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h   |   68 +++++-
  drivers/infiniband/hw/ocrdma/ocrdma_stats.c |  242 +++++++++++++++++++++
  drivers/infiniband/hw/ocrdma/ocrdma_stats.h |    6 +-
  drivers/infiniband/hw/ocrdma/ocrdma_verbs.c |  172 ++++++++++++---
@@ -748,7 +748,7 @@ index 6eed8f1..e905972 100644
  
  #endif				/* __OCRDMA_HW_H__ */
 diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
-index b0b2257..7a2b59a 100644
+index 8be0900..318e383 100644
 --- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
 +++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
 @@ -239,7 +239,7 @@ static int ocrdma_register_device(struct ocrdma_dev *dev)
@@ -769,7 +769,7 @@ index b0b2257..7a2b59a 100644
  	spin_lock_init(&dev->av_tbl.lock);
  	spin_lock_init(&dev->flush_q_lock);
  	return 0;
-@@ -491,6 +493,9 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
+@@ -509,6 +511,9 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
  	spin_unlock(&ocrdma_devlist_lock);
  	/* Init stats */
  	ocrdma_add_port_stats(dev);
@@ -779,7 +779,7 @@ index b0b2257..7a2b59a 100644
  
  	pr_info("%s %s: %s \"%s\" port %d\n",
  		dev_name(&dev->nic_info.pdev->dev), hca_name(dev),
-@@ -528,11 +533,12 @@ static void ocrdma_remove(struct ocrdma_dev *dev)
+@@ -546,11 +551,12 @@ static void ocrdma_remove(struct ocrdma_dev *dev)
  	/* first unregister with stack to stop all the active traffic
  	 * of the registered clients.
  	 */
@@ -1652,5 +1652,5 @@ index 4c68305..7f8c450 100644
  	/* when hw_rq is empty, but wq is not empty, so continue
  	 * to keep the cqe to get the cq event again.
 -- 
-1.7.1
+1.7.9.5
 
