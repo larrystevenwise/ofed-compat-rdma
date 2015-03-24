@@ -1,0 +1,51 @@
+From 515b7c4d26f2bd177a26d0a0b18b00ef194ba3e6 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@emulex.com>
+Date: Wed, 25 Mar 2015 04:25:15 +0530
+Subject: [PATCH 1/2] ocrdma: add backport support for idr_alloc
+
+correct compat changes for idr_alloc
+Signed-off-by: Selvin Xavier <selvin.xavier@emulex.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c |   18 ++++++++++++++----
+ 1 file changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 81bb97a..8be0900 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -458,7 +458,10 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
+ {
+ 	int status = 0, i;
+ 	struct ocrdma_dev *dev;
+-
++#ifndef HAVE_IDR_ALLOC
++	int newid;
++	int ret;
++#endif
+ 	dev = (struct ocrdma_dev *)ib_alloc_device(sizeof(struct ocrdma_dev));
+ 	if (!dev) {
+ 		pr_err("Unable to allocate ib device\n");
+@@ -469,10 +472,17 @@ static struct ocrdma_dev *ocrdma_add(struct be_dev_info *dev_info)
+ 		goto idr_err;
+ 
+ 	memcpy(&dev->nic_info, dev_info, sizeof(*dev_info));
+-#ifdef HAVE_IDR_NEW_INTERFACE
+-	dev->id = idr_alloc(&ocrdma_dev_id, NULL, 0, 0, GFP_KERNEL);
++#ifdef HAVE_IDR_ALLOC
++	idr_preload(GFP_KERNEL);
++	dev->id = idr_alloc(&ocrdma_dev_id, dev, 0, 0, GFP_NOWAIT);
++	idr_preload_end();
+ #else
+-	idr_get_new(&ocrdma_dev_id, NULL, &dev->id);
++	do {
++		if (!idr_pre_get(&ocrdma_dev_id, GFP_KERNEL))
++			break;
++		ret = idr_get_new(&ocrdma_dev_id, dev, &newid);
++	} while (ret == -EAGAIN);
++	dev->id = newid;	
+ #endif
+ 	if (dev->id < 0)
+ 		goto idr_err;
+-- 
+1.7.9.5
+
