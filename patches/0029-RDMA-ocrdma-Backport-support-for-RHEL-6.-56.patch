@@ -19,7 +19,7 @@ index 7a2b59a..6fe4236 100644
 +#ifndef HAVE_INETADDR_IF_NEXT
  		list_for_each_entry(ifp, &in6_dev->addr_list, if_list) {
 +#else
-+		for(ifp=in6_dev->addr_list; ifp; ifp=ifp->if_next) {
++		for (ifp = in6_dev->addr_list; ifp; ifp = ifp->if_next) {
 +#endif
  			pgid = (union ib_gid *)&ifp->addr;
  			ocrdma_add_sgid(dev, pgid);
@@ -31,7 +31,7 @@ index 7a2b59a..6fe4236 100644
 +#ifdef HAVE_IDR_NEW_INTERFACE
  	dev->id = idr_alloc(&ocrdma_dev_id, NULL, 0, 0, GFP_KERNEL);
 +#else
-+	idr_get_new(&ocrdma_dev_id, NULL,&dev->id );
++	idr_get_new(&ocrdma_dev_id, NULL, &dev->id);
 +#endif
  	if (dev->id < 0)
  		goto idr_err;
