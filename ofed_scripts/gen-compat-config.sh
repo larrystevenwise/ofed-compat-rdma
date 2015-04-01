@@ -210,6 +210,7 @@ if [[ ${CONFIG_COMPAT_RHEL_6_3} = "y" ]]; then
 	set_config CONFIG_COMPAT_XPRT_ALLOC_4PARAMS y
 	set_config CONFIG_COMPAT_XPRT_RESERVE_XPRT_CONG_2PARAMS y
 	set_config CONFIG_COMPAT_FRAGS_SKB y
+	set_config CONFIG_COMPAT_KMAP_2PARAMS y
 fi
 
 if [[ ${CONFIG_COMPAT_RHEL_6_4} = "y" ]]; then
@@ -222,6 +223,10 @@ if [[ ${CONFIG_COMPAT_RHEL_6_4} = "y" ]]; then
 	set_config CONFIG_COMPAT_RCU y
 	set_config CONFIG_COMPAT_HAS_NUM_CHANNELS y
 	set_config CONFIG_COMPAT_ETHTOOL_OPS_EXT y
+fi
+
+if [[ ${CONFIG_COMPAT_RHEL_6_6} = "y" ]]; then
+	set_config CONFIG_COMPAT_RPC_XPRT_OPS_HAS_ALLOC_SLOT y
 fi
 
 if [[ ${RHEL_MAJOR} -eq "6" ]]; then
