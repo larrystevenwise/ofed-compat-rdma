@@ -3,21 +3,21 @@ Subject: [PATCH] BACKPORT: mlx4
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/hw/mlx4/cm.c                 |   27 +++
- drivers/infiniband/hw/mlx4/main.c               |    8 +
- drivers/net/ethernet/mellanox/mlx4/cmd.c        |    6 +
- drivers/net/ethernet/mellanox/mlx4/en_clock.c   |    2 +
- drivers/net/ethernet/mellanox/mlx4/en_cq.c      |   11 ++
- drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |    4 +
- drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |   62 +++++++-
- drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |  199 +++++++++++++++++++++++
- drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   84 ++++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   53 ++++++-
- drivers/net/ethernet/mellanox/mlx4/eq.c         |   10 ++
- drivers/net/ethernet/mellanox/mlx4/main.c       |   24 +++
- drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   21 +++-
- include/linux/mlx4/cq.h                         |    5 +
- 14 files changed, 511 insertions(+), 5 deletions(-)
+ drivers/infiniband/hw/mlx4/cm.c                 |  27 ++++
+ drivers/infiniband/hw/mlx4/main.c               |   8 +
+ drivers/net/ethernet/mellanox/mlx4/cmd.c        |   6 +
+ drivers/net/ethernet/mellanox/mlx4/en_clock.c   |   2 +
+ drivers/net/ethernet/mellanox/mlx4/en_cq.c      |  11 ++
+ drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |   4 +
+ drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |  62 ++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_netdev.c  | 205 ++++++++++++++++++++++++
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  84 +++++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  53 +++++-
+ drivers/net/ethernet/mellanox/mlx4/eq.c         |  10 ++
+ drivers/net/ethernet/mellanox/mlx4/main.c       |  24 +++
+ drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |  21 ++-
+ include/linux/mlx4/cq.h                         |   5 +
+ 14 files changed, 517 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -786,7 +786,21 @@ index xxxxxxx..xxxxxxx xxxxxx
  	priv->dev->features    &= ~NETIF_F_GSO_UDP_TUNNEL;
  
  	ret = mlx4_SET_PORT_VXLAN(priv->mdev->dev, priv->port,
-@@ -2379,15 +2482,25 @@ static const struct net_device_ops mlx4_netdev_ops = {
+@@ -2356,11 +2459,13 @@ static void mlx4_en_del_vxlan_port(struct  net_device *dev,
+ 	queue_work(priv->mdev->workqueue, &priv->vxlan_del_task);
+ }
+ 
++#ifdef HAVE_VXLAN_GSO_CHECK
+ static bool mlx4_en_gso_check(struct sk_buff *skb, struct net_device *dev)
+ {
+ 	return vxlan_gso_check(skb);
+ }
+ #endif
++#endif
+ 
+ static const struct net_device_ops mlx4_netdev_ops = {
+ 	.ndo_open		= mlx4_en_open,
+@@ -2379,22 +2484,41 @@ static const struct net_device_ops mlx4_netdev_ops = {
  #ifdef CONFIG_NET_POLL_CONTROLLER
  	.ndo_poll_controller	= mlx4_en_netpoll,
  #endif
@@ -812,8 +826,10 @@ index xxxxxxx..xxxxxxx xxxxxx
  #ifdef CONFIG_MLX4_EN_VXLAN
  	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
  	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
-@@ -2395,6 +2508,13 @@ static const struct net_device_ops mlx4_netdev_ops = {
++#ifdef HAVE_VXLAN_GSO_CHECK
+ 	.ndo_gso_check		= mlx4_en_gso_check,
  #endif
++#endif
  };
  
 +#ifdef HAVE_NETDEV_EXT_NDO_GET_PHYS_PORT_ID
@@ -826,7 +842,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static const struct net_device_ops mlx4_netdev_ops_master = {
  	.ndo_open		= mlx4_en_open,
  	.ndo_stop		= mlx4_en_close,
-@@ -2410,18 +2530,30 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
+@@ -2410,24 +2534,53 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
  	.ndo_vlan_rx_kill_vid	= mlx4_en_vlan_rx_kill_vid,
  	.ndo_set_vf_mac		= mlx4_en_set_vf_mac,
  	.ndo_set_vf_vlan	= mlx4_en_set_vf_vlan,
@@ -857,10 +873,12 @@ index xxxxxxx..xxxxxxx xxxxxx
  #ifdef CONFIG_MLX4_EN_VXLAN
  	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
  	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
-@@ -2429,6 +2561,21 @@ static const struct net_device_ops mlx4_netdev_ops_master = {
++#ifdef HAVE_VXLAN_GSO_CHECK
+ 	.ndo_gso_check		= mlx4_en_gso_check,
  #endif
- };
- 
++#endif
++};
++
 +#ifdef HAVE_NET_DEVICE_OPS_EXT
 +static const struct net_device_ops_ext mlx4_netdev_ops_master_ext = {
 +	.size                   = sizeof(struct net_device_ops_ext),
@@ -873,13 +891,12 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE_NETDEV_EXT_NDO_GET_PHYS_PORT_ID
 +	.ndo_get_phys_port_id	= mlx4_en_get_phys_port_id,
 +#endif
-+};
+ };
 +#endif
-+
+ 
  int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
  			struct mlx4_en_port_profile *prof)
- {
-@@ -2447,7 +2594,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+@@ -2447,7 +2600,9 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
  	netif_set_real_num_rx_queues(dev, prof->rx_ring_num);
  
  	SET_NETDEV_DEV(dev, &mdev->dev->pdev->dev);
@@ -889,7 +906,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/*
  	 * Initialize driver private data
-@@ -2560,19 +2709,41 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+@@ -2560,19 +2715,41 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
  	/*
  	 * Initialize netdev entry points
  	 */
@@ -931,7 +948,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	dev->hw_features = NETIF_F_SG | NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM;
  	if (mdev->LSO_support)
  		dev->hw_features |= NETIF_F_TSO | NETIF_F_TSO6;
-@@ -2588,9 +2759,37 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
+@@ -2588,9 +2765,37 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
  	if (mdev->dev->caps.steering_mode ==
  	    MLX4_STEERING_MODE_DEVICE_MANAGED)
  		dev->hw_features |= NETIF_F_NTUPLE;

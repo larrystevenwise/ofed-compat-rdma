@@ -3,12 +3,12 @@ Subject: [PATCH] BACKPORT: ipoib
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/ulp/ipoib/ipoib.h           |    3 ++
- drivers/infiniband/ulp/ipoib/ipoib_cm.c        |    8 +++++
- drivers/infiniband/ulp/ipoib/ipoib_main.c      |   41 ++++++++++++++++++++++++
- drivers/infiniband/ulp/ipoib/ipoib_multicast.c |   15 +++++++++
- drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |    8 +++++
- 5 files changed, 75 insertions(+), 0 deletions(-)
+ drivers/infiniband/ulp/ipoib/ipoib.h           |  3 ++
+ drivers/infiniband/ulp/ipoib/ipoib_cm.c        |  8 +++++
+ drivers/infiniband/ulp/ipoib/ipoib_main.c      | 45 ++++++++++++++++++++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_multicast.c | 15 +++++++++
+ drivers/infiniband/ulp/ipoib/ipoib_netlink.c   |  8 +++++
+ 5 files changed, 79 insertions(+)
 
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib.h b/drivers/infiniband/ulp/ipoib/ipoib.h
 index xxxxxxx..xxxxxxx xxxxxx
@@ -146,7 +146,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	memcpy(dev->broadcast, ipv4_bcast_addr, INFINIBAND_ALEN);
  
-@@ -1521,6 +1551,7 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+@@ -1394,7 +1424,11 @@ struct ipoib_dev_priv *ipoib_intf_alloc(const char *name)
+ 	struct net_device *dev;
+ 
+ 	dev = alloc_netdev((int)sizeof(struct ipoib_dev_priv), name,
++#ifdef HAVE_ALLOC_NETDEV_4P
+ 			   NET_NAME_UNKNOWN, ipoib_setup);
++#else
++			   ipoib_setup);
++#endif
+ 	if (!dev)
+ 		return NULL;
+ 
+@@ -1521,6 +1555,7 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
  	kfree(device_attr);
  
  	if (priv->hca_caps & IB_DEVICE_UD_IP_CSUM) {
@@ -154,7 +166,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		priv->dev->hw_features = NETIF_F_SG |
  			NETIF_F_IP_CSUM | NETIF_F_RXCSUM;
  
-@@ -1528,6 +1559,14 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
+@@ -1528,6 +1563,14 @@ int ipoib_set_dev_features(struct ipoib_dev_priv *priv, struct ib_device *hca)
  			priv->dev->hw_features |= NETIF_F_TSO;
  
  		priv->dev->features |= priv->dev->hw_features;
@@ -169,7 +181,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
  
  	return 0;
-@@ -1559,7 +1598,9 @@ static struct net_device *ipoib_add_port(const char *format,
+@@ -1559,7 +1602,9 @@ static struct net_device *ipoib_add_port(const char *format,
  	priv->dev->mtu  = IPOIB_UD_MTU(priv->max_ib_mtu);
  	priv->mcast_mtu  = priv->admin_mtu = priv->dev->mtu;
  
