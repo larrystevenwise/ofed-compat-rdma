@@ -31,6 +31,8 @@
 %{!?KVERSION: %define KVERSION %(uname -r)}
 %define krelver %(echo -n %{KVERSION} | sed -e 's/-/_/g')
 
+%global WITH_SYSTEMD %(if ( test -d "/lib/systemd/system" > /dev/null || test -d "%{_prefix}/lib/systemd/system" > /dev/null); then echo -n '1'; else echo -n '0'; fi)
+
 # Select packages to build
 # Kernel module packages to be included into compat-rdma
 
@@ -188,7 +190,7 @@ EOFINFO
 
 chmod +x ${INFO} > /dev/null 2>&1
 
-%if 0%{?suse_version} == 1315
+%if "%{WITH_SYSTEMD}" == "1"
 install -d $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
 install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/openibd.service $RPM_BUILD_ROOT/%{_prefix}/lib/systemd/system
 %endif
@@ -274,12 +276,13 @@ perl -i -ne 'if (m@^#!/bin/bash@) {
                      print;
                  }' /etc/init.d/openibd
 
-        if ! ( /sbin/chkconfig --del openibd > /dev/null 2>&1 ); then
-                true
-        fi
-        if ! ( /sbin/chkconfig --add openibd > /dev/null 2>&1 ); then
-                true
-        fi
+        /sbin/chkconfig openibd off >/dev/null 2>&1 || true
+        /usr/bin/systemctl disable openibd >/dev/null  2>&1 || true
+        /sbin/chkconfig --del openibd >/dev/null 2>&1 || true
+
+        /sbin/chkconfig --add openibd >/dev/null 2>&1 || true
+        /sbin/chkconfig openibd on >/dev/null 2>&1 || true
+        /usr/bin/systemctl enable openibd >/dev/null  2>&1 || true
 
         if [ -x /etc/init.d/ofed-mic ]; then
             if ! ( /sbin/chkconfig --del ofed-mic > /dev/null 2>&1 ); then
@@ -313,9 +316,13 @@ if [ -f /etc/SuSE-release ]; then
                      print;
                  }" /etc/init.d/openibd
 
-        if ! ( /sbin/insserv openibd > /dev/null 2>&1 ); then
-                true
-        fi
+        /sbin/chkconfig openibd off >/dev/null  2>&1 || true
+        /usr/bin/systemctl disable openibd >/dev/null  2>&1 || true
+        /sbin/insserv -r openibd >/dev/null 2>&1 || true
+
+        /sbin/insserv openibd >/dev/null 2>&1 || true
+        /sbin/chkconfig openibd on >/dev/null 2>&1 || true
+        /usr/bin/systemctl enable openibd >/dev/null  2>&1 || true
 fi
 
 if [ -f /etc/debian_version ]; then
@@ -345,7 +352,7 @@ if [ -f /etc/debian_version ]; then
         fi
 fi
 
-%if 0%{?suse_version} == 1315
+%if "%{WITH_SYSTEMD}" == "1"
 /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 %endif
 
@@ -357,9 +364,9 @@ fi # 1 : closed
 %preun
 if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
           if [[ -f /etc/redhat-release || -f /etc/rocks-release ]]; then        
-                if ! ( /sbin/chkconfig --del openibd  > /dev/null 2>&1 ); then
-                        true
-                fi
+                /sbin/chkconfig openibd off >/dev/null 2>&1 || true
+                /usr/bin/systemctl disable openibd >/dev/null  2>&1 || true
+                /sbin/chkconfig --del openibd  >/dev/null 2>&1 || true
 		if [ -x /etc/init.d/ofed-mic ]; then
                     if ! ( /sbin/chkconfig --del ofed-mic  > /dev/null 2>&1 ); then
                         true
@@ -367,9 +374,9 @@ if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
 		fi
           fi
           if [ -f /etc/SuSE-release ]; then
-                if ! ( /sbin/insserv -r openibd > /dev/null 2>&1 ); then
-                        true
-                fi
+                /sbin/chkconfig openibd off >/dev/null 2>&1 || true
+                /usr/bin/systemctl disable openibd >/dev/null  2>&1 || true
+                /sbin/insserv -r openibd >/dev/null 2>&1 || true
 		if [ -x /etc/init.d/ofed-mic ]; then
                     if ! ( /sbin/insserv -r ofed-mic > /dev/null 2>&1 ); then
                         true
@@ -388,7 +395,7 @@ if [ $1 = 0 ]; then  # 1 : Erase, not upgrade
         # Clean /etc/modprobe.d/ofed.conf   
         # Remove previous configuration if exist
         /sbin/depmod %{KVERSION}
-%if 0%{?suse_version} == 1315
+%if "%{WITH_SYSTEMD}" == "1"
 /usr/bin/systemctl daemon-reload >/dev/null 2>&1 || :
 %endif
 fi
@@ -404,7 +411,7 @@ fi
 %endif
 %{RDMA_CONF_DIR}/info
 /etc/init.d/openibd
-%if 0%{?suse_version} == 1315
+%if "%{WITH_SYSTEMD}" == "1"
 %{_prefix}/lib/systemd/system/openibd.service
 %endif
 /sbin/sysctl_perf_tuning
