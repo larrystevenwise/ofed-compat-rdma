@@ -44,25 +44,32 @@ if [ "x$oldstyle" == "xn" ]; then
 		ibrsc=$(cat /sys/class/infiniband/$d/device/resource)
 		eths=$(ls /sys/class/net/)
 		for eth in $eths; do
-			if [ -f /sys/class/net/$eth/device/resource ]; then
-				ethrsc=$(cat /sys/class/net/$eth/device/resource)
+			filepath_resource=/sys/class/net/$eth/device/resource
+
+			if [ -f $filepath_resource ]; then
+				ethrsc=$(cat $filepath_resource)
 				if [ "x$ethrsc" == "x$ibrsc" ]; then
-					if [ -f /sys/class/net/$eth/dev_id ]; then
-						port=$(cat /sys/class/net/$eth/dev_id)
-						port=$(printf "%d" $port)
-						port=$(( port + 1 ))
-						if [ "$1" == "-v" ]; then
-							ibstate=$(printf "%-6s" $(cat /sys/class/infiniband/$d/ports/$port/state | gawk '{print $2}'))
-							devid=$(printf "MT%d" $(cat /sys/class/infiniband/$d/device/device))
-							fwver=$(cat /sys/class/infiniband/$d/fw_ver)
-							tmp=$IFS
-							IFS=":"
-							devdesc=$(printf "%-15s" $(strings /sys/class/infiniband/$d/device/vpd | head -1))
-							partid=$(printf "%-11s" $(strings /sys/class/infiniband/$d/device/vpd | head -4 | tail -1 | gawk '{print $1}'))
-							IFS=$tmp
+					filepath_devid=/sys/class/net/$eth/dev_id
+					filepath_devport=/sys/class/net/$eth/dev_port
+					if [ -f $filepath_devid ]; then
+						port1=0
+						if [ -f $filepath_devport ]; then
+							port1=$(cat $filepath_devport)
+							port1=$(printf "%d" $port1)
 						fi
-						if [ -f /sys/class/net/$eth/carrier ]; then
-							link_state=$(cat /sys/class/net/$eth/carrier 2> /dev/null)
+
+						port=$(cat $filepath_devid)
+						port=$(printf "%d" $port)
+						if [ $port1 -gt $port ]; then
+							port=$port1
+						fi
+
+						port=$(( port + 1 ))
+
+						filepath_carrier=/sys/class/net/$eth/carrier
+
+						if [ -f $filepath_carrier ]; then
+							link_state=$(cat $filepath_carrier 2> /dev/null)
         	                                        if (( link_state == 1 )); then
                 	                                        link_state="Up"
                         	                        else
@@ -71,7 +78,47 @@ if [ "x$oldstyle" == "xn" ]; then
 						else
 							link_state="NA"
 						fi
+
 						if [ "$1" == "-v" ]; then
+							filepath_portstate=/sys/class/infiniband/$d/ports/$port/state
+							filepath_deviceid=/sys/class/infiniband/$d/device/device
+							filepath_fwver=/sys/class/infiniband/$d/fw_ver
+							filepath_vpd=/sys/class/infiniband/$d/device/vpd
+
+							# read port state
+							if [ -f $filepath_portstate ]; then
+								ibstate=$(printf "%-6s" $(cat $filepath_portstate | gawk '{print $2}'))
+							else
+								ibstate="na"
+							fi
+
+							# read device
+							if [ -f $filepath_deviceid ]; then
+								devid=$(printf "mt%d" $(cat $filepath_deviceid))
+							else
+								devid="na"
+							fi
+
+							# read fw version
+							if [ -f $filepath_fwver ]; then
+								fwver=$(cat $filepath_fwver)
+							else
+								fwver="na"
+							fi
+
+							# read device description and part id from the vpd
+							if [ -f $filepath_vpd ]; then
+								tmp=$ifs
+								ifs=":"
+								vpd_content=`cat $filepath_vpd`
+								devdesc=$(printf "%-15s" $(echo $vpd_content | strings | head -1))
+								partid=$(printf "%-11s" $(echo $vpd_content | strings | head -4 | tail -1 | gawk '{print $1}'))
+								ifs=$tmp
+							else
+								devdesc=""
+								partid="na"
+							fi
+
 							echo "$d ($devid - $partid) $devdesc fw $fwver port $port ($ibstate) ==> $eth ($link_state)"
 						else
 							echo "$d port $port ==> $eth ($link_state)"
