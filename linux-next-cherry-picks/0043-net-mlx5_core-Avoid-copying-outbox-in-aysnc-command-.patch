@@ -1,0 +1,35 @@
+From 05e4ecd1dc8b085a9010f20dcb5409b25488480a Mon Sep 17 00:00:00 2001
+From: Eli Cohen <eli@dev.mellanox.co.il>
+Date: Thu, 2 Apr 2015 17:07:26 +0300
+Subject: [PATCH] net/mlx5_core: Avoid copying outbox in aysnc command
+ completion
+
+Avoid copying to the output buffer in cmd_exec since this is done after the
+command is completed. Failure to do this may cause cases where the callback
+handler is called before the copy done by cmd_exec which then overwrites it.
+
+Reported-by: Tamer Hleihel <tamerh@mellanox.com>
+Signed-off-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: Saeed Mahameed <saeedm@mellanox.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/cmd.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/cmd.c b/drivers/net/ethernet/mellanox/mlx5/core/cmd.c
+index 43a73d3..290ae87 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/cmd.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/cmd.c
+@@ -1236,7 +1236,8 @@ static int cmd_exec(struct mlx5_core_dev *dev, void *in, int in_size, void *out,
+ 		goto out_out;
+ 	}
+ 
+-	err = mlx5_copy_from_msg(out, outb, out_size);
++	if (!callback)
++		err = mlx5_copy_from_msg(out, outb, out_size);
+ 
+ out_out:
+ 	if (!callback)
+-- 
+1.8.3.1
+

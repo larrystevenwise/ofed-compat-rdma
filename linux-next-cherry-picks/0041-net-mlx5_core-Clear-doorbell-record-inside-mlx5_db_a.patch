@@ -1,0 +1,33 @@
+From b812b5441e359adb9bd44108f7f91e5b0ba4a768 Mon Sep 17 00:00:00 2001
+From: Saeed Mahameed <saeedm@mellanox.com>
+Date: Thu, 2 Apr 2015 17:07:23 +0300
+Subject: [PATCH] net/mlx5_core: Clear doorbell record inside
+ mlx5_db_alloc()
+
+Do it in one place instead of every where the function is invoked
+
+Signed-off-by: Achiad Shochat <achiad@mellanox.com>
+Signed-off-by: Saeed Mahameed <saeedm@mellanox.com>
+Signed-off-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/alloc.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/alloc.c b/drivers/net/ethernet/mellanox/mlx5/core/alloc.c
+index 201ca6d..63dd754 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/alloc.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/alloc.c
+@@ -171,6 +171,9 @@ static int mlx5_alloc_db_from_pgdir(struct mlx5_db_pgdir *pgdir,
+ 	db->db      = pgdir->db_page + offset / sizeof(*pgdir->db_page);
+ 	db->dma     = pgdir->db_dma  + offset;
+ 
++	db->db[0] = 0;
++	db->db[1] = 0;
++
+ 	return 0;
+ }
+ 
+-- 
+1.8.3.1
+

@@ -1,0 +1,77 @@
+From 479163f4608214d18bc3266ab6e4b578897a3052 Mon Sep 17 00:00:00 2001
+From: Al Viro <viro@ZenIV.linux.org.uk>
+Date: Thu, 20 Nov 2014 08:13:57 +0000
+Subject: [PATCH] mlx5: don't duplicate kvfree()
+
+Signed-off-by: Al Viro <viro@zeniv.linux.org.uk>
+Acked-by: Eli Cohen <eli@mellanox.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/mellanox/mlx5/core/eq.c        | 4 ++--
+ drivers/net/ethernet/mellanox/mlx5/core/pagealloc.c | 4 ++--
+ drivers/net/ethernet/mellanox/mlx5/core/port.c      | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/eq.c b/drivers/net/ethernet/mellanox/mlx5/core/eq.c
+index ad2c96a..dfd3ad0 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/eq.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/eq.c
+@@ -390,7 +390,7 @@ int mlx5_create_map_eq(struct mlx5_core_dev *dev, struct mlx5_eq *eq, u8 vecidx,
+ 	 */
+ 	eq_update_ci(eq, 1);
+ 
+-	mlx5_vfree(in);
++	kvfree(in);
+ 	return 0;
+ 
+ err_irq:
+@@ -400,7 +400,7 @@ err_eq:
+ 	mlx5_cmd_destroy_eq(dev, eq->eqn);
+ 
+ err_in:
+-	mlx5_vfree(in);
++	kvfree(in);
+ 
+ err_buf:
+ 	mlx5_buf_free(dev, &eq->buf);
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/pagealloc.c b/drivers/net/ethernet/mellanox/mlx5/core/pagealloc.c
+index d476918..4fdaae9 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/pagealloc.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/pagealloc.c
+@@ -349,7 +349,7 @@ out_4k:
+ 	for (i--; i >= 0; i--)
+ 		free_4k(dev, be64_to_cpu(in->pas[i]));
+ out_free:
+-	mlx5_vfree(in);
++	kvfree(in);
+ 	return err;
+ }
+ 
+@@ -400,7 +400,7 @@ static int reclaim_pages(struct mlx5_core_dev *dev, u32 func_id, int npages,
+ 	}
+ 
+ out_free:
+-	mlx5_vfree(out);
++	kvfree(out);
+ 	return err;
+ }
+ 
+diff --git a/drivers/net/ethernet/mellanox/mlx5/core/port.c b/drivers/net/ethernet/mellanox/mlx5/core/port.c
+index 3139658..72c2d00 100644
+--- a/drivers/net/ethernet/mellanox/mlx5/core/port.c
++++ b/drivers/net/ethernet/mellanox/mlx5/core/port.c
+@@ -68,9 +68,9 @@ int mlx5_core_access_reg(struct mlx5_core_dev *dev, void *data_in,
+ 		memcpy(data_out, out->data, size_out);
+ 
+ ex2:
+-	mlx5_vfree(out);
++	kvfree(out);
+ ex1:
+-	mlx5_vfree(in);
++	kvfree(in);
+ 	return err;
+ }
+ EXPORT_SYMBOL_GPL(mlx5_core_access_reg);
+-- 
+1.8.3.1
+
