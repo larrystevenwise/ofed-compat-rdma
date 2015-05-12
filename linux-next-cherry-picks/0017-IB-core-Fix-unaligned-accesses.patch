@@ -1,0 +1,142 @@
+From 0d0f738f6a11856a704dcd8fd3a008b200f17625 Mon Sep 17 00:00:00 2001
+From: David Ahern <david.ahern@oracle.com>
+Date: Sun, 3 May 2015 09:48:26 -0400
+Subject: [PATCH] IB/core: Fix unaligned accesses
+
+Addresses the following kernel logs seen during boot of sparc systems:
+
+Kernel unaligned access at TPC[103bce50] cm_find_listen+0x34/0xf8 [ib_cm]
+Kernel unaligned access at TPC[103bce50] cm_find_listen+0x34/0xf8 [ib_cm]
+Kernel unaligned access at TPC[103bce50] cm_find_listen+0x34/0xf8 [ib_cm]
+Kernel unaligned access at TPC[103bce50] cm_find_listen+0x34/0xf8 [ib_cm]
+Kernel unaligned access at TPC[103bce50] cm_find_listen+0x34/0xf8 [ib_cm]
+
+Signed-off-by: David Ahern <david.ahern@oracle.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/core/cm.c      | 23 +++++++++++------------
+ drivers/infiniband/core/cm_msgs.h |  4 ++--
+ include/rdma/ib_cm.h              |  7 ++++---
+ 3 files changed, 17 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/infiniband/core/cm.c b/drivers/infiniband/core/cm.c
+index e28a494..0c14191 100644
+--- a/drivers/infiniband/core/cm.c
++++ b/drivers/infiniband/core/cm.c
+@@ -437,39 +437,38 @@ static struct cm_id_private * cm_acquire_id(__be32 local_id, __be32 remote_id)
+ 	return cm_id_priv;
+ }
+ 
+-static void cm_mask_copy(u8 *dst, u8 *src, u8 *mask)
++static void cm_mask_copy(u32 *dst, const u32 *src, const u32 *mask)
+ {
+ 	int i;
+ 
+-	for (i = 0; i < IB_CM_COMPARE_SIZE / sizeof(unsigned long); i++)
+-		((unsigned long *) dst)[i] = ((unsigned long *) src)[i] &
+-					     ((unsigned long *) mask)[i];
++	for (i = 0; i < IB_CM_COMPARE_SIZE; i++)
++		dst[i] = src[i] & mask[i];
+ }
+ 
+ static int cm_compare_data(struct ib_cm_compare_data *src_data,
+ 			   struct ib_cm_compare_data *dst_data)
+ {
+-	u8 src[IB_CM_COMPARE_SIZE];
+-	u8 dst[IB_CM_COMPARE_SIZE];
++	u32 src[IB_CM_COMPARE_SIZE];
++	u32 dst[IB_CM_COMPARE_SIZE];
+ 
+ 	if (!src_data || !dst_data)
+ 		return 0;
+ 
+ 	cm_mask_copy(src, src_data->data, dst_data->mask);
+ 	cm_mask_copy(dst, dst_data->data, src_data->mask);
+-	return memcmp(src, dst, IB_CM_COMPARE_SIZE);
++	return memcmp(src, dst, sizeof(src));
+ }
+ 
+-static int cm_compare_private_data(u8 *private_data,
++static int cm_compare_private_data(u32 *private_data,
+ 				   struct ib_cm_compare_data *dst_data)
+ {
+-	u8 src[IB_CM_COMPARE_SIZE];
++	u32 src[IB_CM_COMPARE_SIZE];
+ 
+ 	if (!dst_data)
+ 		return 0;
+ 
+ 	cm_mask_copy(src, private_data, dst_data->mask);
+-	return memcmp(src, dst_data->data, IB_CM_COMPARE_SIZE);
++	return memcmp(src, dst_data->data, sizeof(src));
+ }
+ 
+ /*
+@@ -538,7 +537,7 @@ static struct cm_id_private * cm_insert_listen(struct cm_id_private *cm_id_priv)
+ 
+ static struct cm_id_private * cm_find_listen(struct ib_device *device,
+ 					     __be64 service_id,
+-					     u8 *private_data)
++					     u32 *private_data)
+ {
+ 	struct rb_node *node = cm.listen_service_table.rb_node;
+ 	struct cm_id_private *cm_id_priv;
+@@ -953,7 +952,7 @@ int ib_cm_listen(struct ib_cm_id *cm_id, __be64 service_id, __be64 service_mask,
+ 		cm_mask_copy(cm_id_priv->compare_data->data,
+ 			     compare_data->data, compare_data->mask);
+ 		memcpy(cm_id_priv->compare_data->mask, compare_data->mask,
+-		       IB_CM_COMPARE_SIZE);
++		       sizeof(compare_data->mask));
+ 	}
+ 
+ 	cm_id->state = IB_CM_LISTEN;
+diff --git a/drivers/infiniband/core/cm_msgs.h b/drivers/infiniband/core/cm_msgs.h
+index be068f4..8b76f0e 100644
+--- a/drivers/infiniband/core/cm_msgs.h
++++ b/drivers/infiniband/core/cm_msgs.h
+@@ -103,7 +103,7 @@ struct cm_req_msg {
+ 	/* local ACK timeout:5, rsvd:3 */
+ 	u8 alt_offset139;
+ 
+-	u8 private_data[IB_CM_REQ_PRIVATE_DATA_SIZE];
++	u32 private_data[IB_CM_REQ_PRIVATE_DATA_SIZE / sizeof(u32)];
+ 
+ } __attribute__ ((packed));
+ 
+@@ -801,7 +801,7 @@ struct cm_sidr_req_msg {
+ 	__be16 rsvd;
+ 	__be64 service_id;
+ 
+-	u8 private_data[IB_CM_SIDR_REQ_PRIVATE_DATA_SIZE];
++	u32 private_data[IB_CM_SIDR_REQ_PRIVATE_DATA_SIZE / sizeof(u32)];
+ } __attribute__ ((packed));
+ 
+ struct cm_sidr_rep_msg {
+diff --git a/include/rdma/ib_cm.h b/include/rdma/ib_cm.h
+index 0e3ff30..39ed2d2 100644
+--- a/include/rdma/ib_cm.h
++++ b/include/rdma/ib_cm.h
+@@ -105,7 +105,8 @@ enum ib_cm_data_size {
+ 	IB_CM_SIDR_REQ_PRIVATE_DATA_SIZE = 216,
+ 	IB_CM_SIDR_REP_PRIVATE_DATA_SIZE = 136,
+ 	IB_CM_SIDR_REP_INFO_LENGTH	 = 72,
+-	IB_CM_COMPARE_SIZE		 = 64
++	/* compare done u32 at a time */
++	IB_CM_COMPARE_SIZE		 = (64 / sizeof(u32))
+ };
+ 
+ struct ib_cm_id;
+@@ -337,8 +338,8 @@ void ib_destroy_cm_id(struct ib_cm_id *cm_id);
+ #define IB_SDP_SERVICE_ID_MASK	cpu_to_be64(0xFFFFFFFFFFFF0000ULL)
+ 
+ struct ib_cm_compare_data {
+-	u8  data[IB_CM_COMPARE_SIZE];
+-	u8  mask[IB_CM_COMPARE_SIZE];
++	u32  data[IB_CM_COMPARE_SIZE];
++	u32  mask[IB_CM_COMPARE_SIZE];
+ };
+ 
+ /**
+-- 
+1.8.3.1
+
