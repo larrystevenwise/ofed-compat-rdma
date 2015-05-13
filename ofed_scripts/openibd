@@ -882,9 +882,9 @@ start()
         load_module ib_qib
         my_rc=$?
         if [ $my_rc -ne 0 ]; then
-                echo_failure $"Loading QLogic QIB driver: "
-	elif [ -s ${_truescale} ]; then
-		 . ${_truescale} start
+            echo_failure $"Loading QLogic QIB driver: "
+        elif [ -x ${_truescale} ]; then
+            ${_truescale} start
         fi
         RC=$[ $RC + $my_rc ]
     fi
@@ -950,9 +950,9 @@ start()
         load_module ocrdma
         my_rc=$?
         if [ $my_rc -ne 0 ]; then
-                echo_failure $"Loading Emulex One Connect driver: "
-	elif [ -s ${_truescale} ]; then
-		 . ${_truescale} start
+            echo_failure $"Loading Emulex One Connect driver: "
+        elif [ -x ${_truescale} ]; then
+            ${_truescale} start
         fi
         RC=$[ $RC + $my_rc ]
     fi
@@ -1227,8 +1227,8 @@ unload()
                     sleep 2
                     ;;
                 ib_qib)
-                    if [ -s ${_truescale} ]; then
-                        . ${_truescale} stop
+                    if [ -x ${_truescale} ]; then
+                        ${_truescale} stop
                     fi
 
                     if [ -d /ipathfs ]; then

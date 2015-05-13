@@ -231,7 +231,7 @@ install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ibscif-opt $RPM
 %endif
 
 %if %{build_qib}
-install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/truescale.cmds $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
+install -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/truescale.cmds $RPM_BUILD_ROOT/%{RDMA_CONF_DIR}
 %endif
 
 %if %{build_ipoib}
