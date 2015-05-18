@@ -1,0 +1,51 @@
+From b54639011c57edc707798a8616f93e5b983de9d1 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@avagotech.com>
+Date: Thu, 14 May 2015 04:18:47 +0530
+Subject: [PATCH] be2net/Backport: for 3.18.10 build failure fix
+
+Added a mssing Semi-colon in be_main.c
+Added a new compile-time flag to handle rename of __vlan_put_tag.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+---
+ drivers/net/ethernet/emulex/benet/be_compat.h |    5 +++++
+ drivers/net/ethernet/emulex/benet/be_main.c   |    2 +-
+ 2 files changed, 6 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/net/ethernet/emulex/benet/be_compat.h b/drivers/net/ethernet/emulex/benet/be_compat.h
+index 00bc2ba..8391ebb 100644
+--- a/drivers/net/ethernet/emulex/benet/be_compat.h
++++ b/drivers/net/ethernet/emulex/benet/be_compat.h
+@@ -22,11 +22,16 @@ static inline struct sk_buff *__vlan_put_tag_fixed(struct sk_buff *skb,
+ 						   __be16 vlan_proto,
+ 						   ushort vlan_tag)
+ {
++#ifdef HAVE_VLAN_INSERT_TAG_SET_PROTO
++	struct sk_buff *new_skb = vlan_insert_tag_set_proto(skb, vlan_proto,
++							    vlan_tag);
++#else
+ #ifdef HAVE_3_PARAMS_FOR_VLAN_PUT_TAG
+ 	struct sk_buff *new_skb = __vlan_put_tag(skb, vlan_proto, vlan_tag);
+ #else
+ 	struct sk_buff *new_skb = __vlan_put_tag(skb, vlan_tag);
+ #endif
++#endif
+ 	return new_skb;
+ }
+ 
+diff --git a/drivers/net/ethernet/emulex/benet/be_main.c b/drivers/net/ethernet/emulex/benet/be_main.c
+index 4b68fe9..db5711b 100644
+--- a/drivers/net/ethernet/emulex/benet/be_main.c
++++ b/drivers/net/ethernet/emulex/benet/be_main.c
+@@ -677,7 +677,7 @@ static struct rtnl_link_stats64 *be_get_stats64(struct net_device *netdev,
+ 			pkts = rx_stats(rxo)->rx_pkts;
+ 			bytes = rx_stats(rxo)->rx_bytes;
+ #ifdef HAVE_U64_STATS_FETCH_BEGIN_IRQ
+-		ret = u64_stats_fetch_retry_irq(&rx_stats->sync, start)
++		ret = u64_stats_fetch_retry_irq(&rx_stats->sync, start);
+ 		} while (ret);
+ #endif
+ 		stats->rx_packets += pkts;
+-- 
+1.7.1
+
