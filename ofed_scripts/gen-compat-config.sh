@@ -248,6 +248,19 @@ if [[ ${RHEL_MAJOR} -eq "6" ]]; then
 	fi
 fi
 
+if (grep -qw "struct xps_map" ${KLIB_BUILD}/include/linux/netdevice.h > /dev/null 2>&1 || grep -qw "struct xps_map" /lib/modules/${KVERSION}/source/include/linux/netdevice.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_NETIF_IS_XPS y
+fi
+if (grep -qw "__netdev_pick_tx" ${KLIB_BUILD}/include/linux/netdevice.h > /dev/null 2>&1 || grep -qw "__netdev_pick_tx" /lib/modules/${KVERSION}/source/include/linux/netdevice.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_NETIF_HAS_PICK_TX y
+fi
+if (grep -qw "netif_set_xps_queue" ${KLIB_BUILD}/include/linux/netdevice.h > /dev/null 2>&1 || grep -qw "netif_set_xps_queue" /lib/modules/${KVERSION}/source/include/linux/netdevice.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_NETIF_HAS_SET_XPS_QUEUE y
+fi
+if (grep -qw "sk_tx_queue_get" ${KLIB_BUILD}/include/net/sock.h > /dev/null 2>&1 || grep -qw "sk_tx_queue_get" /lib/modules/${KVERSION}/source/include/net/sock.h > /dev/null 2>&1); then
+	set_config CONFIG_COMPAT_SOCK_HAS_QUEUE y
+fi
+
 if (grep -q virtqueue_get_buf ${KLIB_BUILD}/include/linux/virtio.h > /dev/null 2>&1 || grep -q virtqueue_get_buf /lib/modules/${KVERSION}/source/include/linux/virtio.h > /dev/null 2>&1); then
 	set_config CONFIG_COMPAT_VIRTQUEUE_GET_BUF y
 fi
