@@ -130,8 +130,9 @@ cp -a $RPM_BUILD_DIR/%{_name}-%{_version} $RPM_BUILD_DIR/src/
 # Copy InfniBand include files after applying backport patches (if required)
 mkdir -p $RPM_BUILD_DIR/src/%{_name}
 cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/include/ $RPM_BUILD_DIR/src/%{_name}
-cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/configure.mk.kernel $RPM_BUILD_DIR/src/%{_name}
-cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/config.mk  $RPM_BUILD_DIR/src/%{_name}
+cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/config*  $RPM_BUILD_DIR/src/%{_name}
+cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/compat*  $RPM_BUILD_DIR/src/%{_name}
+cp -a $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts*  $RPM_BUILD_DIR/src/%{_name}
 sed -i -e "s@\${CWD}@%{_prefix}/src/%{_name}@g" $RPM_BUILD_DIR/src/%{_name}/config.mk
 
 %if %{build_ibp_server} || %{build_ibscif} || %{build_qib}
