@@ -1272,7 +1272,7 @@ stop()
         fi
 
         # Check if applications which use infiniband are running
-        local apps="opensm osmtest ibbs ibns ibacm"
+        local apps="opensm osmtest ibbs ibns ibacm iwpmd"
         local pid
 
         for app in $apps
