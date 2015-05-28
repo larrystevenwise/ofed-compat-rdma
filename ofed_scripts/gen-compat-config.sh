@@ -229,6 +229,10 @@ if [[ ${CONFIG_COMPAT_RHEL_6_6} = "y" ]]; then
 	set_config CONFIG_COMPAT_RPC_XPRT_OPS_HAS_ALLOC_SLOT y
 fi
 
+if [[ ${CONFIG_COMPAT_RHEL_7_1} = "y" ]]; then
+	set_config CONFIG_COMPAT_RPC_XPRT_OPS_HAS_SECURE_PORT y
+fi
+
 if [[ ${RHEL_MAJOR} -eq "6" ]]; then
 	set_config CONFIG_COMPAT_IS___SKB_TX_HASH y
 	set_config CONFIG_COMPAT_IS_BITMAP y
