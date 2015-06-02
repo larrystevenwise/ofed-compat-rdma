@@ -1,0 +1,35 @@
+From ff726edc2bdac1839b2b431bc96747de7ebbf8bb Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@avagotech.com>
+Date: Wed, 6 May 2015 11:17:54 +0530
+Subject: [PATCH V2 for-4.1 1/9] RDMA/ocrdma: Fix EQ destroy failure during
+ driver unload
+
+Changing the destroy sequence of mailbox queue and event queues.
+FW expects mailbox queue to be destroyed before desroying the EQs.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index 0c9e959..3a5ea5af 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -3147,9 +3147,9 @@ void ocrdma_cleanup_hw(struct ocrdma_dev *dev)
+ 	ocrdma_free_pd_pool(dev);
+ 	ocrdma_mbx_delete_ah_tbl(dev);
+ 
+-	/* cleanup the eqs */
+-	ocrdma_destroy_eqs(dev);
+-
+ 	/* cleanup the control path */
+ 	ocrdma_destroy_mq(dev);
++
++	/* cleanup the eqs */
++	ocrdma_destroy_eqs(dev);
+ }
+-- 
+2.2.0
+

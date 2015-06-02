@@ -1,0 +1,49 @@
+From 55db35ce74a379a4f76ec03f81794141f91984d9 Mon Sep 17 00:00:00 2001
+From: Mitesh Ahuja <mitesh.ahuja@avagotech.com>
+Date: Wed, 13 May 2015 06:32:25 +0530
+Subject: [PATCH V2 for-4.1 7/9] RDMA/ocrdma: Fix dmac resolution for link
+ local address
+
+rdma_addr_find_dmac_by_grh fails to resolve dmac for link local address.
+Use rdma_get_ll_mac to resolve the link local address.
+
+Signed-off-by: Padmanabh Ratnakar <padmanabh.ratnakar@avagotech.com>
+Signed-off-by: Mitesh Ahuja <mitesh.ahuja@avagotech.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma.h    | 2 ++
+ drivers/infiniband/hw/ocrdma/ocrdma_ah.c | 4 +++-
+ 2 files changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma.h b/drivers/infiniband/hw/ocrdma/ocrdma.h
+index c9780d9..ee9e335 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma.h
+@@ -515,6 +515,8 @@ static inline int ocrdma_resolve_dmac(struct ocrdma_dev *dev,
+ 	memcpy(&in6, ah_attr->grh.dgid.raw, sizeof(in6));
+ 	if (rdma_is_multicast_addr(&in6))
+ 		rdma_get_mcast_mac(&in6, mac_addr);
++	else if (rdma_link_local_addr(&in6))
++		rdma_get_ll_mac(&in6, mac_addr);
+ 	else
+ 		memcpy(mac_addr, ah_attr->dmac, ETH_ALEN);
+ 	return 0;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_ah.c b/drivers/infiniband/hw/ocrdma/ocrdma_ah.c
+index 2a5993b..f5a5ea836 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_ah.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_ah.c
+@@ -127,7 +127,9 @@ struct ib_ah *ocrdma_create_ah(struct ib_pd *ibpd, struct ib_ah_attr *attr)
+ 		goto av_conf_err;
+ 	}
+ 
+-	if (pd->uctx) {
++	if ((pd->uctx) &&
++	    (!rdma_is_multicast_addr((struct in6_addr *)attr->grh.dgid.raw)) &&
++	    (!rdma_link_local_addr((struct in6_addr *)attr->grh.dgid.raw))) {
+ 		status = rdma_addr_find_dmac_by_grh(&sgid, &attr->grh.dgid,
+                                         attr->dmac, &attr->vlan_id);
+ 		if (status) {
+-- 
+2.2.0
+
