@@ -1,0 +1,64 @@
+From 82ce3d572fbad0fffa26f3fd7979dddd78bb4d33 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@avagotech.com>
+Date: Wed, 6 May 2015 20:48:08 +0530
+Subject: [PATCH V2 for-4.1 2/9] RDMA/ocrdma: Report EQ full fatal error
+
+Detect when Event Queue (EQ) becomes full and print a warning message.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c  | 6 ++++++
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h | 7 +++++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index 3a5ea5af..65759ac 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -933,12 +933,18 @@ static irqreturn_t ocrdma_irq_handler(int irq, void *handle)
+ 	struct ocrdma_eqe eqe;
+ 	struct ocrdma_eqe *ptr;
+ 	u16 cq_id;
++	u8 mcode;
+ 	int budget = eq->cq_cnt;
+ 
+ 	do {
+ 		ptr = ocrdma_get_eqe(eq);
+ 		eqe = *ptr;
+ 		ocrdma_le32_to_cpu(&eqe, sizeof(eqe));
++		mcode = (eqe.id_valid & OCRDMA_EQE_MAJOR_CODE_MASK)
++				>> OCRDMA_EQE_MAJOR_CODE_SHIFT;
++		if (mcode == OCRDMA_MAJOR_CODE_SENTINAL)
++			pr_err("EQ full on eqid = 0x%x, eqe = 0x%x\n",
++			       eq->q.id, eqe.id_valid);
+ 		if ((eqe.id_valid & OCRDMA_EQE_VALID_MASK) == 0)
+ 			break;
+ 
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+index 243c87c..baf9b8a 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+@@ -1624,12 +1624,19 @@ struct ocrdma_delete_ah_tbl_rsp {
+ enum {
+ 	OCRDMA_EQE_VALID_SHIFT		= 0,
+ 	OCRDMA_EQE_VALID_MASK		= BIT(0),
++	OCRDMA_EQE_MAJOR_CODE_MASK      = 0x0E,
++	OCRDMA_EQE_MAJOR_CODE_SHIFT     = 0x01,
+ 	OCRDMA_EQE_FOR_CQE_MASK		= 0xFFFE,
+ 	OCRDMA_EQE_RESOURCE_ID_SHIFT	= 16,
+ 	OCRDMA_EQE_RESOURCE_ID_MASK	= 0xFFFF <<
+ 				OCRDMA_EQE_RESOURCE_ID_SHIFT,
+ };
+ 
++enum major_code {
++	OCRDMA_MAJOR_CODE_COMPLETION    = 0x00,
++	OCRDMA_MAJOR_CODE_SENTINAL      = 0x01
++};
++
+ struct ocrdma_eqe {
+ 	u32 id_valid;
+ };
+-- 
+2.2.0
+

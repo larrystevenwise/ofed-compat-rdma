@@ -1,0 +1,44 @@
+From 01422961424ed566cb065aabc90a34cab5a2d2c5 Mon Sep 17 00:00:00 2001
+From: Mitesh Ahuja <mitesh.ahuja@avagotech.com>
+Date: Tue, 5 May 2015 13:57:21 +0530
+Subject: [PATCH V2 for-4.1 5/9] RDMA/ocrdma: Fix the request length for
+ RDMA_QUERY_QP mailbox command to FW.
+
+Fix ocrdma_query_qp to pass correct mailbox request length to FW.
+
+Signed-off-by: Mitesh Ahuja <mitesh.ahuja@avagotech.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_hw.c  | 2 +-
+ drivers/infiniband/hw/ocrdma/ocrdma_sli.h | 2 ++
+ 2 files changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+index da688d7..5636eb6 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_hw.c
+@@ -2412,7 +2412,7 @@ int ocrdma_mbx_query_qp(struct ocrdma_dev *dev, struct ocrdma_qp *qp,
+ 	struct ocrdma_query_qp *cmd;
+ 	struct ocrdma_query_qp_rsp *rsp;
+ 
+-	cmd = ocrdma_init_emb_mqe(OCRDMA_CMD_QUERY_QP, sizeof(*cmd));
++	cmd = ocrdma_init_emb_mqe(OCRDMA_CMD_QUERY_QP, sizeof(*rsp));
+ 	if (!cmd)
+ 		return status;
+ 	cmd->qp_id = qp->id;
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+index baf9b8a..02ad0ae 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_sli.h
+@@ -1176,6 +1176,8 @@ struct ocrdma_query_qp_rsp {
+ 	struct ocrdma_mqe_hdr hdr;
+ 	struct ocrdma_mbx_rsp rsp;
+ 	struct ocrdma_qp_params params;
++	u32 dpp_credits_cqid;
++	u32 rbq_id;
+ };
+ 
+ enum {
+-- 
+2.2.0
+

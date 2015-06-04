@@ -6,7 +6,7 @@ index 4e61880..5620016 100644
  static void svc_rdma_detach(struct svc_xprt *xprt);
  static void svc_rdma_free(struct svc_xprt *xprt);
  static int svc_rdma_has_wspace(struct svc_xprt *xprt);
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0) || CONFIG_COMPAT_RPC_XPRT_OPS_HAS_SECURE_PORT)
  static int svc_rdma_secure_port(struct svc_rqst *);
 +#endif
  static void rq_cq_reap(struct svcxprt_rdma *xprt);
@@ -16,7 +16,7 @@ index 4e61880..5620016 100644
  	.xpo_prep_reply_hdr = svc_rdma_prep_reply_hdr,
  	.xpo_has_wspace = svc_rdma_has_wspace,
  	.xpo_accept = svc_rdma_accept,
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0) || CONFIG_COMPAT_RPC_XPRT_OPS_HAS_SECURE_PORT)
  	.xpo_secure_port = svc_rdma_secure_port,
 +#endif
  };
@@ -26,7 +26,7 @@ index 4e61880..5620016 100644
  	return 1;
  }
  
-+#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0)
++#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3, 14, 0) || CONFIG_COMPAT_RPC_XPRT_OPS_HAS_SECURE_PORT)
  static int svc_rdma_secure_port(struct svc_rqst *rqstp)
  {
  	return 1;
