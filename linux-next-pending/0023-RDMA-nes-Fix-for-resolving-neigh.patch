@@ -27,12 +27,15 @@ index 9047af4..8a3ad17 100644
  	if (IS_ERR(rt)) {
  #endif
  		printk(KERN_ERR "%s: ip_route_output_key failed for 0x%08X\n",
-@@ -1545,7 +1546,7 @@ static int nes_addr_resolve_neigh(struct nes_vnic *nesvnic, u32 dst_ip, int arpi
+@@ -1545,7 +1546,11 @@ static int nes_addr_resolve_neigh(struct nes_vnic *nesvnic, u32 dst_ip, int arpi
  	else
  		netdev = nesvnic->netdev;
  
--	neigh = neigh_lookup(&arp_tbl, &rt->rt_gateway, netdev);
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
 +	neigh = dst_neigh_lookup(&rt->dst, &dst_ipaddr);
++#else
+ 	neigh = neigh_lookup(&arp_tbl, &rt->rt_gateway, netdev);
++#endif
  
  	rcu_read_lock();
  	if (neigh) {
