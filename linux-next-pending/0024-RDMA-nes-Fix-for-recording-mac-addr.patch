@@ -1,0 +1,23 @@
+Fix for incorrect recording of the MAC address
+
+Signed-off-by: Tatyana Nikolova <Tatyana.E.Nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_hw.c |    2 +-
+ 1 files changed, 1 insertions(+), 1 deletions(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_hw.c b/drivers/infiniband/hw/nes/nes_hw.c
+index 02120d3..4713dd7 100644
+--- a/drivers/infiniband/hw/nes/nes_hw.c
++++ b/drivers/infiniband/hw/nes/nes_hw.c
+@@ -3861,7 +3861,7 @@ void nes_manage_arp_cache(struct net_device *netdev, unsigned char *mac_addr,
+ 				(((u32)mac_addr[2]) << 24) | (((u32)mac_addr[3]) << 16) |
+ 				(((u32)mac_addr[4]) << 8)  | (u32)mac_addr[5]);
+ 		cqp_wqe->wqe_words[NES_CQP_ARP_WQE_MAC_HIGH_IDX] = cpu_to_le32(
+-				(((u32)mac_addr[0]) << 16) | (u32)mac_addr[1]);
++				(((u32)mac_addr[0]) << 8) | (u32)mac_addr[1]);
+ 	} else {
+ 		cqp_wqe->wqe_words[NES_CQP_ARP_WQE_MAC_ADDR_LOW_IDX] = 0;
+ 		cqp_wqe->wqe_words[NES_CQP_ARP_WQE_MAC_HIGH_IDX] = 0;
+-- 
+1.7.1
+
