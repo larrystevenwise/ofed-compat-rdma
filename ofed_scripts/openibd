@@ -760,15 +760,17 @@ start()
     fi
 
     # W/A: inbox drivers are loaded at boot instead of new ones
-    local mlxko=$(/sbin/lsmod 2>/dev/null | grep '^mlx' | head -1 | awk '{print $NR}')
-    if [ "X$mlxko" != "X" ]; then
-        local loaded_srcver=$(/bin/cat /sys/module/$mlxko/srcversion 2>/dev/null)
-        local curr_srcver=$(/sbin/modinfo $mlxko 2>/dev/null | grep srcversion | awk '{print $NF}')
+    local loaded_modules=$(/sbin/lsmod 2>/dev/null | grep -E '^be2net|^cxgb|^mlx|^iw_nes|^iw_cxgb|^ib_qib|^ib_mthca|^ocrdma|^ib_ipoib|^ib_srp|^ib_iser|^ib_uverbs|^ib_addr|^ib_mad|^ib_sa|^iw_cm|^ib_core|^ib_ucm|^ib_cm|^rdma_ucm|^ib_umad|^rdma_cm|^compat' | awk '{print $1}')
+    for loaded_module in $loaded_modules
+    do
+        local loaded_srcver=$(/bin/cat /sys/module/$loaded_module/srcversion 2>/dev/null)
+        local curr_srcver=$(/sbin/modinfo $loaded_module 2>/dev/null | grep srcversion | awk '{print $NF}')
         if [ "X$loaded_srcver" != "X$curr_srcver" ]; then
-            log_msg "start(): Detected loaded old version of module '$mlxko', calling stop..."
+            log_msg "start(): Detected loaded old version of module '$loaded_module', calling stop..."
             stop
+            break
         fi
-    fi
+    done
 
     # W/A: modules loaded from initrd without taking new params from /etc/modprobe.d/
     local conf_files=$(grep -rE "options.*mlx" /etc/modprobe.d/*.conf 2>/dev/null | grep -v ":#" | cut -d":" -f"1" | uniq)
