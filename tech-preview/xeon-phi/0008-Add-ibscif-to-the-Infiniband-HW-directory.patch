@@ -6972,7 +6972,7 @@ diff -ruN a7/drivers/infiniband/hw/scif/ibscif_protocol.h a8/drivers/infiniband/
 diff -ruN a7/drivers/infiniband/hw/scif/ibscif_provider.c a8/drivers/infiniband/hw/scif/ibscif_provider.c
 --- a7/drivers/infiniband/hw/scif/ibscif_provider.c	1969-12-31 16:00:00.000000000 -0800
 +++ a8/drivers/infiniband/hw/scif/ibscif_provider.c	2015-03-10 13:56:38.829575818 -0700
-@@ -0,0 +1,406 @@
+@@ -0,0 +1,410 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -7330,7 +7330,11 @@ diff -ruN a7/drivers/infiniband/hw/scif/ibscif_provider.c a8/drivers/infiniband/
 +
 +static int ibscif_notifier(struct notifier_block *nb, unsigned long event, void *ptr)
 +{
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3,11,0)
++	struct net_device *netdev = ((struct netdev_notifier_info *) ptr)->dev;
++#else
 +	struct net_device *netdev = (struct net_device *)ptr;
++#endif
 +
 +	if (strcmp(netdev->name, "mic0"))
 +		return NOTIFY_DONE;
