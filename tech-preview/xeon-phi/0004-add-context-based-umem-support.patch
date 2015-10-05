@@ -1,16 +1,13 @@
-From 8b06f1090da0e12c6012d0d13d8b48c69640a6a7 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Thu, 6 Feb 2014 14:08:02 -0800
-Subject: [PATCH 04/12] add context based umem support
+xeon-phi: add context based umem support
 
 The ib_umem_get routine calls get_user_pages to pin pages and create the
 ib_umem structure.  Memory on MIC, however, must be mapped through SCIF for
 access across PCI.  This patch allows setup of context-based ib_umem mapping
 routines.
 ---
-diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
---- a3/drivers/infiniband/core/umem.c	2015-01-05 14:12:52.117593540 -0800
-+++ a4/drivers/infiniband/core/umem.c	2015-01-05 14:41:51.927520253 -0800
+diff -ruN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
+--- a3/drivers/infiniband/core/umem.c	2015-09-10 09:31:52.628958359 -0700
++++ a4/drivers/infiniband/core/umem.c	2015-09-10 09:32:16.722901309 -0700
 @@ -57,6 +57,10 @@
  	for_each_sg(umem->sg_head.sgl, sg, umem->npages, i) {
  
@@ -96,7 +93,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  			    size_t size, int access, int dmasync)
  {
  	struct ib_umem *umem;
-@@ -101,7 +162,6 @@
+@@ -109,7 +170,6 @@
  	if (!umem)
  		return ERR_PTR(-ENOMEM);
  
@@ -104,7 +101,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  	umem->length    = size;
  	umem->offset    = addr & ~PAGE_MASK;
  	umem->page_size = PAGE_SIZE;
-@@ -163,11 +223,18 @@
+@@ -171,11 +231,18 @@
  	sg_list_start = umem->sg_head.sgl;
  
  	while (npages) {
@@ -123,7 +120,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  		if (ret < 0)
  			goto out;
  
-@@ -219,7 +286,6 @@
+@@ -227,7 +294,6 @@
  
  	return ret < 0 ? ERR_PTR(ret) : umem;
  }
@@ -131,7 +128,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  
  static void ib_umem_account(struct work_struct *work)
  {
-@@ -237,10 +303,10 @@
+@@ -245,10 +311,10 @@
  }
  
  /**
@@ -144,7 +141,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  {
  	struct ib_ucontext *context = umem->context;
  	struct mm_struct *mm;
-@@ -290,9 +356,8 @@
+@@ -298,9 +364,8 @@
  out:
  	kfree(umem);
  }
@@ -155,7 +152,7 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
  {
  	int shift;
  	int i;
-@@ -307,4 +372,40 @@
+@@ -315,4 +380,40 @@
  
  	return n;
  }
@@ -196,9 +193,9 @@ diff -urN a3/drivers/infiniband/core/umem.c a4/drivers/infiniband/core/umem.c
 +		ops->page_count(umem) : ib_page_count_umem(umem);
 +}
  EXPORT_SYMBOL(ib_umem_page_count);
-diff -urN a3/include/rdma/ib_verbs.h a4/include/rdma/ib_verbs.h
---- a3/include/rdma/ib_verbs.h	2015-01-05 14:18:48.871578512 -0800
-+++ a4/include/rdma/ib_verbs.h	2015-01-05 14:36:00.826535043 -0800
+diff -ruN a3/include/rdma/ib_verbs.h a4/include/rdma/ib_verbs.h
+--- a3/include/rdma/ib_verbs.h	2015-09-10 09:32:01.420901195 -0700
++++ a4/include/rdma/ib_verbs.h	2015-09-10 09:32:16.723901528 -0700
 @@ -1122,7 +1122,18 @@
  	u8	page_shift;
  };

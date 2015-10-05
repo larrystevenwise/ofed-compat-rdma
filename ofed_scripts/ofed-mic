@@ -191,13 +191,14 @@ start()
 			(/usr/sbin/ibpd &)
 			retval=$?
 		fi
+
 		modprobe ib_uverbs &&
 		modprobe ibp_server &&
 		modprobe ibp_cm_server &&
 		modprobe ibp_sa_server &&
 		modprobe ibscif
 
-		retval=$?
+		retval+=$?
 		[ $retval -eq 0 ] && eval $_success || eval $_failure
 	fi
 
@@ -214,14 +215,6 @@ start()
 	return $retval
 }
 
-stop_module()
-{
-	#if needed to return proper status
-	if [ `grep -c $1 /proc/modules` -ne 0 ] ; then
-		rmmod $1 &> /dev/null
-	fi
-}
-
 stop()
 {
 	echo $"Stopping OFED Stack:"
@@ -233,15 +226,16 @@ stop()
 
 	if [ "$nohost" -eq 0 ]; then
 		echo -n "host"
-		stop_module ibscif
-		retval=$?
 
-		stop_module ibp_sa_server
-		stop_module ibp_cm_server
+		rmmod ibscif &> /dev/null
+		retval=$?
+		rmmod ibp_sa_server &> /dev/null
+		retval+=$?
+		rmmod ibp_cm_server &> /dev/null
 		retval+=$?
 
 		kill $(pidof /usr/sbin/ibpd) &>/dev/null
-		stop_module ibp_server
+		rmmod ibp_server &> /dev/null
 		retval+=$?
 
 		[ $retval -eq 0 ] && eval $_success || eval $_failure

@@ -1,14 +1,10 @@
-From 129a1e301d8567b8d79abe19fd2d998738951cda Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Tue, 4 Feb 2014 12:23:56 -0800
-Subject: [PATCH 06/12] add scif.h to the include directory matching the
- location that is in the mpss installation
+xeon-phi: add scif.h to the include directory matching the
 
-Signed-off-by: Phil Cayton <phil.cayton@intel.com>
+location that is in the mpss installation
 ---
-diff -urN a5/include/modules/scif.h a6/include/modules/scif.h
+diff -ruN a5/include/modules/scif.h a6/include/modules/scif.h
 --- a5/include/modules/scif.h	1969-12-31 16:00:00.000000000 -0800
-+++ a6/include/modules/scif.h	2015-01-05 14:59:07.370476637 -0800
++++ a6/include/modules/scif.h	2015-09-10 09:33:19.295932526 -0700
 @@ -0,0 +1,1748 @@
 +/*
 + * Copyright 2010-2013 Intel Corporation.

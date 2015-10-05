@@ -1,16 +1,13 @@
-From 2ddd9c09050d6f74a2ea9e3e21a76510bbdff155 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Thu, 6 Feb 2014 14:23:36 -0800
-Subject: [PATCH 03/12] add context based udata support
+xeon-phi: add context based udata support
 
 Normally the copy_to_user and copy_from_user calls are used to access vendor
 private data when allocating resources from processes.  However, when the
 processes are running on MIC, this communication is proxied to the host kernel
 via SCIF.  This patch allows setup of context-based udata access routines.
 ---
-diff -urN a2/drivers/infiniband/core/uverbs_cmd.c a3/drivers/infiniband/core/uverbs_cmd.c
---- a2/drivers/infiniband/core/uverbs_cmd.c	2015-01-05 13:59:55.217626266 -0800
-+++ a3/drivers/infiniband/core/uverbs_cmd.c	2015-01-05 14:30:40.647548530 -0800
+diff -ruN a2/drivers/infiniband/core/uverbs_cmd.c a3/drivers/infiniband/core/uverbs_cmd.c
+--- a2/drivers/infiniband/core/uverbs_cmd.c	2015-09-10 09:31:23.790958256 -0700
++++ a3/drivers/infiniband/core/uverbs_cmd.c	2015-09-10 09:32:01.419900874 -0700
 @@ -57,6 +57,21 @@
  static struct uverbs_lock_class xrcd_lock_class = { .name = "XRCD-uobj" };
  static struct uverbs_lock_class rule_lock_class = { .name = "RULE-uobj" };
@@ -41,10 +38,9 @@ diff -urN a2/drivers/infiniband/core/uverbs_cmd.c a3/drivers/infiniband/core/uve
  	ucontext->device = ibdev;
  	INIT_LIST_HEAD(&ucontext->pd_list);
  	INIT_LIST_HEAD(&ucontext->mr_list);
-Binary files a2/drivers/infiniband/core/.uverbs_cmd.c.rej.swp and a3/drivers/infiniband/core/.uverbs_cmd.c.rej.swp differ
-diff -urN a2/drivers/infiniband/core/uverbs.h a3/drivers/infiniband/core/uverbs.h
---- a2/drivers/infiniband/core/uverbs.h	2015-01-05 13:59:55.216626266 -0800
-+++ a3/drivers/infiniband/core/uverbs.h	2015-01-05 14:29:27.559551609 -0800
+diff -ruN a2/drivers/infiniband/core/uverbs.h a3/drivers/infiniband/core/uverbs.h
+--- a2/drivers/infiniband/core/uverbs.h	2015-09-10 09:31:23.788958210 -0700
++++ a3/drivers/infiniband/core/uverbs.h	2015-09-10 09:32:01.420901195 -0700
 @@ -47,8 +47,11 @@
  #include <rdma/ib_umem.h>
  #include <rdma/ib_user_verbs.h>
@@ -65,9 +61,9 @@ diff -urN a2/drivers/infiniband/core/uverbs.h a3/drivers/infiniband/core/uverbs.
  		(udata)->inbuf  = (ilen) ? (const void __user *) (ibuf) : NULL;	\
  		(udata)->outbuf = (olen) ? (void __user *) (obuf) : NULL;	\
  		(udata)->inlen  = (ilen);					\
-diff -urN a2/include/rdma/ib_verbs.h a3/include/rdma/ib_verbs.h
---- a2/include/rdma/ib_verbs.h	2015-01-05 13:59:55.219626266 -0800
-+++ a3/include/rdma/ib_verbs.h	2015-01-05 14:18:48.871578512 -0800
+diff -ruN a2/include/rdma/ib_verbs.h a3/include/rdma/ib_verbs.h
+--- a2/include/rdma/ib_verbs.h	2015-09-10 09:31:23.754932456 -0700
++++ a3/include/rdma/ib_verbs.h	2015-09-10 09:32:01.420901195 -0700
 @@ -1147,7 +1147,14 @@
  	int			live;
  };

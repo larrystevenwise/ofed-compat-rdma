@@ -1,13 +1,8 @@
-From 536a8d5b5c68ecd2ca73446f25443fe8bb234a46 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Thu, 29 May 2014 14:35:13 -0700
-Subject: [PATCH 11/12] correct ib_addr.h for older kernels
-
-Signed-off-by: Phil Cayton <phil.cayton@intel.com>
+xeon-phi: correct ib_addr.h for older kernels
 ---
-diff -urN a10/include/rdma/ib_addr.h a11/include/rdma/ib_addr.h
---- a10/include/rdma/ib_addr.h	2015-01-05 15:10:42.263447365 -0800
-+++ a11/include/rdma/ib_addr.h	2015-01-05 15:12:36.058442572 -0800
+diff -ruN a10/include/rdma/ib_addr.h a11/include/rdma/ib_addr.h
+--- a10/include/rdma/ib_addr.h	2015-09-10 09:35:55.061958421 -0700
++++ a11/include/rdma/ib_addr.h	2015-09-10 09:36:18.093901591 -0700
 @@ -239,6 +239,27 @@
  		return 0;
  }

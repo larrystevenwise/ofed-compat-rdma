@@ -1,7 +1,4 @@
-From c01faf2a8053f8968b9bac84a4cbd54a9952d472 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Tue, 21 Jan 2014 08:59:29 -0800
-Subject: [PATCH 01/12] ib_core add mic node and scif transport types
+xeon-phi: ib_core add mic node and scif transport types
 
 The OFED SCIF driver implements a software-emulated RDMA device to allow OFED
 based applications, such as Intel MPI, to run on Intel(R) MIC Architecture
@@ -10,9 +7,9 @@ node communication within a single platform, where a node is a coprocessor
 or the host processor.  This patch adds new node and transport types to the
 ib_core kernel module to distinguish this new RDMA interface type.
 ---
-diff -urN a0/drivers/infiniband/core/sysfs.c a1/drivers/infiniband/core/sysfs.c
---- a0/drivers/infiniband/core/sysfs.c	2015-01-05 13:35:35.692687746 -0800
-+++ a1/drivers/infiniband/core/sysfs.c	2015-01-05 13:46:38.792659814 -0800
+diff -ruN a/drivers/infiniband/core/sysfs.c a1/drivers/infiniband/core/sysfs.c
+--- a/drivers/infiniband/core/sysfs.c	2015-09-10 09:29:25.232891731 -0700
++++ a1/drivers/infiniband/core/sysfs.c	2015-09-10 09:31:06.464899773 -0700
 @@ -253,6 +253,8 @@
  		return sprintf(buf, "%s\n", "InfiniBand");
  	case IB_LINK_LAYER_ETHERNET:
@@ -30,9 +27,9 @@ diff -urN a0/drivers/infiniband/core/sysfs.c a1/drivers/infiniband/core/sysfs.c
  	default:		  return sprintf(buf, "%d: <unknown>\n", dev->node_type);
  	}
  }
-diff -urN a0/drivers/infiniband/core/verbs.c a1/drivers/infiniband/core/verbs.c
---- a0/drivers/infiniband/core/verbs.c	2015-01-05 13:35:35.693687746 -0800
-+++ a1/drivers/infiniband/core/verbs.c	2015-01-05 13:49:08.470653509 -0800
+diff -ruN a/drivers/infiniband/core/verbs.c a1/drivers/infiniband/core/verbs.c
+--- a/drivers/infiniband/core/verbs.c	2015-09-10 09:29:25.230891773 -0700
++++ a1/drivers/infiniband/core/verbs.c	2015-09-10 09:31:06.465900979 -0700
 @@ -121,6 +121,8 @@
  		return RDMA_TRANSPORT_USNIC;
  	case RDMA_NODE_USNIC_UDP:
@@ -51,9 +48,9 @@ diff -urN a0/drivers/infiniband/core/verbs.c a1/drivers/infiniband/core/verbs.c
  	default:
  		return IB_LINK_LAYER_UNSPECIFIED;
  	}
-diff -urN a0/include/rdma/ib_verbs.h a1/include/rdma/ib_verbs.h
---- a0/include/rdma/ib_verbs.h	2015-01-05 13:45:40.299662278 -0800
-+++ a1/include/rdma/ib_verbs.h	2015-01-05 13:50:57.590648913 -0800
+diff -ruN a/include/rdma/ib_verbs.h a1/include/rdma/ib_verbs.h
+--- a/include/rdma/ib_verbs.h	2015-09-10 09:29:25.240891724 -0700
++++ a1/include/rdma/ib_verbs.h	2015-09-10 09:31:06.466900599 -0700
 @@ -75,13 +75,15 @@
  	RDMA_NODE_RNIC,
  	RDMA_NODE_USNIC,
@@ -79,4 +76,3 @@ diff -urN a0/include/rdma/ib_verbs.h a1/include/rdma/ib_verbs.h
  };
  
  enum ib_device_cap_flags {
-Binary files a0/include/rdma/.ib_verbs.h.rej.swp and a1/include/rdma/.ib_verbs.h.rej.swp differ

@@ -1,12 +1,8 @@
-From 6d88a748ca017a22c08d25e29144dd392c988eb9 Mon Sep 17 00:00:00 2001
-From: Phil Cayton <phil.cayton@intel.com>
-Date: Thu, 5 Jun 2014 09:44:42 -0700
-Subject: [PATCH 12/12] add mlx4 cq_comp locking already done in event handler
-
+xeon-phi: add mlx4 cq_comp locking already done in event handler
 ---
-diff -urN a11/drivers/net/ethernet/mellanox/mlx4/cq.c a12/drivers/net/ethernet/mellanox/mlx4/cq.c
---- a11/drivers/net/ethernet/mellanox/mlx4/cq.c	2015-01-05 15:12:24.028443079 -0800
-+++ a12/drivers/net/ethernet/mellanox/mlx4/cq.c	2015-01-05 15:14:27.994437857 -0800
+diff -ruN a11/drivers/net/ethernet/mellanox/mlx4/cq.c a12/drivers/net/ethernet/mellanox/mlx4/cq.c
+--- a11/drivers/net/ethernet/mellanox/mlx4/cq.c	2015-09-10 09:36:13.117932528 -0700
++++ a12/drivers/net/ethernet/mellanox/mlx4/cq.c	2015-09-10 09:36:38.460901094 -0700
 @@ -54,10 +54,17 @@
  
  void mlx4_cq_completion(struct mlx4_dev *dev, u32 cqn)

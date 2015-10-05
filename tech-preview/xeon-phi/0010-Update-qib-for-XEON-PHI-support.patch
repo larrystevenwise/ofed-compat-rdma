@@ -5,9 +5,9 @@ From: Jubin John <jubin.john@intel.com>
 Reviewed-by: Mike Marciniszyn <mike.marciniszyn@intel.com>
 Signed-off-by: Jubin John <jubin.john@intel.com>
 ---
-diff -urN a9/drivers/infiniband/hw/qib/Makefile a10/drivers/infiniband/hw/qib/Makefile
---- a9/drivers/infiniband/hw/qib/Makefile	2015-01-05 15:05:04.280461602 -0800
-+++ a10/drivers/infiniband/hw/qib/Makefile	2015-01-05 15:10:58.250446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/Makefile a10/drivers/infiniband/hw/qib/Makefile
+--- a9/drivers/infiniband/hw/qib/Makefile	2015-09-10 09:35:36.420958201 -0700
++++ a10/drivers/infiniband/hw/qib/Makefile	2015-09-10 09:36:03.135901227 -0700
 @@ -14,3 +14,8 @@
  ib_qib-$(CONFIG_X86_64) += qib_wc_x86_64.o
  ib_qib-$(CONFIG_PPC64) += qib_wc_ppc64.o
@@ -17,9 +17,9 @@ diff -urN a9/drivers/infiniband/hw/qib/Makefile a10/drivers/infiniband/hw/qib/Ma
 +ib_qib-y += qib_knx.o
 +ccflags-y += -DQIB_CONFIG_KNX
 +endif
-diff -urN a9/drivers/infiniband/hw/qib/qib_common.h a10/drivers/infiniband/hw/qib/qib_common.h
---- a9/drivers/infiniband/hw/qib/qib_common.h	2015-01-05 15:05:04.281461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_common.h	2015-01-05 15:10:58.250446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib_common.h a10/drivers/infiniband/hw/qib/qib_common.h
+--- a9/drivers/infiniband/hw/qib/qib_common.h	2015-09-10 09:35:36.420958201 -0700
++++ a10/drivers/infiniband/hw/qib/qib_common.h	2015-09-10 09:36:03.136900809 -0700
 @@ -1,4 +1,5 @@
  /*
 + * Copyright (c) 2012 Intel Corporation. All rights reserved.
@@ -40,9 +40,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_common.h a10/drivers/infiniband/hw/qi
  
  	/* size of struct base_info to write to */
  	__u32 spu_base_info_size;
-diff -urN a9/drivers/infiniband/hw/qib/qib_file_ops.c a10/drivers/infiniband/hw/qib/qib_file_ops.c
---- a9/drivers/infiniband/hw/qib/qib_file_ops.c	2015-01-05 15:05:04.280461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_file_ops.c	2015-01-05 15:10:58.251446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib_file_ops.c a10/drivers/infiniband/hw/qib/qib_file_ops.c
+--- a9/drivers/infiniband/hw/qib/qib_file_ops.c	2015-09-10 09:35:36.418958234 -0700
++++ a10/drivers/infiniband/hw/qib/qib_file_ops.c	2015-09-10 09:36:03.138932454 -0700
 @@ -48,6 +48,7 @@
  #include "qib.h"
  #include "qib_common.h"
@@ -553,9 +553,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_file_ops.c a10/drivers/infiniband/hw/
  		break;
  
  	case QIB_CMD_USER_INIT:
-diff -urN a9/drivers/infiniband/hw/qib/qib.h a10/drivers/infiniband/hw/qib/qib.h
---- a9/drivers/infiniband/hw/qib/qib.h	2015-01-05 15:05:04.280461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib.h	2015-01-05 15:10:58.250446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib.h a10/drivers/infiniband/hw/qib/qib.h
+--- a9/drivers/infiniband/hw/qib/qib.h	2015-09-10 09:35:36.420958201 -0700
++++ a10/drivers/infiniband/hw/qib/qib.h	2015-09-10 09:36:03.139932597 -0700
 @@ -234,6 +234,10 @@
  	u32 lookaside_qpn;
  	/* QPs waiting for context processing */
@@ -603,9 +603,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib.h a10/drivers/infiniband/hw/qib/qib.h
  
  static inline struct qib_devdata *dd_from_ppd(struct qib_pportdata *ppd)
  {
-diff -urN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/qib_init.c
---- a9/drivers/infiniband/hw/qib/qib_init.c	2015-01-05 15:05:04.279461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_init.c	2015-01-05 15:10:58.251446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/qib_init.c
+--- a9/drivers/infiniband/hw/qib/qib_init.c	2015-09-10 09:35:36.420958201 -0700
++++ a10/drivers/infiniband/hw/qib/qib_init.c	2015-09-10 09:36:03.140934324 -0700
 @@ -51,6 +51,10 @@
  #include "qib_verbs.h"
  #endif
@@ -617,7 +617,7 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/
  #undef pr_fmt
  #define pr_fmt(fmt) QIB_DRV_NAME ": " fmt
  
-@@ -1301,6 +1305,12 @@
+@@ -1319,6 +1323,12 @@
  	/* not fatal if it doesn't work */
  	if (qib_init_qibfs())
  		pr_err("Unable to register ipathfs\n");
@@ -630,7 +630,7 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/
  	goto bail; /* all OK */
  
  bail_dev:
-@@ -1325,6 +1335,9 @@
+@@ -1346,6 +1356,9 @@
  {
  	int ret;
  
@@ -640,7 +640,7 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/
  	ret = qib_exit_qibfs();
  	if (ret)
  		pr_err(
-@@ -1568,6 +1581,9 @@
+@@ -1589,6 +1602,9 @@
  	/* unregister from IB core */
  	qib_unregister_ib_device(dd);
  
@@ -650,9 +650,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_init.c a10/drivers/infiniband/hw/qib/
  	/*
  	 * Disable the IB link, disable interrupts on the device,
  	 * clear dma engines, etc.
-diff -urN a9/drivers/infiniband/hw/qib/qib_knx.c a10/drivers/infiniband/hw/qib/qib_knx.c
+diff -ruN a9/drivers/infiniband/hw/qib/qib_knx.c a10/drivers/infiniband/hw/qib/qib_knx.c
 --- a9/drivers/infiniband/hw/qib/qib_knx.c	1969-12-31 16:00:00.000000000 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_knx.c	2015-01-05 15:10:58.252446692 -0800
++++ a10/drivers/infiniband/hw/qib/qib_knx.c	2015-09-10 09:36:03.140934324 -0700
 @@ -0,0 +1,1532 @@
 +/*
 + * Copyright (c) 2012, 2013 Intel Corporation. All rights reserved.
@@ -2186,9 +2186,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_knx.c a10/drivers/infiniband/hw/qib/q
 +		kfree(server);
 +	}
 +}
-diff -urN a9/drivers/infiniband/hw/qib/qib_knx_common.h a10/drivers/infiniband/hw/qib/qib_knx_common.h
+diff -ruN a9/drivers/infiniband/hw/qib/qib_knx_common.h a10/drivers/infiniband/hw/qib/qib_knx_common.h
 --- a9/drivers/infiniband/hw/qib/qib_knx_common.h	1969-12-31 16:00:00.000000000 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_knx_common.h	2015-01-05 15:10:58.252446692 -0800
++++ a10/drivers/infiniband/hw/qib/qib_knx_common.h	2015-09-10 09:36:03.140934324 -0700
 @@ -0,0 +1,126 @@
 +/*
 + * Copyright (c) 2013 Intel Corporation. All rights reserved.
@@ -2316,9 +2316,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_knx_common.h a10/drivers/infiniband/h
 +};
 +
 +#endif /* _QIB_KNX_COMMON_H */
-diff -urN a9/drivers/infiniband/hw/qib/qib_knx.h a10/drivers/infiniband/hw/qib/qib_knx.h
+diff -ruN a9/drivers/infiniband/hw/qib/qib_knx.h a10/drivers/infiniband/hw/qib/qib_knx.h
 --- a9/drivers/infiniband/hw/qib/qib_knx.h	1969-12-31 16:00:00.000000000 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_knx.h	2015-01-05 15:10:58.252446692 -0800
++++ a10/drivers/infiniband/hw/qib/qib_knx.h	2015-09-10 09:36:03.141932310 -0700
 @@ -0,0 +1,74 @@
 +/*
 + * Copyright (c) 2012, 2013 Intel Corporation. All rights reserved.
@@ -2394,9 +2394,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_knx.h a10/drivers/infiniband/hw/qib/q
 +}
 +#endif
 +#endif /* _QIB_KNX_H */
-diff -urN a9/drivers/infiniband/hw/qib/qib_user_sdma.c a10/drivers/infiniband/hw/qib/qib_user_sdma.c
---- a9/drivers/infiniband/hw/qib/qib_user_sdma.c	2015-01-05 15:05:04.279461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_user_sdma.c	2015-01-05 15:10:58.252446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib_user_sdma.c a10/drivers/infiniband/hw/qib/qib_user_sdma.c
+--- a9/drivers/infiniband/hw/qib/qib_user_sdma.c	2015-09-10 09:35:36.421958157 -0700
++++ a10/drivers/infiniband/hw/qib/qib_user_sdma.c	2015-09-10 09:36:03.141932310 -0700
 @@ -63,80 +63,6 @@
  	pid_t pid;
  };
@@ -2657,9 +2657,9 @@ diff -urN a9/drivers/infiniband/hw/qib/qib_user_sdma.c a10/drivers/infiniband/hw
  {
  	unsigned long flags;
  
-diff -urN a9/drivers/infiniband/hw/qib/qib_user_sdma.h a10/drivers/infiniband/hw/qib/qib_user_sdma.h
---- a9/drivers/infiniband/hw/qib/qib_user_sdma.h	2015-01-05 15:05:04.280461602 -0800
-+++ a10/drivers/infiniband/hw/qib/qib_user_sdma.h	2015-01-05 15:10:58.253446692 -0800
+diff -ruN a9/drivers/infiniband/hw/qib/qib_user_sdma.h a10/drivers/infiniband/hw/qib/qib_user_sdma.h
+--- a9/drivers/infiniband/hw/qib/qib_user_sdma.h	2015-09-10 09:35:36.419958299 -0700
++++ a10/drivers/infiniband/hw/qib/qib_user_sdma.h	2015-09-10 09:36:03.141932310 -0700
 @@ -31,12 +31,108 @@
   */
  #include <linux/device.h>
