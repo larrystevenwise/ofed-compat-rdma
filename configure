@@ -1256,9 +1256,9 @@ else
         DEFINE_SUNRPC_XPRT_RDMA_SERVER="/* CONFIG_SUNRPC_XPRT_RDMA_SERVER is not set */"
 fi
 
-cat >> ${AUTOCONF_H} << EOFAUTOCONF
+cat > ${AUTOCONF_H} << EOFAUTOCONF
 #ifndef __OFED_BUILD__
-#include_next <linux/autoconf.h>
+#include_next <$AUTOCONF_PREFIX/autoconf.h>
 $(echo -e "${DEFINE_INFINIBAND}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_IPOIB}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_CM}" | grep -v undef)
