@@ -1,0 +1,35 @@
+From f12e0a14e43ef02743be0f8f7898d5ddbacc2986 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@avagotech.com>
+Date: Tue, 20 Oct 2015 14:17:57 +0530
+Subject: [PATCH 4/9] RDMA/ocrdma: Avoid a possible crash in
+ ocrdma_rem_port_stats
+
+debugfs_remove should be called before freeing the driver
+stats resources to avoid any crash during ocrdma_remove.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+index b9e5e10..98e1744 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+@@ -856,9 +856,9 @@ void ocrdma_rem_port_stats(struct ocrdma_dev *dev)
+ {
+ 	if (!dev->dir)
+ 		return;
++	debugfs_remove(dev->dir);
+ 	mutex_destroy(&dev->stats_lock);
+ 	ocrdma_release_stats_mem(dev);
+-	debugfs_remove(dev->dir);
+ }
+ 
+ void ocrdma_init_debugfs(void)
+-- 
+2.2.0
+

@@ -1,0 +1,45 @@
+From 3c4579ec474299d5ef8c0c13d1d7538f05eb01fd Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@avagotech.com>
+Date: Tue, 20 Oct 2015 14:17:59 +0530
+Subject: [PATCH 6/9] RDMA/ocrdma: Prevent CQ-Doorbell floods
+
+Changing CQ-Doorbell(DB) logic to prevent DB floods, it is supposed to be
+pressed only if any hw CQE is polled. If cq-arm was requested
+previously then don't bother about number of hw CQEs polled and
+arm the CQ.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@avagotech.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@avagotech.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_verbs.c | 11 +++--------
+ 1 file changed, 3 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+index aae5601..45b8e09 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_verbs.c
+@@ -2886,16 +2886,11 @@ expand_cqe:
+ 	}
+ stop_cqe:
+ 	cq->getp = cur_getp;
+-	if (cq->deferred_arm) {
+-		ocrdma_ring_cq_db(dev, cq->id, true, cq->deferred_sol,
+-				  polled_hw_cqes);
++	if (cq->deferred_arm || polled_hw_cqes) {
++		ocrdma_ring_cq_db(dev, cq->id, cq->deferred_arm,
++				  cq->deferred_sol, polled_hw_cqes);
+ 		cq->deferred_arm = false;
+ 		cq->deferred_sol = false;
+-	} else {
+-		/* We need to pop the CQE. No need to arm */
+-		ocrdma_ring_cq_db(dev, cq->id, false, cq->deferred_sol,
+-				  polled_hw_cqes);
+-		cq->deferred_sol = false;
+ 	}
+ 
+ 	return i;
+-- 
+2.2.0
+

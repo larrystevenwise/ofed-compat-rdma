@@ -1,0 +1,118 @@
+From 81afbfac5107d1bae0077f0c53dbcb410efceb9a Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Fri, 5 Feb 2016 20:06:37 +0530
+Subject: [PATCH 7/9] RDMA/ocrdma: Initialize stats resources in the driver
+ before ib device registration.
+
+In the latest kernel, process_mad hook of the driver can be invoked as
+soon as device is registered. In this hook, ocrdma driver is issuing a
+command to get the stats counters from the HW. This is triggering system
+crash since the statistics command resources are not allocated by the driver.
+Changing the sequence of initialization to avoid this crash.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_main.c  |  6 ++++++
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.c | 14 ++++----------
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.h |  2 ++
+ 3 files changed, 12 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_main.c b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+index 3db5349..b66711d 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_main.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_main.c
+@@ -346,6 +346,11 @@ static int ocrdma_alloc_resources(struct ocrdma_dev *dev)
+ 
+ 	ocrdma_alloc_pd_pool(dev);
+ 
++	if (!ocrdma_alloc_stats_resources(dev)) {
++		pr_err("%s: stats resource allocation failed\n", __func__);
++		goto alloc_err;
++	}
++
+ 	spin_lock_init(&dev->av_tbl.lock);
+ 	spin_lock_init(&dev->flush_q_lock);
+ 	return 0;
+@@ -356,6 +361,7 @@ alloc_err:
+ 
+ static void ocrdma_free_resources(struct ocrdma_dev *dev)
+ {
++	ocrdma_release_stats_resources(dev);
+ 	kfree(dev->stag_arr);
+ 	kfree(dev->qp_tbl);
+ 	kfree(dev->cq_tbl);
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+index 98e1744..844e249 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+@@ -64,10 +64,11 @@ static int ocrdma_add_stat(char *start, char *pcur,
+ 	return cpy_len;
+ }
+ 
+-static bool ocrdma_alloc_stats_mem(struct ocrdma_dev *dev)
++bool ocrdma_alloc_stats_resources(struct ocrdma_dev *dev)
+ {
+ 	struct stats_mem *mem = &dev->stats_mem;
+ 
++	mutex_init(&dev->stats_lock);
+ 	/* Alloc mbox command mem*/
+ 	mem->size = max_t(u32, sizeof(struct ocrdma_rdma_stats_req),
+ 			sizeof(struct ocrdma_rdma_stats_resp));
+@@ -91,13 +92,14 @@ static bool ocrdma_alloc_stats_mem(struct ocrdma_dev *dev)
+ 	return true;
+ }
+ 
+-static void ocrdma_release_stats_mem(struct ocrdma_dev *dev)
++void ocrdma_release_stats_resources(struct ocrdma_dev *dev)
+ {
+ 	struct stats_mem *mem = &dev->stats_mem;
+ 
+ 	if (mem->va)
+ 		dma_free_coherent(&dev->nic_info.pdev->dev, mem->size,
+ 				  mem->va, mem->pa);
++	mem->va = NULL;
+ 	kfree(mem->debugfs_mem);
+ }
+ 
+@@ -839,15 +841,9 @@ void ocrdma_add_port_stats(struct ocrdma_dev *dev)
+ 				&dev->reset_stats, &ocrdma_dbg_ops))
+ 		goto err;
+ 
+-	/* Now create dma_mem for stats mbx command */
+-	if (!ocrdma_alloc_stats_mem(dev))
+-		goto err;
+-
+-	mutex_init(&dev->stats_lock);
+ 
+ 	return;
+ err:
+-	ocrdma_release_stats_mem(dev);
+ 	debugfs_remove_recursive(dev->dir);
+ 	dev->dir = NULL;
+ }
+@@ -857,8 +853,6 @@ void ocrdma_rem_port_stats(struct ocrdma_dev *dev)
+ 	if (!dev->dir)
+ 		return;
+ 	debugfs_remove(dev->dir);
+-	mutex_destroy(&dev->stats_lock);
+-	ocrdma_release_stats_mem(dev);
+ }
+ 
+ void ocrdma_init_debugfs(void)
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.h b/drivers/infiniband/hw/ocrdma/ocrdma_stats.h
+index c9e58d0..bba1fec 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_stats.h
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.h
+@@ -65,6 +65,8 @@ enum OCRDMA_STATS_TYPE {
+ 
+ void ocrdma_rem_debugfs(void);
+ void ocrdma_init_debugfs(void);
++bool ocrdma_alloc_stats_resources(struct ocrdma_dev *dev);
++void ocrdma_release_stats_resources(struct ocrdma_dev *dev);
+ void ocrdma_rem_port_stats(struct ocrdma_dev *dev);
+ void ocrdma_add_port_stats(struct ocrdma_dev *dev);
+ int ocrdma_pma_counters(struct ocrdma_dev *dev,
+-- 
+2.2.0
+

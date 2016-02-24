@@ -1,0 +1,31 @@
+From abab0d4223adc9390980d02b8f4e96f69f361ede Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Fri, 5 Feb 2016 20:06:40 +0530
+Subject: [PATCH 9/9] RDMA/ocrdma: Fixing ocrdma debugfs directory remove
+
+During the ocrdma device remove sequence, the debugfs directory
+tree of each ocrdma device needs to be removed. Use
+debugfs_remove_recursive instead of debugfs_remove.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/ocrdma/ocrdma_stats.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+index 844e249..54c0958 100644
+--- a/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
++++ b/drivers/infiniband/hw/ocrdma/ocrdma_stats.c
+@@ -852,7 +852,7 @@ void ocrdma_rem_port_stats(struct ocrdma_dev *dev)
+ {
+ 	if (!dev->dir)
+ 		return;
+-	debugfs_remove(dev->dir);
++	debugfs_remove_recursive(dev->dir);
+ }
+ 
+ void ocrdma_init_debugfs(void)
+-- 
+2.2.0
+
