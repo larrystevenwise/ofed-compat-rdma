@@ -3,21 +3,21 @@ Subject: [PATCH] BACKPORT: mlx4
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/hw/mlx4/cm.c                 |  27 ++++
- drivers/infiniband/hw/mlx4/main.c               |   8 +
- drivers/net/ethernet/mellanox/mlx4/cmd.c        |   6 +
- drivers/net/ethernet/mellanox/mlx4/en_clock.c   |  10 ++
- drivers/net/ethernet/mellanox/mlx4/en_cq.c      |  11 ++
- drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |   4 +
- drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |  87 +++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_netdev.c  | 206 ++++++++++++++++++++++++
- drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  84 +++++++++-
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  53 +++++-
- drivers/net/ethernet/mellanox/mlx4/eq.c         |  10 ++
- drivers/net/ethernet/mellanox/mlx4/main.c       |  24 +++
- drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |  21 ++-
- include/linux/mlx4/cq.h                         |   5 +
- include/linux/mlx4/device.h                     |   4 +
+ drivers/infiniband/hw/mlx4/cm.c                 |   27 +++
+ drivers/infiniband/hw/mlx4/main.c               |    8 +
+ drivers/net/ethernet/mellanox/mlx4/cmd.c        |    6 +
+ drivers/net/ethernet/mellanox/mlx4/en_clock.c   |   10 +
+ drivers/net/ethernet/mellanox/mlx4/en_cq.c      |   11 ++
+ drivers/net/ethernet/mellanox/mlx4/en_dcb_nl.c  |    4 +
+ drivers/net/ethernet/mellanox/mlx4/en_ethtool.c |   87 +++++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_netdev.c  |  206 +++++++++++++++++++++++
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c      |   84 +++++++++-
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |   53 ++++++-
+ drivers/net/ethernet/mellanox/mlx4/eq.c         |   10 +
+ drivers/net/ethernet/mellanox/mlx4/main.c       |   24 +++
+ drivers/net/ethernet/mellanox/mlx4/mlx4_en.h    |   21 +++-
+ include/linux/mlx4/cq.h                         |    5 +
+ include/linux/mlx4/device.h                     |    4 +
  15 files changed, 553 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/cm.c b/drivers/infiniband/hw/mlx4/cm.c
@@ -332,7 +332,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  }
  
-+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(3,2,0))
++#ifdef HAVE_ETHTOOL_OPS_GET_RXNFC_U32_RULE_LOCS
  static int mlx4_en_get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd,
  			     u32 *rule_locs)
 +#else
