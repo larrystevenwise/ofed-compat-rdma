@@ -186,10 +186,12 @@ install_modules:
 clean: clean_kernel
 
 clean_kernel:
-	$(MAKE) -C $(KSRC_OBJ) SUBDIRS="$(CWD)" $(WITH_MAKE_PARAMS) clean
+	$(MAKE) -C $(KSRC_OBJ) rm-files= SUBDIRS="$(CWD)" $(WITH_MAKE_PARAMS) clean
+
+distclean: clean_kernel
 	@/bin/rm -f $(clean-files)
 
-clean-files := Module.symvers modules.order Module.markers compat/modules.order
+clean-files := Module.symvers modules.order Module.markers compat/modules.order compat/configure
 clean-files += $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
 
 help:
