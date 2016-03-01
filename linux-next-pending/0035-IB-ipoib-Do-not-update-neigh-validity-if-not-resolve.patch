@@ -1,0 +1,28 @@
+From: Erez Shitrit <erezsh@mellanox.com>
+Subject: [PATCH] IB/ipoib: Do not update neigh validity if not resolved yet
+
+
+ipoib_neigh_get whenever tries to access specific neigh updates its
+"alive" variable member, the neigh now considered as updated and will
+not bee cleaned by the GC process even if it needs to be resolved again.
+
+Signed-off-by: Erez Shitrit <erezsh@mellanox.com>
+---
+ drivers/infiniband/ulp/ipoib/ipoib_main.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib_main.c b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/ipoib/ipoib_main.c
++++ b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+@@ -1131,7 +1131,9 @@ struct ipoib_neigh *ipoib_neigh_get(struct net_device *dev, u8 *daddr)
+ 				neigh = NULL;
+ 				goto out_unlock;
+ 			}
+-			neigh->alive = jiffies;
++
++			if (likely(skb_queue_len(&neigh->queue) < IPOIB_MAX_PATH_REC_QUEUE))
++				neigh->alive = jiffies;
+ 			goto out_unlock;
+ 		}
+ 	}
