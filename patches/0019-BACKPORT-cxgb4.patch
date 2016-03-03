@@ -260,16 +260,6 @@ diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ether
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-@@ -71,7 +71,9 @@
- #include "l2t.h"
- #include "t4_firmware.h"
- 
-+#ifdef HAVE_BONDING_H
- #include <../drivers/net/bonding/bonding.h>
-+#endif
- 
- #ifdef DRV_VERSION
- #undef DRV_VERSION
 @@ -584,9 +586,14 @@ static int set_addr_filters(const struct net_device *dev, bool sleep)
  	int ret, naddr = 0;
  	const struct netdev_hw_addr *ha;
