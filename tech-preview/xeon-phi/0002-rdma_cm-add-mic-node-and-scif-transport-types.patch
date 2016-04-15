@@ -1,13 +1,33 @@
-xeon-phi: rdma_cm add mic node and scif transport types
-
-The OFED SCIF driver can leverage the iWARP cm calls to establish connections.
-This patch utilizes the new node and transport types in the rdma cm to call
-the underlying driver as needed.
----
-diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
---- a1/drivers/infiniband/core/cma.c	2015-09-10 09:30:08.319958447 -0700
-+++ a2/drivers/infiniband/core/cma.c	2015-09-10 09:31:32.894900298 -0700
-@@ -747,6 +747,7 @@
+diff -Nrup a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
+--- a/drivers/infiniband/core/cma.c	2016-03-30 22:51:11.000000000 -0700
++++ b/drivers/infiniband/core/cma.c	2016-04-04 12:45:42.802635851 -0700
+@@ -371,8 +371,11 @@ static int cma_acquire_dev(struct rdma_i
+ 	memcpy(&gid, dev_addr->src_dev_addr +
+ 	       rdma_addr_gid_offset(dev_addr), sizeof gid);
+ 	if (listen_id_priv &&
+-	    rdma_port_get_link_layer(listen_id_priv->id.device,
+-				     listen_id_priv->id.port_num) == dev_ll) {
++	    (rdma_port_get_link_layer(listen_id_priv->id.device,
++				      listen_id_priv->id.port_num) == dev_ll ||
++	     (dev_ll == IB_LINK_LAYER_ETHERNET && /* special check for ibscif */
++	      rdma_port_get_link_layer(listen_id_priv->cma_dev->device,
++				       listen_id_priv->id.port_num) == IB_LINK_LAYER_SCIF))) {
+ 		cma_dev = listen_id_priv->cma_dev;
+ 		port = listen_id_priv->id.port_num;
+ 		if (rdma_node_get_transport(cma_dev->device->node_type) == RDMA_TRANSPORT_IB &&
+@@ -394,7 +397,10 @@ static int cma_acquire_dev(struct rdma_i
+ 			    listen_id_priv->cma_dev == cma_dev &&
+ 			    listen_id_priv->id.port_num == port)
+ 				continue;
+-			if (rdma_port_get_link_layer(cma_dev->device, port) == dev_ll) {
++			if (rdma_port_get_link_layer(cma_dev->device, port) == dev_ll ||
++			    (dev_ll == IB_LINK_LAYER_ETHERNET && /* special check for ibscif */
++			     rdma_port_get_link_layer(cma_dev->device, port) == IB_LINK_LAYER_SCIF)) {
++
+ 				if (rdma_node_get_transport(cma_dev->device->node_type) == RDMA_TRANSPORT_IB &&
+ 				    rdma_port_get_link_layer(cma_dev->device, port) == IB_LINK_LAYER_ETHERNET)
+ 					ret = ib_find_cached_gid(cma_dev->device, &iboe_gid, &found_port, NULL);
+@@ -747,6 +753,7 @@ int rdma_init_qp_attr(struct rdma_cm_id 
  			qp_attr->rq_psn = id_priv->seq_num;
  		break;
  	case RDMA_TRANSPORT_IWARP:
@@ -15,7 +35,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  		if (!id_priv->cm_id.iw) {
  			qp_attr->qp_access_flags = 0;
  			*qp_attr_mask = IB_QP_STATE | IB_QP_ACCESS_FLAGS;
-@@ -1043,6 +1044,7 @@
+@@ -1043,6 +1050,7 @@ void rdma_destroy_id(struct rdma_cm_id *
  				ib_destroy_cm_id(id_priv->cm_id.ib);
  			break;
  		case RDMA_TRANSPORT_IWARP:
@@ -23,7 +43,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  			if (id_priv->cm_id.iw)
  				iw_destroy_cm_id(id_priv->cm_id.iw);
  			break;
-@@ -1995,6 +1997,7 @@
+@@ -1995,6 +2003,7 @@ int rdma_resolve_route(struct rdma_cm_id
  		}
  		break;
  	case RDMA_TRANSPORT_IWARP:
@@ -31,7 +51,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  		ret = cma_resolve_iw_route(id_priv, timeout_ms);
  		break;
  	default:
-@@ -2185,6 +2188,25 @@
+@@ -2185,6 +2194,25 @@ err:
  	return ret;
  }
  
@@ -57,7 +77,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  static int cma_bind_addr(struct rdma_cm_id *id, struct sockaddr *src_addr,
  			 struct sockaddr *dst_addr)
  {
-@@ -2226,9 +2248,12 @@
+@@ -2226,9 +2254,12 @@ int rdma_resolve_addr(struct rdma_cm_id 
  	if (cma_any_addr(dst_addr)) {
  		ret = cma_resolve_loopback(id_priv);
  	} else {
@@ -72,7 +92,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  			ret = rdma_resolve_ip(&addr_client, cma_src_addr(id_priv),
  					      dst_addr, &id->route.addr.dev_addr,
  					      timeout_ms, addr_handler, id_priv);
-@@ -2599,6 +2624,7 @@
+@@ -2599,6 +2630,7 @@ int rdma_listen(struct rdma_cm_id *id, i
  				goto err;
  			break;
  		case RDMA_TRANSPORT_IWARP:
@@ -80,7 +100,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  			ret = cma_iw_listen(id_priv, backlog);
  			if (ret)
  				goto err;
-@@ -2948,6 +2974,7 @@
+@@ -2948,6 +2980,7 @@ int rdma_connect(struct rdma_cm_id *id, 
  			ret = cma_connect_ib(id_priv, conn_param);
  		break;
  	case RDMA_TRANSPORT_IWARP:
@@ -88,7 +108,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  		ret = cma_connect_iw(id_priv, conn_param);
  		break;
  	default:
-@@ -3075,6 +3102,7 @@
+@@ -3075,6 +3108,7 @@ int rdma_accept(struct rdma_cm_id *id, s
  		}
  		break;
  	case RDMA_TRANSPORT_IWARP:
@@ -96,7 +116,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  		ret = cma_accept_iw(id_priv, conn_param);
  		break;
  	default:
-@@ -3135,6 +3163,7 @@
+@@ -3135,6 +3169,7 @@ int rdma_reject(struct rdma_cm_id *id, c
  					     0, private_data, private_data_len);
  		break;
  	case RDMA_TRANSPORT_IWARP:
@@ -104,7 +124,7 @@ diff -ruN a1/drivers/infiniband/core/cma.c a2/drivers/infiniband/core/cma.c
  		ret = iw_cm_reject(id_priv->cm_id.iw,
  				   private_data, private_data_len);
  		break;
-@@ -3165,6 +3194,7 @@
+@@ -3165,6 +3200,7 @@ int rdma_disconnect(struct rdma_cm_id *i
  			ib_send_cm_drep(id_priv->cm_id.ib, NULL, 0);
  		break;
  	case RDMA_TRANSPORT_IWARP:
