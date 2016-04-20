@@ -10,7 +10,7 @@ diff -Nrup a/drivers/infiniband/hw/mlx5/mr.c b/drivers/infiniband/hw/mlx5/mr.c
  static int use_umr(int order)
  {
 -	return order <= 17;
-+	return order <= 13;
++	return order <= 12;
  }
  
  static void prep_umr_reg_wqe(struct ib_pd *pd, struct ib_send_wr *wr,
