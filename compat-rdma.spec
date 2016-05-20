@@ -98,6 +98,9 @@ Requires: perl
 Requires: procps
 Requires: module-init-tools
 Requires: lsof
+%if %{build_ibscif}
+BuildRequires: /lib/modules/%{KVERSION}/scif.symvers
+%endif
 Summary: Infiniband Driver and ULPs kernel modules
 %description
 InfiniBand "verbs", Access Layer  and ULPs
