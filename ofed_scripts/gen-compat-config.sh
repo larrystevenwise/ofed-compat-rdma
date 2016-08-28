@@ -17,8 +17,9 @@ fi
 KERNEL_VERSION=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^\([0-9]\)\..*/\1/p')
 
 # 3.0 kernel stuff
-COMPAT_LATEST_VERSION="18"
+COMPAT_LATEST_VERSION="8"
 KERNEL_SUBLEVEL="-1"
+COMPAT_3xLATEST_VERSION="19"
 
 function set_config {
 	VAR=$1
@@ -46,8 +47,15 @@ function check_autofconf {
 # the top of the generated file causes the build to slow down
 # by an order of magnitude.
 
-if [[ ${KERNEL_VERSION} -eq "3" ]]; then
-	KERNEL_SUBLEVEL=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^3\.\([0-9]\+\).*/\1/p')
+if [[ ${KERNEL_VERSION} -eq "4" ]]; then
+	KERNEL_SUBLEVEL=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^4\.\([0-9]\+\).*/\1/p')
+elif [[ ${KERNEL_VERSION} -eq "3" ]]; then
+	KERNEL_3xSUBLEVEL=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^3\.\([0-9]\+\).*/\1/p')
+	let KERNEL_3xSUBLEVEL=${KERNEL_3xSUBLEVEL}+1
+
+	for i in $(seq ${KERNEL_3xSUBLEVEL} ${COMPAT_3xLATEST_VERSION}); do
+		set_config CONFIG_COMPAT_KERNEL_3_${i} y
+	done
 else
 	COMPAT_26LATEST_VERSION="39"
 	KERNEL_26SUBLEVEL=$(${MAKE} -C ${KLIB_BUILD} kernelversion | sed -n 's/^2\.6\.\([0-9]\+\).*/\1/p')
@@ -56,11 +64,15 @@ else
 	for i in $(seq ${KERNEL_26SUBLEVEL} ${COMPAT_26LATEST_VERSION}); do
 		set_config CONFIG_COMPAT_KERNEL_2_6_${i} y
 	done
+
+	for i in $(seq 0 ${COMPAT_3xLATEST_VERSION}); do
+		set_config CONFIG_COMPAT_KERNEL_3_${i} y
+	done
 fi
 
 let KERNEL_SUBLEVEL=${KERNEL_SUBLEVEL}+1
 for i in $(seq ${KERNEL_SUBLEVEL} ${COMPAT_LATEST_VERSION}); do
-	set_config CONFIG_COMPAT_KERNEL_3_${i} y
+	set_config CONFIG_COMPAT_KERNEL_4_${i} y
 done
 
 # The purpose of these seem to be the inverse of the above other varibales.
