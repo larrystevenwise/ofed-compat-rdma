@@ -1,5 +1,5 @@
 From: Vladimir Sokolovsky <vlad@mellanox.com>
-Subject: [PATCH] [PATCH] BACKPORT: scsi/Makefile
+Subject: [PATCH] BACKPORT: scsi/Makefile
 
 Avoid recompilation of the whole SCSI stack
 Leave only SRP related staff
