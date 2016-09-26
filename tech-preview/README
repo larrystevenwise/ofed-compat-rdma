@@ -1,0 +1,6 @@
+
+Technology preview patches
+==========================
+
+Patches should be placed under tech-preview/<feature>/ directory.
+Update configure script accordingly
