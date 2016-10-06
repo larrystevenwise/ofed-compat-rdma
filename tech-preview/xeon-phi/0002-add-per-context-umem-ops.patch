@@ -1,0 +1,200 @@
+From 83b46fe462d045bfbffc23bf1addaf2f3b87813f Mon Sep 17 00:00:00 2001
+From: Jerrie Coffman <jerrie.l.coffman@intel.com>
+Date: Fri, 20 May 2016 16:07:06 -0700
+Subject: [PATCH 2/7] add per-context umem ops
+
+Allow specification of umem mapping routines.  The ib_umem_get routine
+calls get_user_pages to pin pages and initialize the ib_umem structure
+for user-mode processes.
+
+When processes are running on a Xeon Phi coprocessor, these operations
+are proxied from the Xeon Phi kernel to the host kernel via scif and
+mapped to allow peer-to-peer access across PCI.  This patch allows
+context-based ib_umem mapping routines.
+
+Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
+---
+ drivers/infiniband/core/umem.c       | 65 ++++++++++++++++++++++++++++++------
+ drivers/infiniband/core/uverbs_cmd.c |  1 +
+ include/rdma/ib_verbs.h              | 13 ++++++++
+ 3 files changed, 68 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/infiniband/core/umem.c b/drivers/infiniband/core/umem.c
+index c68746c..dfa59bd 100644
+--- a/drivers/infiniband/core/umem.c
++++ b/drivers/infiniband/core/umem.c
+@@ -68,7 +68,7 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
+ }
+ 
+ /**
+- * ib_umem_get - Pin and DMA map userspace memory.
++ * ib_get_umem - Pin and DMA map userspace memory.
+  *
+  * If access flags indicate ODP memory, avoid pinning. Instead, stores
+  * the mm for future page fault handling in conjunction with MMU notifiers.
+@@ -79,7 +79,7 @@ static void __ib_umem_release(struct ib_device *dev, struct ib_umem *umem, int d
+  * @access: IB_ACCESS_xxx flags for memory being pinned
+  * @dmasync: flush in-flight DMA when the memory region is written
+  */
+-struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
++struct ib_umem *ib_get_umem(struct ib_ucontext *context, unsigned long addr,
+ 			    size_t size, int access, int dmasync)
+ {
+ 	struct ib_umem *umem;
+@@ -116,7 +116,6 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+ 	if (!umem)
+ 		return ERR_PTR(-ENOMEM);
+ 
+-	umem->context   = context;
+ 	umem->length    = size;
+ 	umem->address   = addr;
+ 	umem->page_size = PAGE_SIZE;
+@@ -239,7 +238,6 @@ out:
+ 
+ 	return ret < 0 ? ERR_PTR(ret) : umem;
+ }
+-EXPORT_SYMBOL(ib_umem_get);
+ 
+ static void ib_umem_account(struct work_struct *work)
+ {
+@@ -253,10 +251,10 @@ static void ib_umem_account(struct work_struct *work)
+ }
+ 
+ /**
+- * ib_umem_release - release memory pinned with ib_umem_get
++ * ib_release_umem - release memory pinned with ib_get_umem
+  * @umem: umem struct to release
+  */
+-void ib_umem_release(struct ib_umem *umem)
++void ib_release_umem(struct ib_umem *umem)
+ {
+ 	struct ib_ucontext *context = umem->context;
+ 	struct mm_struct *mm;
+@@ -307,9 +305,8 @@ void ib_umem_release(struct ib_umem *umem)
+ out:
+ 	kfree(umem);
+ }
+-EXPORT_SYMBOL(ib_umem_release);
+ 
+-int ib_umem_page_count(struct ib_umem *umem)
++int ib_page_count_umem(struct ib_umem *umem)
+ {
+ 	int shift;
+ 	int i;
+@@ -327,7 +324,6 @@ int ib_umem_page_count(struct ib_umem *umem)
+ 
+ 	return n;
+ }
+-EXPORT_SYMBOL(ib_umem_page_count);
+ 
+ /*
+  * Copy from the given ib_umem's pages to the given buffer.
+@@ -339,14 +335,14 @@ EXPORT_SYMBOL(ib_umem_page_count);
+  *
+  * Returns 0 on success, or an error code.
+  */
+-int ib_umem_copy_from(void *dst, struct ib_umem *umem, size_t offset,
++int ib_copy_from_umem(void *dst, struct ib_umem *umem, size_t offset,
+ 		      size_t length)
+ {
+ 	size_t end = offset + length;
+ 	int ret;
+ 
+ 	if (offset > umem->length || length > umem->length - offset) {
+-		pr_err("ib_umem_copy_from not in range. offset: %zd umem length: %zd end: %zd\n",
++		pr_err("ib_copy_from_umem not in range. offset: %zd umem length: %zd end: %zd\n",
+ 		       offset, umem->length, end);
+ 		return -EINVAL;
+ 	}
+@@ -361,4 +357,51 @@ int ib_umem_copy_from(void *dst, struct ib_umem *umem, size_t offset,
+ 	else
+ 		return 0;
+ }
++
++struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
++			    size_t size, int access, int dmasync)
++{
++	struct ib_umem_ops *ops = context->umem_ops;
++	struct ib_umem *umem;
++
++	umem = (ops && ops->get) ?
++		ops->get(context, addr, size, access, dmasync) :
++		ib_get_umem(context, addr, size, access, dmasync);
++
++	if (!IS_ERR(umem))
++		umem->context = context;
++
++	return umem;
++}
++EXPORT_SYMBOL(ib_umem_get);
++
++void ib_umem_release(struct ib_umem *umem)
++{
++	struct ib_umem_ops *ops = umem->context->umem_ops;
++
++	if (ops && ops->release)
++		ops->release(umem);
++	else
++		ib_release_umem(umem);
++}
++EXPORT_SYMBOL(ib_umem_release);
++
++int ib_umem_page_count(struct ib_umem *umem)
++{
++	struct ib_umem_ops *ops = umem->context->umem_ops;
++
++	return (ops && ops->page_count) ?
++		ops->page_count(umem) : ib_page_count_umem(umem);
++}
++EXPORT_SYMBOL(ib_umem_page_count);
++
++int ib_umem_copy_from(void *dst, struct ib_umem *umem, size_t offset,
++		      size_t length)
++{
++	struct ib_umem_ops *ops = umem->context->umem_ops;
++
++	return (ops && ops->copy_from) ?
++		ops->copy_from(dst, umem, offset, length) :
++		ib_copy_from_umem(dst, umem, offset, length);
++}
+ EXPORT_SYMBOL(ib_umem_copy_from);
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index ba90171..f4d1562 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -357,6 +357,7 @@ ssize_t ib_uverbs_get_context(struct ib_uverbs_file *file,
+ 	}
+ 
+ 	ucontext->device = ib_dev;
++	ucontext->umem_ops = NULL;
+ 	INIT_LIST_HEAD(&ucontext->pd_list);
+ 	INIT_LIST_HEAD(&ucontext->mr_list);
+ 	INIT_LIST_HEAD(&ucontext->mw_list);
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index 1204971..ac83f4d 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -1315,7 +1315,20 @@ struct ib_fmr_attr {
+ 
+ struct ib_umem;
+ 
++struct ib_ucontext;
++struct ib_umem_ops {
++	struct ib_umem	     *(*get)(struct ib_ucontext *context,
++				     unsigned long addr, size_t size,
++				     int access, int dmasync);
++	void		      (*release)(struct ib_umem *umem);
++	int		      (*page_count)(struct ib_umem *umem);
++	int		      (*copy_from)(void *dst, struct ib_umem *umem,
++					   size_t offset, size_t length);
++};
++
+ struct ib_ucontext {
++	struct ib_umem_ops     *umem_ops;	/* set to NULL for default ops */
++	void		       *umem_private_data;
+ 	struct ib_device       *device;
+ 	struct list_head	pd_list;
+ 	struct list_head	mr_list;
+-- 
+2.7.0
+

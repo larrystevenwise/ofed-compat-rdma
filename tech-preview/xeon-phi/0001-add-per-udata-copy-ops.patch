@@ -1,0 +1,115 @@
+From 669e1b83bae20664f3d47124e1ae41f52b7a57bc Mon Sep 17 00:00:00 2001
+From: Jerrie Coffman <jerrie.l.coffman@intel.com>
+Date: Fri, 20 May 2016 16:05:32 -0700
+Subject: [PATCH 1/7] add per-udata copy ops
+
+Allow specification of udata copy routines.  Vendor private data passed
+through ib_uverbs will use the kernel supplied copy_from_user and copy_to
+routines to move data when allocating resources for user-mode processes.
+
+When processes are running on a Xeon Phi coprocessor, these operations
+are proxied from the Xeon Phi kernel to the host kernel via scif.  This
+patch allows context-based udata copy routines.
+
+Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
+---
+ drivers/infiniband/core/uverbs.h     |  4 ++++
+ drivers/infiniband/core/uverbs_cmd.c | 15 +++++++++++++++
+ include/rdma/ib_verbs.h              | 19 +++++++++++++------
+ 3 files changed, 32 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/core/uverbs.h b/drivers/infiniband/core/uverbs.h
+index df26a74..6f022ec 100644
+--- a/drivers/infiniband/core/uverbs.h
++++ b/drivers/infiniband/core/uverbs.h
+@@ -47,8 +47,11 @@
+ #include <rdma/ib_umem.h>
+ #include <rdma/ib_user_verbs.h>
+ 
++extern struct ib_udata_ops uverbs_copy;
++
+ #define INIT_UDATA(udata, ibuf, obuf, ilen, olen)			\
+ 	do {								\
++		(udata)->ops	= &uverbs_copy;				\
+ 		(udata)->inbuf  = (const void __user *) (ibuf);		\
+ 		(udata)->outbuf = (void __user *) (obuf);		\
+ 		(udata)->inlen  = (ilen);				\
+@@ -57,6 +60,7 @@
+ 
+ #define INIT_UDATA_BUF_OR_NULL(udata, ibuf, obuf, ilen, olen)			\
+ 	do {									\
++		(udata)->ops	= &uverbs_copy;					\
+ 		(udata)->inbuf  = (ilen) ? (const void __user *) (ibuf) : NULL;	\
+ 		(udata)->outbuf = (olen) ? (void __user *) (obuf) : NULL;	\
+ 		(udata)->inlen  = (ilen);					\
+diff --git a/drivers/infiniband/core/uverbs_cmd.c b/drivers/infiniband/core/uverbs_cmd.c
+index f664731..ba90171 100644
+--- a/drivers/infiniband/core/uverbs_cmd.c
++++ b/drivers/infiniband/core/uverbs_cmd.c
+@@ -60,6 +60,21 @@ static struct uverbs_lock_class rule_lock_class = { .name = "RULE-uobj" };
+ static struct uverbs_lock_class wq_lock_class = { .name = "WQ-uobj" };
+ static struct uverbs_lock_class rwq_ind_table_lock_class = { .name = "IND_TBL-uobj" };
+ 
++static int uverbs_copy_from_udata(void *dst, struct ib_udata *udata, size_t len)
++{
++	return copy_from_user(dst, udata->inbuf, len) ? -EFAULT : 0;
++}
++
++static int uverbs_copy_to_udata(struct ib_udata *udata, void *src, size_t len)
++{
++	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
++}
++
++struct ib_udata_ops uverbs_copy = {
++	.copy_from = uverbs_copy_from_udata,
++	.copy_to = uverbs_copy_to_udata
++};
++
+ /*
+  * The ib_uobject locking scheme is as follows:
+  *
+diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
+index e1f9673..1204971 100644
+--- a/include/rdma/ib_verbs.h
++++ b/include/rdma/ib_verbs.h
+@@ -1361,11 +1361,18 @@ struct ib_uobject {
+ 	int			live;
+ };
+ 
++struct ib_udata;
++struct ib_udata_ops {
++	int	(*copy_from)(void *dest, struct ib_udata *udata, size_t len);
++	int	(*copy_to)(struct ib_udata *udata, void *src, size_t len);
++};
++
+ struct ib_udata {
+-	const void __user *inbuf;
+-	void __user *outbuf;
+-	size_t       inlen;
+-	size_t       outlen;
++	struct ib_udata_ops	*ops;
++	const void __user	*inbuf;
++	void __user 		*outbuf;
++	size_t       		inlen;
++	size_t       		outlen;
+ };
+ 
+ struct ib_pd {
+@@ -2102,12 +2109,12 @@ void  ib_set_client_data(struct ib_device *device, struct ib_client *client,
+ 
+ static inline int ib_copy_from_udata(void *dest, struct ib_udata *udata, size_t len)
+ {
+-	return copy_from_user(dest, udata->inbuf, len) ? -EFAULT : 0;
++	return udata->ops->copy_from(dest, udata, len);
+ }
+ 
+ static inline int ib_copy_to_udata(struct ib_udata *udata, void *src, size_t len)
+ {
+-	return copy_to_user(udata->outbuf, src, len) ? -EFAULT : 0;
++	return udata->ops->copy_to(udata, src, len);
+ }
+ 
+ static inline bool ib_is_udata_cleared(struct ib_udata *udata,
+-- 
+2.7.0
+

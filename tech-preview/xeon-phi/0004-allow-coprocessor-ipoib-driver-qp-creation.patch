@@ -1,0 +1,79 @@
+From 0dbc5eea074fdeb751698365e6d448f8041f43f4 Mon Sep 17 00:00:00 2001
+From: Jerrie Coffman <jerrie.l.coffman@intel.com>
+Date: Fri, 20 May 2016 16:20:00 -0700
+Subject: [PATCH 4/7] allow coprocessor ipoib driver qp creation
+
+From the host's point of view, each Xeon Phi coprocessor kernel
+appears as a "user-mode process".  To allow qp creation from the
+coprocessor's IPoIB driver, QP creation must be allowed regardless
+of whether the call originates from kernel or "user" space.  Because
+ib_uverbs always clears qp create_flags, they cannot be set by normal
+user-mode calls through ib_uverbs; moving these checks is not an issue.
+
+Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
+---
+ drivers/infiniband/hw/mlx4/qp.c | 27 ++++++++++++---------------
+ 1 file changed, 12 insertions(+), 15 deletions(-)
+
+diff --git a/drivers/infiniband/hw/mlx4/qp.c b/drivers/infiniband/hw/mlx4/qp.c
+index 7fb9629..03b4634 100644
+--- a/drivers/infiniband/hw/mlx4/qp.c
++++ b/drivers/infiniband/hw/mlx4/qp.c
+@@ -719,6 +719,18 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
+ 	INIT_LIST_HEAD(&qp->gid_list);
+ 	INIT_LIST_HEAD(&qp->steering_rules);
+ 
++	if (init_attr->create_flags & IB_QP_CREATE_IPOIB_UD_LSO)
++		qp->flags |= MLX4_IB_QP_LSO;
++
++	if (init_attr->create_flags & IB_QP_CREATE_NETIF_QP) {
++		if (dev->steering_support == MLX4_STEERING_MODE_DEVICE_MANAGED)
++			qp->flags |= MLX4_IB_QP_NETIF;
++		else {
++			err = -EINVAL;
++			goto err;
++		}
++	}
++
+ 	qp->state	 = IB_QPS_RESET;
+ 	if (init_attr->sq_sig_type == IB_SIGNAL_ALL_WR)
+ 		qp->sq_signal_bits = cpu_to_be32(MLX4_WQE_CTRL_CQ_UPDATE);
+@@ -766,17 +778,6 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
+ 	} else {
+ 		qp->sq_no_prefetch = 0;
+ 
+-		if (init_attr->create_flags & IB_QP_CREATE_IPOIB_UD_LSO)
+-			qp->flags |= MLX4_IB_QP_LSO;
+-
+-		if (init_attr->create_flags & IB_QP_CREATE_NETIF_QP) {
+-			if (dev->steering_support ==
+-			    MLX4_STEERING_MODE_DEVICE_MANAGED)
+-				qp->flags |= MLX4_IB_QP_NETIF;
+-			else
+-				goto err;
+-		}
+-
+ 		memcpy(&backup_cap, &init_attr->cap, sizeof(backup_cap));
+ 		err = set_kernel_sq_size(dev, &init_attr->cap,
+ 					 qp_type, qp, true);
+@@ -1127,7 +1128,6 @@ static struct ib_qp *_mlx4_ib_create_qp(struct ib_pd *pd,
+ {
+ 	struct mlx4_ib_qp *qp = NULL;
+ 	int err;
+-	int sup_u_create_flags = MLX4_IB_QP_BLOCK_MULTICAST_LOOPBACK;
+ 	u16 xrcdn = 0;
+ 	gfp_t gfp;
+ 
+@@ -1152,9 +1152,6 @@ static struct ib_qp *_mlx4_ib_create_qp(struct ib_pd *pd,
+ 	}
+ 
+ 	if (init_attr->create_flags) {
+-		if (udata && init_attr->create_flags & ~(sup_u_create_flags))
+-			return ERR_PTR(-EINVAL);
+-
+ 		if ((init_attr->create_flags & ~(MLX4_IB_SRIOV_SQP |
+ 						 MLX4_IB_QP_CREATE_USE_GFP_NOIO |
+ 						 MLX4_IB_QP_CREATE_ROCE_V2_GSI  |
+-- 
+2.7.0
+

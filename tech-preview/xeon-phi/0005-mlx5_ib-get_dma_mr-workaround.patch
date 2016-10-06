@@ -1,0 +1,29 @@
+From ed85e5a60c94fce84547f1f8a6243df7b688b305 Mon Sep 17 00:00:00 2001
+From: Jerrie Coffman <jerrie.l.coffman@intel.com>
+Date: Sat, 4 Jun 2016 14:04:31 -0700
+Subject: [PATCH 5/7] mlx5_ib get_dma_mr workaround
+
+Workaround an mlx5 memory region registration issue with
+large (contig) pages for card-side ib_get_dma_mr support.
+
+Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
+---
+ drivers/infiniband/hw/mlx5/mr.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/mlx5/mr.c b/drivers/infiniband/hw/mlx5/mr.c
+index 4b02130..d613df6 100644
+--- a/drivers/infiniband/hw/mlx5/mr.c
++++ b/drivers/infiniband/hw/mlx5/mr.c
+@@ -725,7 +725,7 @@ static int get_octo_len(u64 addr, u64 len, int page_size)
+ 
+ static int use_umr(int order)
+ {
+-	return order <= MLX5_MAX_UMR_SHIFT;
++	return order <= 12;
+ }
+ 
+ static int dma_map_mr_pas(struct mlx5_ib_dev *dev, struct ib_umem *umem,
+-- 
+2.7.0
+
