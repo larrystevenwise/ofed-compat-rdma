@@ -1,0 +1,101 @@
+From: Vladimir Sokolovsky <vlad@mellanox.com>
+Subject: [PATCH] BACKPORT: ipoib
+
+Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
+---
+ drivers/infiniband/ulp/ipoib/ipoib_main.c | 26 ++++++++++++++++++++++++++
+ 1 file changed, 26 insertions(+)
+
+diff --git a/drivers/infiniband/ulp/ipoib/ipoib_main.c b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/ipoib/ipoib_main.c
++++ b/drivers/infiniband/ulp/ipoib/ipoib_main.c
+@@ -250,9 +250,15 @@ static bool ipoib_is_dev_match_addr_rcu(const struct sockaddr *addr,
+ 		if (!in_dev)
+ 			return false;
+ 
++#ifdef HAVE_INET_CONFIRM_ADDR_5_PARAMS
+ 		ret_addr = inet_confirm_addr(net, in_dev, 0,
+ 					     addr_in->sin_addr.s_addr,
+ 					     RT_SCOPE_HOST);
++#else
++		ret_addr = inet_confirm_addr(in_dev, 0,
++					     addr_in->sin_addr.s_addr,
++					     RT_SCOPE_HOST);
++#endif
+ 		in_dev_put(in_dev);
+ 		if (ret_addr)
+ 			return true;
+@@ -306,7 +312,9 @@ static struct net_device *ipoib_get_net_dev_match_addr(
+ {
+ 	struct net_device *upper,
+ 			  *result = NULL;
++#ifdef HAVE_NETDEV_FOR_EACH_ALL_UPPER_DEV_RCU
+ 	struct list_head *iter;
++#endif
+ 
+ 	rcu_read_lock();
+ 	if (ipoib_is_dev_match_addr_rcu(addr, dev)) {
+@@ -315,6 +323,7 @@ static struct net_device *ipoib_get_net_dev_match_addr(
+ 		goto out;
+ 	}
+ 
++#ifdef HAVE_NETDEV_FOR_EACH_ALL_UPPER_DEV_RCU
+ 	netdev_for_each_all_upper_dev_rcu(dev, upper, iter) {
+ 		if (ipoib_is_dev_match_addr_rcu(addr, upper)) {
+ 			dev_hold(upper);
+@@ -322,6 +331,15 @@ static struct net_device *ipoib_get_net_dev_match_addr(
+ 			break;
+ 		}
+ 	}
++#else
++	for_each_netdev(&init_net, upper) {
++		if (ipoib_is_dev_match_addr_rcu(addr, upper)) {
++			dev_hold(upper);
++			result = upper;
++			break;
++		}
++	}
++#endif
+ out:
+ 	rcu_read_unlock();
+ 	return result;
+@@ -1689,6 +1707,7 @@ static int ipoib_get_vf_config(struct net_device *dev, int vf,
+ 	return 0;
+ }
+ 
++#ifdef HAVE_NDO_SET_VF_GUID
+ static int ipoib_set_vf_guid(struct net_device *dev, int vf, u64 guid, int type)
+ {
+ 	struct ipoib_dev_priv *priv = netdev_priv(dev);
+@@ -1698,7 +1717,9 @@ static int ipoib_set_vf_guid(struct net_device *dev, int vf, u64 guid, int type)
+ 
+ 	return ib_set_vf_guid(priv->ca, vf, priv->port, guid, type);
+ }
++#endif
+ 
++#ifdef HAVE_NDO_GET_VF_STATS
+ static int ipoib_get_vf_stats(struct net_device *dev, int vf,
+ 			      struct ifla_vf_stats *vf_stats)
+ {
+@@ -1706,6 +1727,7 @@ static int ipoib_get_vf_stats(struct net_device *dev, int vf,
+ 
+ 	return ib_get_vf_stats(priv->ca, vf, priv->port, vf_stats);
+ }
++#endif
+ 
+ static const struct header_ops ipoib_header_ops = {
+ 	.create	= ipoib_hard_header,
+@@ -1723,8 +1745,12 @@ static const struct net_device_ops ipoib_netdev_ops_pf = {
+ 	.ndo_get_iflink		 = ipoib_get_iflink,
+ 	.ndo_set_vf_link_state	 = ipoib_set_vf_link_state,
+ 	.ndo_get_vf_config	 = ipoib_get_vf_config,
++#ifdef HAVE_NDO_GET_VF_STATS
+ 	.ndo_get_vf_stats	 = ipoib_get_vf_stats,
++#endif
++#ifdef HAVE_NDO_SET_VF_GUID
+ 	.ndo_set_vf_guid	 = ipoib_set_vf_guid,
++#endif
+ 	.ndo_set_mac_address	 = ipoib_set_mac,
+ };
+ 
