@@ -10,11 +10,11 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/netlink.c       |  3 +++
  drivers/infiniband/core/roce_gid_mgmt.c | 46 +++++++++++++++++++++++++++++++++
  drivers/infiniband/core/sa_query.c      | 19 ++++++++++++++
- drivers/infiniband/core/umem.c          | 19 ++++++++++++++
+ drivers/infiniband/core/umem.c          | 17 +++++++++++-
  drivers/infiniband/core/user_mad.c      |  3 +++
  include/rdma/ib_addr.h                  | 23 +++++++++++++++++
  include/rdma/ib_verbs.h                 | 18 +++++++++++++
- 11 files changed, 180 insertions(+)
+ 11 files changed, 177 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -403,19 +403,16 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	if (!size)
  		return ERR_PTR(-EINVAL);
-@@ -187,7 +198,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+@@ -187,7 +198,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
  	sg_list_start = umem->sg_head.sgl;
  
  	while (npages) {
-+#ifdef HAVE_GET_USER_PAGES_6_PARAMS
- 		ret = get_user_pages(cur_base,
-+#else
+-		ret = get_user_pages(cur_base,
 +		ret = get_user_pages(current, current->mm, cur_base,
-+#endif
  				     min_t(unsigned long, npages,
  					   PAGE_SIZE / sizeof (struct page *)),
  				     1, !umem->writable, page_list, vma_list);
-@@ -214,7 +229,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+@@ -214,7 +225,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
  				  umem->sg_head.sgl,
  				  umem->npages,
  				  DMA_BIDIRECTIONAL,
