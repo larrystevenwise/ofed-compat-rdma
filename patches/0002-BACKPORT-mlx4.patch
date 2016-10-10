@@ -756,7 +756,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		return -EINVAL;
  
 +#ifdef HAVE_ETHTOOL_xLINKSETTINGS
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	if (channel->tx_count * MLX4_EN_NUM_UP <= priv->xdp_ring_num) {
  		en_err(priv, "Minimum %d tx channels required with XDP on\n",
  		       priv->xdp_ring_num / MLX4_EN_NUM_UP + 1);
@@ -801,7 +801,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +	}
 +#endif
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	netif_set_real_num_tx_queues(dev, priv->tx_ring_num -
  							priv->xdp_ring_num);
 +#else
@@ -903,7 +903,7 @@ index xxxxxxx..xxxxxxx xxxxxx
   *
   */
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  #include <linux/bpf.h>
 +#endif
  #include <linux/etherdevice.h>
@@ -951,7 +951,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	free_cpumask_var(priv->rx_ring[ring_idx]->affinity_mask);
  }
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  static void mlx4_en_init_recycle_ring(struct mlx4_en_priv *priv,
  				      int tx_ring_idx)
  {
@@ -967,7 +967,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		}
  		tx_ring->tx_queue = netdev_get_tx_queue(dev, i);
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  		mlx4_en_init_recycle_ring(priv, i);
 +#endif
  
@@ -1026,7 +1026,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		en_err(priv, "Bad MTU size:%d.\n", new_mtu);
  		return -EPERM;
  	}
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	if (priv->xdp_ring_num && MLX4_EN_EFF_MTU(new_mtu) > FRAG_SZ0) {
  		en_err(priv, "MTU size:%d requires frags but XDP running\n",
  		       new_mtu);
@@ -1211,7 +1211,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
 +#endif
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  static int mlx4_xdp_set(struct net_device *dev, struct bpf_prog *prog)
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
@@ -1251,7 +1251,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE_NDO_SET_TX_MAXRATE
  	.ndo_set_tx_maxrate	= mlx4_en_set_tx_maxrate,
 +#endif
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	.ndo_xdp		= mlx4_xdp,
 +#endif
  };
@@ -1298,7 +1298,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE_NDO_SET_TX_MAXRATE
  	.ndo_set_tx_maxrate	= mlx4_en_set_tx_maxrate,
 +#endif
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	.ndo_xdp		= mlx4_xdp,
 +#endif
  };
@@ -1393,7 +1393,7 @@ index xxxxxxx..xxxxxxx xxxxxx
   */
  
  #include <net/busy_poll.h>
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  #include <linux/bpf.h>
 +#endif
  #include <linux/mlx4/cq.h>
@@ -1456,7 +1456,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
  }
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  /* When the rx ring is running in page-per-packet mode, a released frame can go
   * directly into a small cache, to avoid unmapping or touching the page
   * allocator. In bpf prog performance scenarios, buffers are either forwarded
@@ -1472,7 +1472,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_dev *mdev = priv->mdev;
  	struct mlx4_en_rx_ring *ring = *pring;
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	struct bpf_prog *old_prog;
  
  	old_prog = READ_ONCE(ring->xdp_prog);
@@ -1486,7 +1486,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	struct mlx4_en_rx_ring *ring = priv->rx_ring[cq->ring];
  	struct mlx4_en_rx_alloc *frags;
  	struct mlx4_en_rx_desc *rx_desc;
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	struct bpf_prog *xdp_prog;
  	int doorbell_pending;
  	struct sk_buff *skb;
@@ -1501,7 +1501,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (budget <= 0)
  		return polled;
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	xdp_prog = READ_ONCE(ring->xdp_prog);
  	doorbell_pending = 0;
  	tx_index = (priv->tx_ring_num - priv->xdp_ring_num) + cq->ring;
@@ -1513,7 +1513,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		l2_tunnel = (dev->hw_enc_features & NETIF_F_RXCSUM) &&
  			(cqe->vlan_my_qpn & cpu_to_be32(MLX4_CQE_L2_TUNNEL));
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  		/* A bpf program gets first chance to drop the packet. It may
  		 * read bytes but not past the end of the frag.
  		 */
@@ -1529,7 +1529,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		for (nr = 0; nr < priv->num_frags; nr++)
  			mlx4_en_free_frag(priv, frags, nr);
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  consumed:
 +#endif
  		++cq->mcq.cons_index;
@@ -1539,7 +1539,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
  
  out:
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	if (doorbell_pending)
  		mlx4_en_xmit_doorbell(priv->tx_ring[tx_index]);
 +#endif
@@ -1571,7 +1571,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	int buf_size = 0;
  	int i = 0;
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	/* bpf requires buffers to be set up as 1 packet per page.
  	 * This only works when num_frags == 1.
  	 */
@@ -1591,7 +1591,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	ring->last_nr_txbb = 1;
  	memset(ring->tx_info, 0, ring->size * sizeof(struct mlx4_en_tx_info));
  	memset(ring->buf, 0, ring->buf_size);
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	ring->free_tx_desc = mlx4_en_free_tx_desc;
 +#endif
  
@@ -1612,7 +1612,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	return tx_info->nr_txbb;
  }
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  u32 mlx4_en_recycle_tx_desc(struct mlx4_en_priv *priv,
  			    struct mlx4_en_tx_ring *ring,
  			    int index, u8 owner, u64 timestamp,
@@ -1628,7 +1628,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
  
  	while (ring->cons != ring->prod) {
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  		ring->last_nr_txbb = ring->free_tx_desc(priv, ring,
 +#else
 +		ring->last_nr_txbb = mlx4_en_free_tx_desc(priv, ring,
@@ -1654,7 +1654,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  				timestamp = mlx4_en_get_cqe_ts(cqe);
  
  			/* free next descriptor */
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  			last_nr_txbb = ring->free_tx_desc(
 +#else
 +			last_nr_txbb = mlx4_en_free_tx_desc(
@@ -1666,7 +1666,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	ACCESS_ONCE(ring->last_nr_txbb) = last_nr_txbb;
  	ACCESS_ONCE(ring->cons) = ring_cons + txbbs_skipped;
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	if (ring->free_tx_desc == mlx4_en_recycle_tx_desc)
  		return done < budget;
 +#endif
@@ -1720,7 +1720,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	return NETDEV_TX_OK;
  }
  
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  netdev_tx_t mlx4_en_xmit_frame(struct mlx4_en_rx_alloc *frame,
  			       struct net_device *dev, unsigned int length,
  			       int tx_ind, int *doorbell_pending)
@@ -1961,7 +1961,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  					 MLX4_EN_NUM_UP)
  
  #define MLX4_EN_DEFAULT_TX_WORK		256
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  #define MLX4_EN_DOORBELL_BUDGET		8
 +#endif
  
@@ -1971,7 +1971,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	__be32			mr_key;
  	void			*buf;
  	struct mlx4_en_tx_info	*tx_info;
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	struct mlx4_en_rx_ring	*recycle_ring;
  	u32			(*free_tx_desc)(struct mlx4_en_priv *priv,
  						struct mlx4_en_tx_ring *ring,
@@ -1985,7 +1985,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	u8  fcs_del;
  	void *buf;
  	void *rx_info;
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	struct bpf_prog *xdp_prog;
 +#endif
  	struct mlx4_en_page_cache page_cache;
@@ -1995,7 +1995,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	struct mlx4_en_frag_info frag_info[MLX4_EN_MAX_RX_FRAGS];
  	u16 num_frags;
  	u16 log_rx_info;
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  	int xdp_ring_num;
 +#endif
  
@@ -2043,7 +2043,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +u16 mlx4_en_select_queue(struct net_device *dev, struct sk_buff *skb);
 +#endif
  netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev);
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  netdev_tx_t mlx4_en_xmit_frame(struct mlx4_en_rx_alloc *frame,
  			       struct net_device *dev, unsigned int length,
  			       int tx_ind, int *doorbell_pending);
@@ -2058,7 +2058,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  			  int budget);
  int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget);
  int mlx4_en_poll_tx_cq(struct napi_struct *napi, int budget);
-+#ifdef HAVE_LINUX_BPF_H
++#ifdef HAVE_FILTER_XDP
  u32 mlx4_en_free_tx_desc(struct mlx4_en_priv *priv,
  			 struct mlx4_en_tx_ring *ring,
  			 int index, u8 owner, u64 timestamp,
