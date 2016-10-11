@@ -1,0 +1,460 @@
+From 614b6bf4644aac10a87a91f588220f8ba32231d0 Mon Sep 17 00:00:00 2001
+From: root <root@stevo3.asicdesigners.com>
+Date: Tue, 11 Oct 2016 15:55:07 -0700
+Subject: [PATCH] BACKPORT: cxgb4
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/infiniband/hw/cxgb4/Makefile               |   2 +-
+ drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c      |  19 ++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c |  15 +-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c | 232 ++++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |  21 ++
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         |   3 +-
+ 6 files changed, 286 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/Makefile b/drivers/infiniband/hw/cxgb4/Makefile
+index e11cf72..2f9fbf3 100644
+--- a/drivers/infiniband/hw/cxgb4/Makefile
++++ b/drivers/infiniband/hw/cxgb4/Makefile
+@@ -1,4 +1,4 @@
+-ccflags-y := -Idrivers/net/ethernet/chelsio/cxgb4
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb4
+ 
+ obj-$(CONFIG_INFINIBAND_CXGB4) += iw_cxgb4.o
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
+index 7ad43af..5e2873a 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c
+@@ -237,7 +237,26 @@ int cxgb4_update_root_dev_clip(struct net_device *dev)
+ 	}
+ 
+ 	for (i = 0; i < VLAN_N_VID; i++) {
++#ifdef HAVE___VLAN_FIND_DEV_DEEP_RCU
+ 		root_dev = __vlan_find_dev_deep_rcu(dev, htons(ETH_P_8021Q), i);
++#else
++#ifdef HAVE__VLAN_FIND_DEV_DEEP_3P
++		root_dev = __vlan_find_dev_deep(dev, htons(ETH_P_8021Q), i);
++#else
++#ifdef HAVE__VLAN_FIND_DEV_DEEP
++		root_dev = __vlan_find_dev_deep(dev, i);
++#else
++	{
++		struct port_info *p = netdev_priv(dev);
++
++		if (p->vlan_grp)
++			root_dev = vlan_group_get_device(p->vlan_grp, i);
++		else
++			root_dev = NULL;
++	}
++#endif
++#endif
++#endif
+ 		if (!root_dev)
+ 			continue;
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+index 91fb508..ed4f506 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c
+@@ -2931,8 +2931,13 @@ static void mem_region_show(struct seq_file *seq, const char *name,
+ {
+ 	char buf[40];
+ 
++#ifdef HAVE_STRING_GET_SIZE_5_PARAMS
+ 	string_get_size((u64)to - from + 1, 1, STRING_UNITS_2, buf,
+ 			sizeof(buf));
++#else
++	string_get_size((u64)to - from + 1, STRING_UNITS_2, buf,
++			sizeof(buf));
++#endif
+ 	seq_printf(seq, "%-15s %#x-%#x [%s]\n", name, from, to, buf);
+ }
+ 
+@@ -3319,10 +3324,16 @@ int t4_setup_debugfs(struct adapter *adap)
+ 
+ 	de = debugfs_create_file_size("flash", S_IRUSR, adap->debugfs_root, adap,
+ 				      &flash_debugfs_fops, adap->params.sf_size);
++
++#ifdef HAVE_DEBUGFS_CREATE_BOOL_USES_BOOL_PTR
++#define __CAST
++#else
++#define __CAST (u32 *)
++#endif
+ 	debugfs_create_bool("use_backdoor", S_IWUSR | S_IRUSR,
+-			    adap->debugfs_root, &adap->use_bd);
++			    adap->debugfs_root, __CAST &adap->use_bd);
+ 	debugfs_create_bool("trace_rss", S_IWUSR | S_IRUSR,
+-			    adap->debugfs_root, &adap->trace_rss);
++			    adap->debugfs_root, __CAST &adap->trace_rss);
+ 
+ 	return 0;
+ }
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+index 02f80fe..194c50b 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
+@@ -201,6 +201,12 @@ static int get_eeprom_len(struct net_device *dev)
+ 	return EEPROMSIZE;
+ }
+ 
++#ifdef HAVE_ETHTOOL_DRVINFO_EROM_VERSION
++#define __EROM_VERSION erom_version
++#else
++#define __EROM_VERSION reserved1
++#endif
++
+ static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+ {
+ 	struct adapter *adapter = netdev2adap(dev);
+@@ -228,7 +234,7 @@ static void get_drvinfo(struct net_device *dev, struct ethtool_drvinfo *info)
+ 			 FW_HDR_FW_VER_BUILD_G(adapter->params.tp_vers));
+ 
+ 	if (!t4_get_exprom_version(adapter, &exprom_vers))
+-		snprintf(info->erom_version, sizeof(info->erom_version),
++		snprintf(info->__EROM_VERSION, sizeof(info->__EROM_VERSION),
+ 			 "%u.%u.%u.%u",
+ 			 FW_HDR_FW_VER_MAJOR_G(exprom_vers),
+ 			 FW_HDR_FW_VER_MINOR_G(exprom_vers),
+@@ -540,6 +546,221 @@ static unsigned int speed_to_fw_caps(int speed)
+ 	return 0;
+ }
+ 
++#ifndef HAVE___ETHTOOL_GET_LINK_KSETTINGS
++
++/**
++ *	fw_caps_to_et_caps - translate Firmware to old-style ethtool capabilities
++ *	@port_type: Firmware Port Type
++ *	@fw_caps: Firmware Port Capabilities
++ *
++ *	Translate a Firmware Port Capabilities specification to an old-style
++ *	ethtool Port Capabilities value.
++ */
++static unsigned int fw_caps_to_et_caps(enum fw_port_type port_type,
++				       unsigned int fw_caps)
++{
++	unsigned int et_caps = 0;
++
++	switch (port_type) {
++	case FW_PORT_TYPE_BT_SGMII:
++	case FW_PORT_TYPE_BT_XFI:
++	case FW_PORT_TYPE_BT_XAUI:
++		et_caps |= SUPPORTED_TP;
++		if (fw_caps & FW_PORT_CAP_SPEED_100M)
++			et_caps |= SUPPORTED_100baseT_Full;
++		if (fw_caps & FW_PORT_CAP_SPEED_1G)
++			et_caps |= SUPPORTED_1000baseT_Full;
++		if (fw_caps & FW_PORT_CAP_SPEED_10G)
++			et_caps |= SUPPORTED_10000baseT_Full;
++		break;
++
++	case FW_PORT_TYPE_KX4:
++	case FW_PORT_TYPE_KX:
++		et_caps |= SUPPORTED_Backplane;
++		if (fw_caps & FW_PORT_CAP_SPEED_1G)
++			et_caps |= SUPPORTED_1000baseKX_Full;
++		if (fw_caps & FW_PORT_CAP_SPEED_10G)
++			et_caps |= SUPPORTED_10000baseKX4_Full;
++		break;
++
++	case FW_PORT_TYPE_KR:
++		et_caps |= SUPPORTED_Backplane | SUPPORTED_10000baseKR_Full;
++		break;
++
++	case FW_PORT_TYPE_BP_AP:
++		et_caps |= SUPPORTED_Backplane | SUPPORTED_10000baseR_FEC |
++		     SUPPORTED_10000baseKR_Full | SUPPORTED_1000baseKX_Full;
++		break;
++
++	case FW_PORT_TYPE_BP4_AP:
++		et_caps |= SUPPORTED_Backplane | SUPPORTED_10000baseR_FEC |
++		     SUPPORTED_10000baseKR_Full | SUPPORTED_1000baseKX_Full |
++		     SUPPORTED_10000baseKX4_Full;
++		break;
++
++	case FW_PORT_TYPE_FIBER_XFI:
++	case FW_PORT_TYPE_FIBER_XAUI:
++	case FW_PORT_TYPE_SFP:
++	case FW_PORT_TYPE_QSFP_10G:
++	case FW_PORT_TYPE_QSA:
++		et_caps |= SUPPORTED_FIBRE;
++		if (fw_caps & FW_PORT_CAP_SPEED_1G)
++			et_caps |= SUPPORTED_1000baseT_Full;
++		if (fw_caps & FW_PORT_CAP_SPEED_10G)
++			et_caps |= SUPPORTED_10000baseT_Full;
++		break;
++
++	case FW_PORT_TYPE_BP40_BA:
++	case FW_PORT_TYPE_QSFP:
++		et_caps |= SUPPORTED_FIBRE;
++		et_caps |= SUPPORTED_40000baseSR4_Full;
++		break;
++
++	case FW_PORT_TYPE_CR_QSFP:
++	case FW_PORT_TYPE_SFP28:
++		et_caps |= SUPPORTED_FIBRE;
++		/* legacy ethtool capabilities can't represent 25Gb/s */
++		break;
++        case FW_PORT_TYPE_KR4_100G:
++        case FW_PORT_TYPE_CR4_QSFP:
++		et_caps |= SUPPORTED_FIBRE;
++		/* legacy ethtool capabilities can't represent 100Gb/s */
++		break;
++	default:
++		break;
++	}
++
++	if (fw_caps & FW_PORT_CAP_ANEG)
++		et_caps |= SUPPORTED_Autoneg;
++
++	if (fw_caps & FW_PORT_CAP_802_3_PAUSE)
++		et_caps |= SUPPORTED_Pause;
++
++	if (fw_caps & FW_PORT_CAP_802_3_ASM_DIR)
++		et_caps |= SUPPORTED_Asym_Pause;
++
++	return et_caps;
++}
++
++/**
++ *	et_caps_to_fw_caps - translate old-style ethtool to Firmware capabilities
++ *	@et_caps: ethtool Port capabilities
++ *
++ *	Translate old-style ethtool Port Capabilities into a Firmware Port
++ *	capabilities value.  Note that legacy ethtool capabilities can't
++ *	represent 25/50/100Gb/s.
++ */
++static unsigned int et_caps_to_fw_caps(unsigned int et_caps)
++{
++	unsigned int fw_caps = 0;
++
++	if (et_caps & ADVERTISED_100baseT_Full)
++		fw_caps |= FW_PORT_CAP_SPEED_100M;
++	if (et_caps & ADVERTISED_1000baseT_Full)
++		fw_caps |= FW_PORT_CAP_SPEED_1G;
++	if (et_caps & ADVERTISED_10000baseT_Full)
++		fw_caps |= FW_PORT_CAP_SPEED_10G;
++	if (et_caps & ADVERTISED_40000baseSR4_Full)
++		fw_caps |= FW_PORT_CAP_SPEED_40G;
++
++	return fw_caps;
++}
++
++static int get_settings(struct net_device *dev, struct ethtool_cmd *cmd)
++{
++	const struct port_info *pi = netdev_priv(dev);
++
++	cmd->port = from_fw_port_mod_type(pi->port_type, pi->mod_type);
++
++	if (pi->mdio_addr >= 0) {
++		cmd->phy_address = pi->mdio_addr;
++		cmd->transceiver = XCVR_EXTERNAL;
++		cmd->mdio_support = (pi->port_type == FW_PORT_TYPE_BT_SGMII
++				     ? MDIO_SUPPORTS_C22
++				     : MDIO_SUPPORTS_C45);
++	} else {
++		cmd->phy_address = 0;  /* not really, but no better option */
++		cmd->transceiver = XCVR_INTERNAL;
++		cmd->mdio_support = 0;
++	}
++
++	cmd->supported = fw_caps_to_et_caps(pi->port_type,
++					    pi->link_cfg.supported);
++	cmd->advertising = fw_caps_to_et_caps(pi->port_type,
++					      pi->link_cfg.advertising);
++	if (pi->link_cfg.fc & PAUSE_RX) {
++		if (pi->link_cfg.fc & PAUSE_TX) {
++			cmd->advertising |= ADVERTISED_Pause;
++		} else {
++			cmd->advertising |= ADVERTISED_Pause |
++					    ADVERTISED_Asym_Pause;
++		}
++	} else if (pi->link_cfg.fc & PAUSE_TX) {
++		cmd->advertising |= ADVERTISED_Asym_Pause;
++	}
++	ethtool_cmd_speed_set(cmd,
++			      netif_carrier_ok(dev) ? pi->link_cfg.speed : 0);
++	cmd->duplex = DUPLEX_FULL;
++	cmd->autoneg = pi->link_cfg.autoneg;
++	cmd->maxtxpkt = 0;
++	cmd->maxrxpkt = 0;
++
++	return 0;
++}
++
++static int set_settings(struct net_device *dev, struct ethtool_cmd *cmd)
++{
++	struct port_info *pi = netdev_priv(dev);
++	struct link_config *lc = &pi->link_cfg;
++	u32 speed = ethtool_cmd_speed(cmd);
++	struct link_config old_lc;
++	unsigned int fw_caps;
++	int ret;
++
++	if (cmd->duplex != DUPLEX_FULL)     /* only full-duplex supported */
++		return -EINVAL;
++
++	if (!(lc->supported & FW_PORT_CAP_ANEG)) {
++		/*
++		 * PHY offers a single speed.  See if that's what's
++		 * being requested.
++		 */
++		if (cmd->autoneg == AUTONEG_DISABLE &&
++		    (lc->supported & speed_to_fw_caps(speed)))
++				return 0;
++		return -EINVAL;
++	}
++
++	old_lc = *lc;
++	if (cmd->autoneg == AUTONEG_DISABLE) {
++		fw_caps = speed_to_fw_caps(speed);
++
++		if (!(lc->supported & fw_caps))
++			return -EINVAL;
++		lc->requested_speed = fw_caps;
++		lc->advertising = 0;
++	} else {
++		fw_caps = et_caps_to_fw_caps(cmd->advertising);
++		if (!(lc->supported & fw_caps))
++			return -EINVAL;
++		lc->requested_speed = 0;
++		lc->advertising = fw_caps | FW_PORT_CAP_ANEG;
++	}
++	lc->autoneg = cmd->autoneg;
++
++	/*
++	 * If the firmware rejects the Link Configuration request, back out
++	 * the changes and report the error.
++	 */
++	ret = t4_link_l1cfg(pi->adapter, pi->adapter->mbox, pi->tx_chan, lc);
++	if (ret)
++		*lc = old_lc;
++
++	return ret;
++}
++
++#else /* HAVE___ETHTOOL_GET_LINK_KSETTINGS */
++
+ /**
+  *	fw_caps_to_lmm - translate Firmware to ethtool Link Mode Mask
+  *	@port_type: Firmware Port Type
+@@ -621,12 +842,13 @@ static void fw_caps_to_lmm(enum fw_port_type port_type,
+ 		SET_LMM(25000baseCR_Full);
+ 		break;
+ 
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,7,0)
+ 	case FW_PORT_TYPE_KR4_100G:
+ 	case FW_PORT_TYPE_CR4_QSFP:
+ 		SET_LMM(FIBRE);
+ 		SET_LMM(100000baseCR4_Full);
+ 		break;
+-
++#endif
+ 	default:
+ 		break;
+ 	}
+@@ -772,6 +994,7 @@ static int set_link_ksettings(struct net_device *dev,
+ 
+ 	return ret;
+ }
++#endif /* HAVE___ETHTOOL_GET_LINK_KSETTINGS */
+ 
+ static void get_pauseparam(struct net_device *dev,
+ 			   struct ethtool_pauseparam *epause)
+@@ -1208,8 +1431,13 @@ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+ }
+ 
+ static const struct ethtool_ops cxgb_ethtool_ops = {
++#ifndef HAVE___ETHTOOL_GET_LINK_KSETTINGS
++	.get_settings      = get_settings,
++	.set_settings      = set_settings,
++#else
+ 	.get_link_ksettings = get_link_ksettings,
+ 	.set_link_ksettings = set_link_ksettings,
++#endif
+ 	.get_drvinfo       = get_drvinfo,
+ 	.get_msglevel      = get_msglevel,
+ 	.set_msglevel      = set_msglevel,
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 3ceafb5..336129e 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -32,6 +32,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/bitmap.h>
+@@ -1342,8 +1345,17 @@ static int del_filter_wr(struct adapter *adapter, int fidx)
+ 	return 0;
+ }
+ 
++#ifdef HAVE_SELECT_QUEUE_FALLBACK_T
+ static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
+ 			     void *accel_priv, select_queue_fallback_t fallback)
++#else
++#ifdef NDO_SELECT_QUEUE_HAS_ACCEL_PRIV
++static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
++			     void *accel_priv)
++#else
++#endif
++static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb)
++#endif
+ {
+ 	int txq;
+ 
+@@ -1385,7 +1397,11 @@ static u16 cxgb_select_queue(struct net_device *dev, struct sk_buff *skb,
+ 		return txq;
+ 	}
+ 
++#ifdef HAVE_SELECT_QUEUE_FALLBACK_T
+ 	return fallback(dev, skb) % dev->real_num_tx_queues;
++#else
++	return __netdev_pick_tx(dev, skb) % dev->real_num_tx_queues;
++#endif
+ }
+ 
+ static int closest_timer(const struct sge *s, int time)
+@@ -3389,8 +3405,13 @@ static int adap_init0_phy(struct adapter *adap)
+ 	 * where we can load a PHY firmware file from the host if we want to
+ 	 * override the PHY firmware File in flash.
+ 	 */
++#ifdef HAVE_REQUEST_FIRMWARE_DIRECT
+ 	ret = request_firmware_direct(&phyf, phy_info->phy_fw_file,
+ 				      adap->pdev_dev);
++#else
++	ret = request_firmware(&phyf, phy_info->phy_fw_file,
++				      adap->pdev_dev);
++#endif
+ 	if (ret < 0) {
+ 		/* For adapters without FLASH attached to PHY for their
+ 		 * firmware, it's obviously a fatal error if we can't get the
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+index 660204b..3dd5302 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
+@@ -2634,6 +2634,7 @@ int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p)
+ 	if (!vpd)
+ 		return -ENOMEM;
+ 
++#ifdef HAVE_PCI_SET_VPD_SIZE
+ 	/* We have two VPD data structures stored in the adapter VPD area.
+ 	 * By default, Linux calculates the size of the VPD area by traversing
+ 	 * the first VPD area at offset 0x0, so we need to tell the OS what
+@@ -2642,7 +2643,7 @@ int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p)
+ 	ret = pci_set_vpd_size(adapter->pdev, VPD_SIZE);
+ 	if (ret < 0)
+ 		goto out;
+-
++#endif
+ 	/* Card information normally starts at VPD_BASE but early cards had
+ 	 * it at 0.
+ 	 */
+-- 
+1.8.3.1
+
