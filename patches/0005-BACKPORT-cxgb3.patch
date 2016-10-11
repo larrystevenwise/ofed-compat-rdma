@@ -1,0 +1,76 @@
+From 0ce1cc8e6850f043d06f819511a7a1b140b08825 Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Tue, 11 Oct 2016 13:57:22 -0700
+Subject: [PATCH] BACKPORT: cxgb3
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/infiniband/hw/cxgb3/Makefile               |  2 +-
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  3 +++
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c | 18 ++++++++++++++++++
+ 3 files changed, 22 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/cxgb3/Makefile b/drivers/infiniband/hw/cxgb3/Makefile
+index 2761364..c780a7a 100644
+--- a/drivers/infiniband/hw/cxgb3/Makefile
++++ b/drivers/infiniband/hw/cxgb3/Makefile
+@@ -1,4 +1,4 @@
+-ccflags-y := -Idrivers/net/ethernet/chelsio/cxgb3
++ccflags-y := -I$(CWD)/drivers/net/ethernet/chelsio/cxgb3
+ 
+ obj-$(CONFIG_INFINIBAND_CXGB3) += iw_cxgb3.o
+ 
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index 43da891..4d0f1af 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -30,6 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/module.h>
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+index 76684dc..53392bd 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c
+@@ -30,6 +30,9 @@
+  * SOFTWARE.
+  */
+ 
++#ifdef pr_fmt
++#undef pr_fmt
++#endif
+ #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
+ 
+ #include <linux/list.h>
+@@ -185,7 +188,22 @@ static struct net_device *get_iff_from_mac(struct adapter *adapter,
+ 		if (ether_addr_equal(dev->dev_addr, mac)) {
+ 			rcu_read_lock();
+ 			if (vlan && vlan != VLAN_VID_MASK) {
++#ifdef HAVE___VLAN_FIND_DEV_DEEP_RCU
+ 				dev = __vlan_find_dev_deep_rcu(dev, htons(ETH_P_8021Q), vlan);
++#else
++#if LINUX_VERSION_CODE >= KERNEL_VERSION(3, 1, 0)
++				dev = __vlan_find_dev_deep(dev, htons(ETH_P_8021Q), vlan);
++#else
++			{
++				struct port_info *p = netdev_priv(dev);
++
++				if (p->vlan_grp)
++					dev = vlan_group_get_device(p->vlan_grp, vlan);
++				else
++					dev = NULL;
++			}
++#endif
++#endif
+ 			} else if (netif_is_bond_slave(dev)) {
+ 				struct net_device *upper_dev;
+ 
+-- 
+1.8.3.1
+
