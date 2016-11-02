@@ -187,6 +187,9 @@ Usage:  `basename $0` [options]
     --with-nfsrdma-mod    make CONFIG_SUNRPC_XPRT_RDMA=m [no]
     --without-nfsrdma-mod    [yes]
 
+    --with-pvrdma-mod    make CONFIG_INFINIBAND_PVRDMA=m [no]
+    --without-pvrdma-mod    [yes]
+
     --help - print out options
 
 
@@ -709,6 +712,12 @@ main()
                             CONFIG_SUNRPC_XPRT_RDMA_CLIENT=
                             CONFIG_SUNRPC_XPRT_RDMA_SERVER=
                         ;;
+                        --with-pvrdma-mod)
+                            CONFIG_INFINIBAND_PVRDMA="m"
+                        ;;
+			--without-pvrdma-mod)
+			    CONFIG_INFINIBAND=
+			;;
                         -h | --help)
                                 usage
                                 exit 0
@@ -765,6 +774,7 @@ if [ $ARCH != "x86_64" ]; then
     CONFIG_INFINIBAND_QIB=
     CONFIG_INFINIBAND_RDMAVT=
     CONFIG_INFINIBAND_RXE=
+    CONFIG_INFINIBAND_PVRDMA=
 fi
 
 SKIP_AUTOCONF=${SKIP_AUTOCONF:-0}
@@ -821,6 +831,7 @@ CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI:-''}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES:-''}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA:-''}
 CONFIG_BE2NET=${CONFIG_BE2NET:-''}
+CONFIG_INFINIBAND_PVRDMA=${CONFIG_INFINIBAND_PVRDMA:-''}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA:-''}
 CONFIG_SUNRPC_XPRT_RDMA_CLIENT=${CONFIG_SUNRPC_XPRT_RDMA_CLIENT:-''}
@@ -863,6 +874,12 @@ fi
 		echo ".xeon_phi_applied does not exist. running ofed-patch.sh for xeon-phi"
 		ex ${CWD}/ofed_scripts/ofed_patch.sh --with-patchdir=tech-preview/xeon-phi
 		touch .xeon_phi_applied
+	fi
+
+	if [[ ! -e .pvrdma_applied && "X$CONFIG_INFINIBAND_PVRDMA" == "Xm" ]]; then
+		echo ".pvrdma_applied does not exist. running ofed-patch.sh for pvrdma"
+		ex ${CWD}/ofed_scripts/ofed_patch.sh --without-git --without-quilt --with-patchdir=tech-preview/pvrdma
+		touch .pvrdma_applied
 	fi
 
         # Create configure.mk
@@ -935,6 +952,7 @@ CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA}
 CONFIG_BE2NET=${CONFIG_BE2NET}
+CONFIG_INFINIBAND_PVRDMA=${CONFIG_INFINIBAND_PVRDMA}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA}
 CONFIG_SUNRPC_XPRT_RDMA_CLIENT=${CONFIG_SUNRPC_XPRT_RDMA_CLIENT}
@@ -1269,6 +1287,11 @@ if [ "X${CONFIG_SUNRPC_XPRT_RDMA_SERVER}" == "Xm" ]; then
 else
         DEFINE_SUNRPC_XPRT_RDMA_SERVER="/* CONFIG_SUNRPC_XPRT_RDMA_SERVER is not set */"
 fi
+if [ "X${CONFIG_INFINIBAND_PVRDMA}" == "Xm" ]; then
+        DEFINE_INFINIBAND_PVRDMA="#undef CONFIG_INFINIBAND_PVRDMA\n#define CONFIG_INFINIBAND_PVRDMA 1"
+else
+        DEFINE_INFINIBAND_PVRDMA="#undef CONFIG_INFINIBAND_PVRDMA"
+fi
 
 cat > ${AUTOCONF_H} << EOFAUTOCONF
 #ifndef __OFED_BUILD__
@@ -1294,6 +1317,7 @@ $(echo -e "${DEFINE_CHELSIO_T4}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}" | grep -v undef)
 $(echo -e "${DEFINE_BE2NET}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_PVRDMA}" | grep -v undef)
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}" | grep -v undef)
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA_CLIENT}" | grep -v undef)
@@ -1393,6 +1417,7 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_INFINIBAND_NES_DEBUG
 #undef CONFIG_INFINIBAND_OCRDMA
 #undef CONFIG_BE2NET
+#undef CONFIG_INFINIBAND_PVRDMA
 
 #undef CONFIG_SUNRPC_XPRT_RDMA
 #undef CONFIG_SUNRPC_XPRT_RDMA_CLIENT
@@ -1432,6 +1457,7 @@ $(echo -e "${DEFINE_CHELSIO_T4}")
 $(echo -e "${DEFINE_INFINIBAND_NES}")
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}")
 $(echo -e "${DEFINE_BE2NET}")
+$(echo -e "${DEFINE_INFINIBAND_PVRDMA}")
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}")
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA_CLIENT}")

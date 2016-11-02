@@ -58,6 +58,7 @@
 %define build_ocrdma %(if ( echo %{configure_options} | grep "with-ocrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_ibp_server %(if ( echo %{configure_options} | grep "with-ibp-server-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_ibscif %(if ( echo %{configure_options} | grep "with-ibscif-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_pvrdma %(if ( echo %{configure_options} | grep "with-pvrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 
 %{!?LIB_MOD_DIR: %define LIB_MOD_DIR /lib/modules/%{KVERSION}/updates}
 
