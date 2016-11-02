@@ -1,0 +1,39 @@
+From 35672befe649ebcd0d9915122c2fcf048f539bf7 Mon Sep 17 00:00:00 2001
+From: Adit Ranadive <aditr@vmware.com>
+Date: Sun, 18 Sep 2016 01:32:51 -0700
+Subject: [PATCH 14/14] IB: Add PVRDMA driver
+
+This patch updates the InfiniBand subsystem to build the PVRDMA driver.
+
+Reviewed-by: Jorgen Hansen <jhansen@vmware.com>
+Reviewed-by: George Zhang <georgezhang@vmware.com>
+Reviewed-by: Aditya Sarwade <asarwade@vmware.com>
+Reviewed-by: Bryan Tan <bryantan@vmware.com>
+Signed-off-by: Adit Ranadive <aditr@vmware.com>
+---
+ drivers/infiniband/Kconfig     | 1 +
+ drivers/infiniband/hw/Makefile | 1 +
+ 2 files changed, 2 insertions(+)
+
+diff --git a/drivers/infiniband/Kconfig b/drivers/infiniband/Kconfig
+index e9b7dc0..bb4f5ac 100644
+--- a/drivers/infiniband/Kconfig
++++ b/drivers/infiniband/Kconfig
+@@ -87,5 +87,6 @@ source "drivers/infiniband/sw/rdmavt/Kconfig"
+ source "drivers/infiniband/sw/rxe/Kconfig"
+ 
+ source "drivers/infiniband/hw/hfi1/Kconfig"
++source "drivers/infiniband/hw/pvrdma/Kconfig"
+ 
+ endif # INFINIBAND
+diff --git a/drivers/infiniband/hw/Makefile b/drivers/infiniband/hw/Makefile
+index c0c7cf8..eb24449 100644
+--- a/drivers/infiniband/hw/Makefile
++++ b/drivers/infiniband/hw/Makefile
+@@ -9,3 +9,4 @@ obj-$(CONFIG_INFINIBAND_NES)		+= nes/
+ obj-$(CONFIG_INFINIBAND_OCRDMA)		+= ocrdma/
+ obj-$(CONFIG_INFINIBAND_USNIC)		+= usnic/
+ obj-$(CONFIG_INFINIBAND_HFI1)		+= hfi1/
++obj-$(CONFIG_INFINIBAND_PVRDMA)		+= pvrdma/
+-- 
+2.7.4
