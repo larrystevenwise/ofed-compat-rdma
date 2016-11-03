@@ -715,9 +715,9 @@ main()
                         --with-pvrdma-mod)
                             CONFIG_INFINIBAND_PVRDMA="m"
                         ;;
-			--without-pvrdma-mod)
-			    CONFIG_INFINIBAND=
-			;;
+                        --without-pvrdma-mod)
+                            CONFIG_INFINIBAND_PVRDMA=
+                        ;;
                         -h | --help)
                                 usage
                                 exit 0
