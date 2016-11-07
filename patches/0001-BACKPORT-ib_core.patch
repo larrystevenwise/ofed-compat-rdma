@@ -12,9 +12,10 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/sa_query.c      | 19 ++++++++++++++
  drivers/infiniband/core/umem.c          | 17 +++++++++++-
  drivers/infiniband/core/user_mad.c      |  3 +++
+ drivers/infiniband/core/verbs.c         |  4 +++
  include/rdma/ib_addr.h                  | 23 +++++++++++++++++
  include/rdma/ib_verbs.h                 | 18 +++++++++++++
- 11 files changed, 177 insertions(+), 1 deletion(-)
+ 12 files changed, 181 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -438,6 +439,36 @@ index xxxxxxx..xxxxxxx xxxxxx
  #define pr_fmt(fmt) "user_mad: " fmt
  
  #include <linux/module.h>
+diff --git a/drivers/infiniband/core/verbs.c b/drivers/infiniband/core/verbs.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/verbs.c
++++ b/drivers/infiniband/core/verbs.c
+@@ -1781,6 +1781,7 @@ int ib_get_vf_config(struct ib_device *device, int vf, u8 port,
+ }
+ EXPORT_SYMBOL(ib_get_vf_config);
+ 
++#ifdef HAVE_NDO_GET_VF_STATS
+ int ib_get_vf_stats(struct ib_device *device, int vf, u8 port,
+ 		    struct ifla_vf_stats *stats)
+ {
+@@ -1790,7 +1791,9 @@ int ib_get_vf_stats(struct ib_device *device, int vf, u8 port,
+ 	return device->get_vf_stats(device, vf, port, stats);
+ }
+ EXPORT_SYMBOL(ib_get_vf_stats);
++#endif
+ 
++#ifdef HAVE_NDO_SET_VF_GUID
+ int ib_set_vf_guid(struct ib_device *device, int vf, u8 port, u64 guid,
+ 		   int type)
+ {
+@@ -1800,6 +1803,7 @@ int ib_set_vf_guid(struct ib_device *device, int vf, u8 port, u64 guid,
+ 	return device->set_vf_guid(device, vf, port, guid, type);
+ }
+ EXPORT_SYMBOL(ib_set_vf_guid);
++#endif
+ 
+ /**
+  * ib_map_mr_sg() - Map the largest prefix of a dma mapped SG list
 diff --git a/include/rdma/ib_addr.h b/include/rdma/ib_addr.h
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/include/rdma/ib_addr.h
