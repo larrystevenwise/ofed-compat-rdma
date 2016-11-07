@@ -1,4 +1,4 @@
-From 614b6bf4644aac10a87a91f588220f8ba32231d0 Mon Sep 17 00:00:00 2001
+From 3737efd52aefe51ac6650db18698c3083b22eac0 Mon Sep 17 00:00:00 2001
 From: root <root@stevo3.asicdesigners.com>
 Date: Tue, 11 Oct 2016 15:55:07 -0700
 Subject: [PATCH] BACKPORT: cxgb4
@@ -9,9 +9,9 @@ Signed-off-by: Steve Wise <swise@opengridcomputing.com>
  drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c      |  19 ++
  drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c |  15 +-
  drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c | 232 ++++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |  21 ++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |  23 +-
  drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         |   3 +-
- 6 files changed, 286 insertions(+), 6 deletions(-)
+ 6 files changed, 287 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/Makefile b/drivers/infiniband/hw/cxgb4/Makefile
 index e11cf72..2f9fbf3 100644
@@ -377,7 +377,7 @@ index 02f80fe..194c50b 100644
  	.get_msglevel      = get_msglevel,
  	.set_msglevel      = set_msglevel,
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 3ceafb5..336129e 100644
+index 3ceafb5..1a4cc34 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -32,6 +32,9 @@
@@ -390,6 +390,15 @@ index 3ceafb5..336129e 100644
  #define pr_fmt(fmt) KBUILD_MODNAME ": " fmt
  
  #include <linux/bitmap.h>
+@@ -82,7 +85,7 @@ char cxgb4_driver_name[] = KBUILD_MODNAME;
+ #ifdef DRV_VERSION
+ #undef DRV_VERSION
+ #endif
+-#define DRV_VERSION "2.0.0-ko"
++#define DRV_VERSION "2.0.0-ofed"
+ const char cxgb4_driver_version[] = DRV_VERSION;
+ #define DRV_DESC "Chelsio T4/T5/T6 Network Driver"
+ 
 @@ -1342,8 +1345,17 @@ static int del_filter_wr(struct adapter *adapter, int fidx)
  	return 0;
  }
@@ -456,5 +465,5 @@ index 660204b..3dd5302 100644
  	 * it at 0.
  	 */
 -- 
-1.8.3.1
+2.10.2
 

@@ -1,4 +1,4 @@
-From 0ce1cc8e6850f043d06f819511a7a1b140b08825 Mon Sep 17 00:00:00 2001
+From c7cc99288411bf76cfe3bb076b0c2eca1c689d23 Mon Sep 17 00:00:00 2001
 From: Steve Wise <swise@opengridcomputing.com>
 Date: Tue, 11 Oct 2016 13:57:22 -0700
 Subject: [PATCH] BACKPORT: cxgb3
@@ -8,7 +8,8 @@ Signed-off-by: Steve Wise <swise@opengridcomputing.com>
  drivers/infiniband/hw/cxgb3/Makefile               |  2 +-
  drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c    |  3 +++
  drivers/net/ethernet/chelsio/cxgb3/cxgb3_offload.c | 18 ++++++++++++++++++
- 3 files changed, 22 insertions(+), 1 deletion(-)
+ drivers/net/ethernet/chelsio/cxgb3/version.h       |  2 +-
+ 4 files changed, 23 insertions(+), 2 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb3/Makefile b/drivers/infiniband/hw/cxgb3/Makefile
 index 2761364..c780a7a 100644
@@ -71,6 +72,19 @@ index 76684dc..53392bd 100644
  			} else if (netif_is_bond_slave(dev)) {
  				struct net_device *upper_dev;
  
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/version.h b/drivers/net/ethernet/chelsio/cxgb3/version.h
+index 165bfb9..1cfffe2 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/version.h
++++ b/drivers/net/ethernet/chelsio/cxgb3/version.h
+@@ -35,7 +35,7 @@
+ #define DRV_DESC "Chelsio T3 Network Driver"
+ #define DRV_NAME "cxgb3"
+ /* Driver version */
+-#define DRV_VERSION "1.1.5-ko"
++#define DRV_VERSION "1.1.5-ofed"
+ 
+ /* Firmware version */
+ #define FW_VERSION_MAJOR 7
 -- 
-1.8.3.1
+2.10.2
 
