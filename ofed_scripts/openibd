@@ -223,11 +223,6 @@ POST_LOAD_MODULES=""
 
 RUN_SYSCTL=${RUN_SYSCTL:-"no"}
 
-if [ "X${SDP_LOAD}" == "Xyes" ]; then
-    POST_LOAD_MODULES="$POST_LOAD_MODULES ib_sdp"
-    IPOIB_LOAD="yes"
-fi
-
 IPOIB=0
 IPOIB_MTU=${IPOIB_MTU:-65520}
 if [ "X${IPOIB_LOAD}" == "Xyes" ]; then
@@ -266,16 +261,16 @@ if [ "X${RDMA_UCM_LOAD}" == "Xyes" ]; then
     POST_LOAD_MODULES="$POST_LOAD_MODULES rdma_ucm"
 fi
 
-GEN1_UNLOAD_MODULES="ib_srp_target scsi_target ib_srp kdapltest_module ib_kdapl ib_sdp ib_useraccess ib_useraccess_cm ib_cm ib_dapl_srv ib_ip2pr ib_ipoib ib_tavor mod_thh mod_rhh ib_dm_client ib_sa_client ib_client_query ib_poll ib_mad ib_core ib_services"
+GEN1_UNLOAD_MODULES="ib_srp_target scsi_target ib_srp kdapltest_module ib_kdapl ib_useraccess ib_useraccess_cm ib_cm ib_dapl_srv ib_ip2pr ib_ipoib ib_tavor mod_thh mod_rhh ib_dm_client ib_sa_client ib_client_query ib_poll ib_mad ib_core ib_services"
 
 UNLOAD_MODULES="ib_mthca mlx5_ib mlx5_core mlx4_ib ib_ipath ipath_core ib_ehca iw_nes iw_cxgb3 cxgb3 iw_cxgb4 cxgb4 ocrdma"
 UNLOAD_MODULES="$UNLOAD_MODULES ib_qib"
 UNLOAD_MODULES="$UNLOAD_MODULES ib_ipoib ib_madeye ib_rds"
-UNLOAD_MODULES="$UNLOAD_MODULES rds_rdma rds_tcp rds ib_ucm kdapl ib_srp_target scsi_target ib_srpt ib_srp ib_iser ib_sdp"
+UNLOAD_MODULES="$UNLOAD_MODULES rds_rdma rds_tcp rds ib_ucm kdapl ib_srp_target scsi_target ib_srpt ib_srp ib_iser"
 UNLOAD_MODULES="$UNLOAD_MODULES rdma_ucm rdma_cm iw_cm ib_cm ib_local_sa findex"
 UNLOAD_MODULES="$UNLOAD_MODULES ib_sa ib_uverbs ib_umad ib_mad ib_core ib_addr"
 
-STATUS_MODULES="rdma_ucm ib_rds rds rds_rdma rds_tcp ib_srpt ib_srp qlgc_vnic ib_sdp rdma_cm ib_addr ib_local_sa findex ib_ipoib ib_ehca ib_ipath ipath_core mlx4_core mlx4_ib mlx4_en mlx5_core mlx5_ib ib_mthca ib_uverbs ib_umad ib_ucm ib_sa ib_cm ib_mad ib_core iw_cxgb3 iw_cxgb4 iw_nes pvrdma"
+STATUS_MODULES="rdma_ucm ib_rds rds rds_rdma rds_tcp ib_srpt ib_srp qlgc_vnic rdma_cm ib_addr ib_local_sa findex ib_ipoib ib_ehca ib_ipath ipath_core mlx4_core mlx4_ib mlx4_en mlx5_core mlx5_ib ib_mthca ib_uverbs ib_umad ib_ucm ib_sa ib_cm ib_mad ib_core iw_cxgb3 iw_cxgb4 iw_nes pvrdma"
 STATUS_MODULES="$STATUS_MODULES ib_qib ocrdma"
 
 if (modinfo scsi_transport_srp 2>/dev/null | grep depends: | grep -q compat 2>/dev/null) ||

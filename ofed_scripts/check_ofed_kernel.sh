@@ -65,7 +65,8 @@ if [ -z "$configure_options" ]; then
 	configure_options=" \
 		--with-mthca-mod --with-mthca_debug-mod \
 		--with-mlx4-mod --with-mlx4_debug-mod --with-ipoib-mod \
-		--with-ipoib_debug-mod --with-sdp-mod --with-sdp_debug-mod \
+		--with-ipoib_debug-mod \
+		--with-mlx5-mod \
 		--with-rds-mod --with-cxgb3-mod --with-cxgb4-mod \
                 --with-nes-mod \
 		${custom_options} \
