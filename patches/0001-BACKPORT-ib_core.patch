@@ -3,20 +3,20 @@ Subject: [PATCH] BACKPORT: ib_core
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/core/cma.c           |  23 ++++++++
- drivers/infiniband/core/cma_configfs.c  | 101 ++++++++++++++++++++++++++++++++
- drivers/infiniband/core/core_priv.h     |  28 +++++----
- drivers/infiniband/core/cq.c            |   6 ++
- drivers/infiniband/core/mad.c           |   3 +
- drivers/infiniband/core/netlink.c       |   3 +
- drivers/infiniband/core/roce_gid_mgmt.c |  46 +++++++++++++++
- drivers/infiniband/core/sa_query.c      |  19 ++++++
- drivers/infiniband/core/umem.c          |  17 +++++-
- drivers/infiniband/core/user_mad.c      |   3 +
- drivers/infiniband/core/verbs.c         |   4 ++
- include/rdma/ib_addr.h                  |  23 ++++++++
- include/rdma/ib_verbs.h                 |  18 ++++++
- 13 files changed, 282 insertions(+), 12 deletions(-)
+ drivers/infiniband/core/cma.c           | 23 ++++++++
+ drivers/infiniband/core/cma_configfs.c  | 98 +++++++++++++++++++++++++++++++++
+ drivers/infiniband/core/core_priv.h     | 28 ++++++----
+ drivers/infiniband/core/cq.c            |  6 ++
+ drivers/infiniband/core/mad.c           |  3 +
+ drivers/infiniband/core/netlink.c       |  3 +
+ drivers/infiniband/core/roce_gid_mgmt.c | 46 ++++++++++++++++
+ drivers/infiniband/core/sa_query.c      | 19 +++++++
+ drivers/infiniband/core/umem.c          | 17 +++++-
+ drivers/infiniband/core/user_mad.c      |  3 +
+ drivers/infiniband/core/verbs.c         |  4 ++
+ include/rdma/ib_addr.h                  | 23 ++++++++
+ include/rdma/ib_verbs.h                 | 18 ++++++
+ 13 files changed, 279 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -165,7 +165,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static int cma_configfs_params_get(struct config_item *item,
  				   struct cma_device **pcma_dev,
  				   struct cma_dev_port_group **pgroup)
-@@ -140,11 +189,28 @@ static ssize_t default_roce_mode_store(struct config_item *item,
+@@ -140,11 +189,25 @@ static ssize_t default_roce_mode_store(struct config_item *item,
  CONFIGFS_ATTR(, default_roce_mode);
  
  static struct configfs_attribute *cma_configfs_attributes[] = {
@@ -182,9 +182,6 @@ index xxxxxxx..xxxxxxx xxxxxx
 +	.show_attribute		= cma_configfs_attr_show,
 +	.store_attribute	= cma_configfs_attr_store,
 +};
-+#else /* HAVE_OLD_CONFIGFS_API */
-+static struct configfs_item_operations cma_item_ops = {
-+};
 +#endif
 +
  static struct config_item_type cma_port_group_type = {
@@ -194,7 +191,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.ct_attrs	= cma_configfs_attributes,
  	.ct_owner	= THIS_MODULE
  };
-@@ -172,6 +238,13 @@ static int make_cma_ports(struct cma_dev_group *cma_dev_group,
+@@ -172,6 +235,13 @@ static int make_cma_ports(struct cma_dev_group *cma_dev_group,
  		goto free;
  	}
  
@@ -208,7 +205,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	for (i = 0; i < ports_num; i++) {
  		char port_str[10];
  
-@@ -181,10 +254,17 @@ static int make_cma_ports(struct cma_dev_group *cma_dev_group,
+@@ -181,10 +251,17 @@ static int make_cma_ports(struct cma_dev_group *cma_dev_group,
  		config_group_init_type_name(&ports[i].group,
  					    port_str,
  					    &cma_port_group_type);
@@ -226,7 +223,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	cma_dev_group->ports = ports;
  
  	return 0;
-@@ -252,6 +332,14 @@ static struct config_group *make_cma_dev(struct config_group *group,
+@@ -252,6 +329,14 @@ static struct config_group *make_cma_dev(struct config_group *group,
  		err = -ENOMEM;
  		goto fail;
  	}
@@ -241,7 +238,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	strncpy(cma_dev_group->name, name, sizeof(cma_dev_group->name));
  
-@@ -260,16 +348,29 @@ static struct config_group *make_cma_dev(struct config_group *group,
+@@ -260,16 +345,29 @@ static struct config_group *make_cma_dev(struct config_group *group,
  
  	err = make_cma_ports(cma_dev_group, cma_dev);
  	if (err)
