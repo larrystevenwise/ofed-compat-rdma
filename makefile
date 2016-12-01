@@ -201,6 +201,7 @@ distclean: clean_kernel
 
 clean-files := Module.symvers modules.order Module.markers compat/modules.order compat/configure
 clean-files += $(COMPAT_CONFIG) $(COMPAT_AUTOCONF)
+clean-files += include/linux/autoconf.h include/generated/autoconf.h
 
 help:
 	@echo
