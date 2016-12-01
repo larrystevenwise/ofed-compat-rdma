@@ -9,14 +9,14 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/cq.c            |  6 ++
  drivers/infiniband/core/mad.c           |  3 +
  drivers/infiniband/core/netlink.c       |  3 +
- drivers/infiniband/core/roce_gid_mgmt.c | 46 ++++++++++++++++
+ drivers/infiniband/core/roce_gid_mgmt.c | 51 +++++++++++++++++
  drivers/infiniband/core/sa_query.c      | 19 +++++++
  drivers/infiniband/core/umem.c          | 17 +++++-
  drivers/infiniband/core/user_mad.c      |  3 +
  drivers/infiniband/core/verbs.c         |  4 ++
  include/rdma/ib_addr.h                  | 23 ++++++++
- include/rdma/ib_verbs.h                 | 18 ++++++
- 13 files changed, 279 insertions(+), 12 deletions(-)
+ include/rdma/ib_verbs.h                 | 22 ++++++++
+ 13 files changed, 288 insertions(+), 12 deletions(-)
 
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -403,7 +403,25 @@ diff --git a/drivers/infiniband/core/roce_gid_mgmt.c b/drivers/infiniband/core/r
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/roce_gid_mgmt.c
 +++ b/drivers/infiniband/core/roce_gid_mgmt.c
-@@ -189,6 +189,33 @@ static int pass_all_filter(struct ib_device *ib_dev, u8 port,
+@@ -128,12 +128,17 @@ static enum bonding_slave_state is_eth_active_slave_of_bonding_rcu(struct net_de
+ 								   struct net_device *upper)
+ {
+ 	if (upper && netif_is_bond_master(upper)) {
++#ifdef HAVE_BONDING_H
+ 		struct net_device *pdev =
+ 			bond_option_active_slave_get_rcu(netdev_priv(upper));
+ 
+ 		if (pdev)
+ 			return dev == pdev ? BONDING_SLAVE_STATE_ACTIVE :
+ 				BONDING_SLAVE_STATE_INACTIVE;
++#else
++	return memcmp(upper->dev_addr, dev->dev_addr, ETH_ALEN) ?
++		BONDING_SLAVE_STATE_INACTIVE : BONDING_SLAVE_STATE_ACTIVE;
++#endif
+ 	}
+ 
+ 	return BONDING_SLAVE_STATE_NA;
+@@ -189,6 +194,33 @@ static int pass_all_filter(struct ib_device *ib_dev, u8 port,
  	return 1;
  }
  
@@ -437,7 +455,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static int upper_device_filter(struct ib_device *ib_dev, u8 port,
  			       struct net_device *rdma_ndev, void *cookie)
  {
-@@ -207,6 +234,7 @@ static int upper_device_filter(struct ib_device *ib_dev, u8 port,
+@@ -207,6 +239,7 @@ static int upper_device_filter(struct ib_device *ib_dev, u8 port,
  
  	return res;
  }
@@ -445,7 +463,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  static void update_gid_ip(enum gid_op_type gid_op,
  			  struct ib_device *ib_dev,
-@@ -437,6 +465,7 @@ static void callback_for_addr_gid_device_scan(struct ib_device *device,
+@@ -437,6 +470,7 @@ static void callback_for_addr_gid_device_scan(struct ib_device *device,
  			  &parsed->gid_attr);
  }
  
@@ -453,7 +471,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static void handle_netdev_upper(struct ib_device *ib_dev, u8 port,
  				void *cookie,
  				void (*handle_netdev)(struct ib_device *ib_dev,
-@@ -497,6 +526,7 @@ static void add_netdev_upper_ips(struct ib_device *ib_dev, u8 port,
+@@ -497,6 +531,7 @@ static void add_netdev_upper_ips(struct ib_device *ib_dev, u8 port,
  {
  	handle_netdev_upper(ib_dev, port, cookie, _add_netdev_ips);
  }
@@ -461,7 +479,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  static void del_netdev_default_ips_join(struct ib_device *ib_dev, u8 port,
  					struct net_device *rdma_ndev,
-@@ -578,6 +608,7 @@ static int netdevice_queue_work(struct netdev_event_work_cmd *cmds,
+@@ -578,6 +613,7 @@ static int netdevice_queue_work(struct netdev_event_work_cmd *cmds,
  
  static const struct netdev_event_work_cmd add_cmd = {
  	.cb = add_netdev_ips, .filter = is_eth_port_of_netdev};
@@ -469,7 +487,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static const struct netdev_event_work_cmd add_cmd_upper_ips = {
  	.cb = add_netdev_upper_ips, .filter = is_eth_port_of_netdev};
  
-@@ -601,10 +632,15 @@ static void netdevice_event_changeupper(struct netdev_notifier_changeupper_info
+@@ -601,10 +637,15 @@ static void netdevice_event_changeupper(struct netdev_notifier_changeupper_info
  		cmds[1].filter_ndev = changeupper_info->upper_dev;
  	}
  }
@@ -485,7 +503,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	static const struct netdev_event_work_cmd del_cmd = {
  		.cb = del_netdev_ips, .filter = pass_all_filter};
  	static const struct netdev_event_work_cmd bonding_default_del_cmd_join = {
-@@ -612,7 +648,11 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
+@@ -612,7 +653,11 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
  	static const struct netdev_event_work_cmd default_del_cmd = {
  		.cb = del_netdev_default_ips, .filter = pass_all_filter};
  	static const struct netdev_event_work_cmd bonding_event_ips_del_cmd = {
@@ -497,7 +515,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	struct net_device *ndev = netdev_notifier_info_to_dev(ptr);
  	struct netdev_event_work_cmd cmds[ROCE_NETDEV_CALLBACK_SZ] = { {NULL} };
  
-@@ -638,16 +678,22 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
+@@ -638,16 +683,22 @@ static int netdevice_event(struct notifier_block *this, unsigned long event,
  		cmds[1] = add_cmd;
  		break;
  
@@ -725,7 +743,29 @@ index xxxxxxx..xxxxxxx xxxxxx
  		struct work_struct	work;
  	};
  };
-@@ -2911,7 +2913,11 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
+@@ -2000,8 +2002,10 @@ struct ib_device {
+ 							int state);
+ 	int			   (*get_vf_config)(struct ib_device *device, int vf, u8 port,
+ 						   struct ifla_vf_info *ivf);
++#ifdef HAVE_NDO_GET_VF_STATS
+ 	int			   (*get_vf_stats)(struct ib_device *device, int vf, u8 port,
+ 						   struct ifla_vf_stats *stats);
++#endif
+ 	int			   (*set_vf_guid)(struct ib_device *device, int vf, u8 port, u64 guid,
+ 						  int type);
+ 	struct ib_wq *		   (*create_wq)(struct ib_pd *pd,
+@@ -2474,8 +2478,10 @@ int ib_set_vf_link_state(struct ib_device *device, int vf, u8 port,
+ 			 int state);
+ int ib_get_vf_config(struct ib_device *device, int vf, u8 port,
+ 		     struct ifla_vf_info *info);
++#ifdef HAVE_NDO_GET_VF_STATS
+ int ib_get_vf_stats(struct ib_device *device, int vf, u8 port,
+ 		    struct ifla_vf_stats *stats);
++#endif
+ int ib_set_vf_guid(struct ib_device *device, int vf, u8 port, u64 guid,
+ 		   int type);
+ 
+@@ -2911,7 +2917,11 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
  static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
  					  void *cpu_addr, size_t size,
  					  enum dma_data_direction direction,
@@ -737,7 +777,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_map_single_attrs(dev->dma_device, cpu_addr, size,
  				    direction, dma_attrs);
-@@ -2920,7 +2926,11 @@ static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
+@@ -2920,7 +2930,11 @@ static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
  static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
  					     u64 addr, size_t size,
  					     enum dma_data_direction direction,
@@ -749,7 +789,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_unmap_single_attrs(dev->dma_device, addr, size,
  				      direction, dma_attrs);
-@@ -2998,7 +3008,11 @@ static inline void ib_dma_unmap_sg(struct ib_device *dev,
+@@ -2998,7 +3012,11 @@ static inline void ib_dma_unmap_sg(struct ib_device *dev,
  static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
  				      struct scatterlist *sg, int nents,
  				      enum dma_data_direction direction,
@@ -761,7 +801,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_map_sg_attrs(dev->dma_device, sg, nents, direction,
  				dma_attrs);
-@@ -3007,7 +3021,11 @@ static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
+@@ -3007,7 +3025,11 @@ static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
  static inline void ib_dma_unmap_sg_attrs(struct ib_device *dev,
  					 struct scatterlist *sg, int nents,
  					 enum dma_data_direction direction,
