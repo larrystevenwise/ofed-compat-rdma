@@ -3,8 +3,8 @@ Subject: [PATCH] BACKPORT: ipoib
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
- drivers/infiniband/ulp/ipoib/ipoib_main.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ drivers/infiniband/ulp/ipoib/ipoib_main.c | 32 +++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
 diff --git a/drivers/infiniband/ulp/ipoib/ipoib_main.c b/drivers/infiniband/ulp/ipoib/ipoib_main.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -60,7 +60,23 @@ index xxxxxxx..xxxxxxx xxxxxx
  out:
  	rcu_read_unlock();
  	return result;
-@@ -1689,6 +1707,7 @@ static int ipoib_get_vf_config(struct net_device *dev, int vf,
+@@ -1152,6 +1170,7 @@ static void ipoib_set_mcast_list(struct net_device *dev)
+ 	queue_work(priv->wq, &priv->restart_task);
+ }
+ 
++#ifdef HAVE_NDO_GET_IFLINK
+ static int ipoib_get_iflink(const struct net_device *dev)
+ {
+ 	struct ipoib_dev_priv *priv = netdev_priv(dev);
+@@ -1163,6 +1182,7 @@ static int ipoib_get_iflink(const struct net_device *dev)
+ 	/* child/vlan interface */
+ 	return priv->parent->ifindex;
+ }
++#endif
+ 
+ static u32 ipoib_addr_hash(struct ipoib_neigh_hash *htbl, u8 *daddr)
+ {
+@@ -1689,6 +1709,7 @@ static int ipoib_get_vf_config(struct net_device *dev, int vf,
  	return 0;
  }
  
@@ -68,7 +84,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static int ipoib_set_vf_guid(struct net_device *dev, int vf, u64 guid, int type)
  {
  	struct ipoib_dev_priv *priv = netdev_priv(dev);
-@@ -1698,7 +1717,9 @@ static int ipoib_set_vf_guid(struct net_device *dev, int vf, u64 guid, int type)
+@@ -1698,7 +1719,9 @@ static int ipoib_set_vf_guid(struct net_device *dev, int vf, u64 guid, int type)
  
  	return ib_set_vf_guid(priv->ca, vf, priv->port, guid, type);
  }
@@ -78,7 +94,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  static int ipoib_get_vf_stats(struct net_device *dev, int vf,
  			      struct ifla_vf_stats *vf_stats)
  {
-@@ -1706,6 +1727,7 @@ static int ipoib_get_vf_stats(struct net_device *dev, int vf,
+@@ -1706,6 +1729,7 @@ static int ipoib_get_vf_stats(struct net_device *dev, int vf,
  
  	return ib_get_vf_stats(priv->ca, vf, priv->port, vf_stats);
  }
@@ -86,8 +102,13 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  static const struct header_ops ipoib_header_ops = {
  	.create	= ipoib_hard_header,
-@@ -1723,8 +1745,12 @@ static const struct net_device_ops ipoib_netdev_ops_pf = {
+@@ -1720,11 +1744,17 @@ static const struct net_device_ops ipoib_netdev_ops_pf = {
+ 	.ndo_start_xmit		 = ipoib_start_xmit,
+ 	.ndo_tx_timeout		 = ipoib_timeout,
+ 	.ndo_set_rx_mode	 = ipoib_set_mcast_list,
++#ifdef HAVE_NDO_GET_IFLINK
  	.ndo_get_iflink		 = ipoib_get_iflink,
++#endif
  	.ndo_set_vf_link_state	 = ipoib_set_vf_link_state,
  	.ndo_get_vf_config	 = ipoib_get_vf_config,
 +#ifdef HAVE_NDO_GET_VF_STATS
@@ -99,3 +120,13 @@ index xxxxxxx..xxxxxxx xxxxxx
  	.ndo_set_mac_address	 = ipoib_set_mac,
  };
  
+@@ -1737,7 +1767,9 @@ static const struct net_device_ops ipoib_netdev_ops_vf = {
+ 	.ndo_start_xmit	 	 = ipoib_start_xmit,
+ 	.ndo_tx_timeout		 = ipoib_timeout,
+ 	.ndo_set_rx_mode	 = ipoib_set_mcast_list,
++#ifdef HAVE_NDO_GET_IFLINK
+ 	.ndo_get_iflink		 = ipoib_get_iflink,
++#endif
+ };
+ 
+ void ipoib_setup(struct net_device *dev)
