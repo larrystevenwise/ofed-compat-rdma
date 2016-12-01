@@ -746,7 +746,7 @@ CWD=$(pwd)
 CONFIG="configure.mk.kernel"
 
 
-if (/bin/ls -1 $KSRC/include/*/autoconf.h 2>/dev/null | head -1 | grep -q generated); then
+if (/bin/ls -1 $KSRC_OBJ/include/*/autoconf.h 2>/dev/null | head -1 | grep -q generated); then
     AUTOCONF_PREFIX=generated
 else
     AUTOCONF_PREFIX=linux
