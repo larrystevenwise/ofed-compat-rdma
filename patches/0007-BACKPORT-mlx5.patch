@@ -5,8 +5,9 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
  drivers/infiniband/hw/mlx5/gsi.c                   |  37 ++
  drivers/infiniband/hw/mlx5/ib_virt.c               |   2 +
- drivers/infiniband/hw/mlx5/main.c                  |  10 +
- drivers/infiniband/hw/mlx5/mlx5_ib.h               |   2 +
+ drivers/infiniband/hw/mlx5/main.c                  |  32 ++
+ drivers/infiniband/hw/mlx5/mlx5_ib.h               |  15 +
+ drivers/infiniband/hw/mlx5/mr.c                    |  55 +++
  drivers/net/ethernet/mellanox/mlx5/core/Makefile   |   7 +-
  drivers/net/ethernet/mellanox/mlx5/core/cmd.c      |  32 ++
  drivers/net/ethernet/mellanox/mlx5/core/en.h       |  24 ++
@@ -27,7 +28,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx5/core/sriov.c    |   8 +
  include/linux/mlx5/driver.h                        |   5 +
  include/linux/mlx5/port.h                          |   5 +
- 24 files changed, 926 insertions(+), 3 deletions(-)
+ 25 files changed, 1016 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx5/gsi.c b/drivers/infiniband/hw/mlx5/gsi.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -249,7 +250,65 @@ index xxxxxxx..xxxxxxx xxxxxx
  #elif !(defined(CONFIG_PPC) || (defined(CONFIG_ARM) && defined(CONFIG_MMU)))
  			return -EPERM;
  #endif
-@@ -2781,12 +2789,14 @@ static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
+@@ -2216,7 +2224,11 @@ static void destroy_umrc_res(struct mlx5_ib_dev *dev)
+ 		mlx5_ib_warn(dev, "mr cache cleanup failed\n");
+ 
+ 	mlx5_ib_destroy_qp(dev->umrc.qp);
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	ib_free_cq(dev->umrc.cq);
++#else
++	ib_destroy_cq(dev->umrc.cq);
++#endif
+ 	ib_dealloc_pd(dev->umrc.pd);
+ }
+ 
+@@ -2231,6 +2243,9 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
+ 	struct ib_pd *pd;
+ 	struct ib_cq *cq;
+ 	struct ib_qp *qp;
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++	struct ib_cq_init_attr cq_attr = {};
++#endif
+ 	int ret;
+ 
+ 	attr = kzalloc(sizeof(*attr), GFP_KERNEL);
+@@ -2247,12 +2262,23 @@ static int create_umr_res(struct mlx5_ib_dev *dev)
+ 		goto error_0;
+ 	}
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	cq = ib_alloc_cq(&dev->ib_dev, NULL, 128, 0, IB_POLL_SOFTIRQ);
+ 	if (IS_ERR(cq)) {
+ 		mlx5_ib_dbg(dev, "Couldn't create CQ for sync UMR QP\n");
+ 		ret = PTR_ERR(cq);
+ 		goto error_2;
+ 	}
++#else
++	cq_attr.cqe = 128;
++	cq = ib_create_cq(&dev->ib_dev, mlx5_umr_cq_handler, NULL, NULL, &cq_attr);
++	if (IS_ERR(cq)) {
++		mlx5_ib_dbg(dev, "Couldn't create CQ for sync UMR QP\n");
++		ret = PTR_ERR(cq);
++		goto error_2;
++	}
++	ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
++#endif
+ 
+ 	init_attr->send_cq = cq;
+ 	init_attr->recv_cq = cq;
+@@ -2319,7 +2345,11 @@ error_4:
+ 	mlx5_ib_destroy_qp(qp);
+ 
+ error_3:
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	ib_free_cq(cq);
++#else
++	ib_destroy_cq(cq);
++#endif
+ 
+ error_2:
+ 	ib_dealloc_pd(pd);
+@@ -2781,12 +2811,14 @@ static void *mlx5_ib_add(struct mlx5_core_dev *mdev)
  	dev->ib_dev.check_mr_status	= mlx5_ib_check_mr_status;
  	dev->ib_dev.get_port_immutable  = mlx5_port_immutable;
  	dev->ib_dev.get_dev_fw_str      = get_dev_fw_str;
@@ -268,7 +327,39 @@ diff --git a/drivers/infiniband/hw/mlx5/mlx5_ib.h b/drivers/infiniband/hw/mlx5/m
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/hw/mlx5/mlx5_ib.h
 +++ b/drivers/infiniband/hw/mlx5/mlx5_ib.h
-@@ -869,6 +869,7 @@ static inline void mlx5_ib_qp_enable_pagefaults(struct mlx5_ib_qp *qp)  {}
+@@ -518,11 +518,21 @@ struct mlx5_ib_mw {
+ };
+ 
+ struct mlx5_ib_umr_context {
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	struct ib_cqe		cqe;
++#endif
+ 	enum ib_wc_status	status;
+ 	struct completion	done;
+ };
+ 
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++static inline void mlx5_ib_init_umr_context(struct mlx5_ib_umr_context *context)
++{
++	context->status = -1;
++	init_completion(&context->done);
++}
++#endif
++
+ struct umr_common {
+ 	struct ib_pd	*pd;
+ 	struct ib_cq	*cq;
+@@ -825,6 +835,9 @@ int mlx5_ib_get_cqe_size(struct mlx5_ib_dev *dev, struct ib_cq *ibcq);
+ int mlx5_mr_cache_init(struct mlx5_ib_dev *dev);
+ int mlx5_mr_cache_cleanup(struct mlx5_ib_dev *dev);
+ int mlx5_mr_ib_cont_pages(struct ib_umem *umem, u64 addr, int *count, int *shift);
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++void mlx5_umr_cq_handler(struct ib_cq *cq, void *cq_context);
++#endif
+ int mlx5_ib_check_mr_status(struct ib_mr *ibmr, u32 check_mask,
+ 			    struct ib_mr_status *mr_status);
+ struct ib_wq *mlx5_ib_create_wq(struct ib_pd *pd,
+@@ -869,6 +882,7 @@ static inline void mlx5_ib_qp_enable_pagefaults(struct mlx5_ib_qp *qp)  {}
  
  #endif /* CONFIG_INFINIBAND_ON_DEMAND_PAGING */
  
@@ -276,7 +367,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  int mlx5_ib_get_vf_config(struct ib_device *device, int vf,
  			  u8 port, struct ifla_vf_info *info);
  int mlx5_ib_set_vf_link_state(struct ib_device *device, int vf,
-@@ -877,6 +878,7 @@ int mlx5_ib_get_vf_stats(struct ib_device *device, int vf,
+@@ -877,6 +891,7 @@ int mlx5_ib_get_vf_stats(struct ib_device *device, int vf,
  			 u8 port, struct ifla_vf_stats *stats);
  int mlx5_ib_set_vf_guid(struct ib_device *device, int vf, u8 port,
  			u64 guid, int type);
@@ -284,6 +375,138 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  __be16 mlx5_get_roce_udp_sport(struct mlx5_ib_dev *dev, u8 port_num,
  			       int index);
+diff --git a/drivers/infiniband/hw/mlx5/mr.c b/drivers/infiniband/hw/mlx5/mr.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/mlx5/mr.c
++++ b/drivers/infiniband/hw/mlx5/mr.c
+@@ -836,6 +836,7 @@ static struct ib_umem *mr_umem_get(struct ib_pd *pd, u64 start, u64 length,
+ 	return umem;
+ }
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ static void mlx5_ib_umr_done(struct ib_cq *cq, struct ib_wc *wc)
+ {
+ 	struct mlx5_ib_umr_context *context =
+@@ -851,6 +852,29 @@ static inline void mlx5_ib_init_umr_context(struct mlx5_ib_umr_context *context)
+ 	context->status = -1;
+ 	init_completion(&context->done);
+ }
++#else
++void mlx5_umr_cq_handler(struct ib_cq *cq, void *cq_context)
++{
++	struct mlx5_ib_umr_context *context;
++	struct ib_wc wc;
++	int err;
++
++	while (1) {
++		err = ib_poll_cq(cq, 1, &wc);
++		if (err < 0) {
++			pr_warn("poll cq error %d\n", err);
++			return;
++		}
++		if (err == 0)
++			break;
++
++		context = (struct mlx5_ib_umr_context *) (unsigned long) wc.wr_id;
++		context->status = wc.status;
++		complete(&context->done);
++	}
++	ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
++}
++#endif
+ 
+ static struct mlx5_ib_mr *reg_umr(struct ib_pd *pd, struct ib_umem *umem,
+ 				  u64 virt_addr, u64 len, int npages,
+@@ -890,12 +914,20 @@ static struct mlx5_ib_mr *reg_umr(struct ib_pd *pd, struct ib_umem *umem,
+ 	if (err)
+ 		goto free_mr;
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	mlx5_ib_init_umr_context(&umr_context);
+ 
+ 	umrwr.wr.wr_cqe = &umr_context.cqe;
++#else
++	memset(&umrwr, 0, sizeof(umrwr));
++	umrwr.wr.wr_id = (u64)(unsigned long)&umr_context;
++#endif
+ 	prep_umr_reg_wqe(pd, &umrwr.wr, &sg, dma, npages, mr->mmkey.key,
+ 			 page_shift, virt_addr, len, access_flags);
+ 
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++	mlx5_ib_init_umr_context(&umr_context);
++#endif
+ 	down(&umrc->sem);
+ 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
+ 	if (err) {
+@@ -1007,10 +1039,15 @@ int mlx5_ib_update_mtt(struct mlx5_ib_mr *mr, u64 start_page_index, int npages,
+ 
+ 		dma_sync_single_for_device(ddev, dma, size, DMA_TO_DEVICE);
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 		mlx5_ib_init_umr_context(&umr_context);
+ 
+ 		memset(&wr, 0, sizeof(wr));
+ 		wr.wr.wr_cqe = &umr_context.cqe;
++#else
++		memset(&wr, 0, sizeof(wr));
++		wr.wr.wr_id = (u64)(unsigned long)&umr_context;
++#endif
+ 
+ 		sg.addr = dma;
+ 		sg.length = ALIGN(npages * sizeof(u64),
+@@ -1027,6 +1064,9 @@ int mlx5_ib_update_mtt(struct mlx5_ib_mr *mr, u64 start_page_index, int npages,
+ 		wr.mkey = mr->mmkey.key;
+ 		wr.target.offset = start_page_index;
+ 
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++		mlx5_ib_init_umr_context(&umr_context);
++#endif
+ 		down(&umrc->sem);
+ 		err = ib_post_send(umrc->qp, &wr.wr, &bad);
+ 		if (err) {
+@@ -1203,10 +1243,18 @@ static int unreg_umr(struct mlx5_ib_dev *dev, struct mlx5_ib_mr *mr)
+ 	if (mdev->state == MLX5_DEVICE_STATE_INTERNAL_ERROR)
+ 		return 0;
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	mlx5_ib_init_umr_context(&umr_context);
+ 
+ 	umrwr.wr.wr_cqe = &umr_context.cqe;
+ 	prep_umr_unreg_wqe(dev, &umrwr.wr, mr->mmkey.key);
++#else
++	memset(&umrwr.wr, 0, sizeof(umrwr));
++	umrwr.wr.wr_id = (u64)(unsigned long)&umr_context;
++	prep_umr_unreg_wqe(dev, &umrwr.wr, mr->mmkey.key);
++
++	mlx5_ib_init_umr_context(&umr_context);
++#endif
+ 
+ 	down(&umrc->sem);
+ 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
+@@ -1245,9 +1293,13 @@ static int rereg_umr(struct ib_pd *pd, struct mlx5_ib_mr *mr, u64 virt_addr,
+ 	int size;
+ 	int err;
+ 
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ 	mlx5_ib_init_umr_context(&umr_context);
+ 
+ 	umrwr.wr.wr_cqe = &umr_context.cqe;
++#else
++	umrwr.wr.wr_id = (u64)(unsigned long)&umr_context;
++#endif
+ 	umrwr.wr.send_flags = MLX5_IB_SEND_UMR_FAIL_IF_FREE;
+ 
+ 	if (flags & IB_MR_REREG_TRANS) {
+@@ -1274,6 +1326,9 @@ static int rereg_umr(struct ib_pd *pd, struct mlx5_ib_mr *mr, u64 virt_addr,
+ 		umrwr.wr.send_flags |= MLX5_IB_SEND_UMR_UPDATE_ACCESS;
+ 	}
+ 
++#if ! defined(HAVE_IRQ_POLL_H) || ! IS_ENABLED(CONFIG_IRQ_POLL)
++	mlx5_ib_init_umr_context(&umr_context);
++#endif
+ 	/* post send request to UMR QP */
+ 	down(&umrc->sem);
+ 	err = ib_post_send(umrc->qp, &umrwr.wr, &bad);
 diff --git a/drivers/net/ethernet/mellanox/mlx5/core/Makefile b/drivers/net/ethernet/mellanox/mlx5/core/Makefile
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/net/ethernet/mellanox/mlx5/core/Makefile
