@@ -1,0 +1,49 @@
+From: Vladimir Neyelov <vladimirn@mellanox.com>
+Subject: [PATCH] BACKPORT: ib_iser
+
+Signed-off-by: Vladimir Neyelov <vladimirn@mellanox.com>
+---
+ drivers/infiniband/ulp/iser/iscsi_iser.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/ulp/iser/iscsi_iser.c b/drivers/infiniband/ulp/iser/iscsi_iser.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/iser/iscsi_iser.c
++++ b/drivers/infiniband/ulp/iser/iscsi_iser.c
+@@ -985,8 +985,13 @@ static int iscsi_iser_slave_alloc(struct scsi_device *sdev)
+ 	ib_dev = iser_conn->ib_conn.device->ib_device;
+ 
+ 	if (!(ib_dev->attrs.device_cap_flags & IB_DEVICE_SG_GAPS_REG))
++	{
++#ifdef HAVE_BLK_QUEUE_VIRT_BOUNDARY
+ 		blk_queue_virt_boundary(sdev->request_queue, ~MASK_4K);
+-
++#else
++		queue_flag_set_unlocked(QUEUE_FLAG_SG_GAPS, sdev->request_queue);
++#endif
++	}
+ 	return 0;
+ }
+ 
+@@ -994,7 +999,11 @@ static struct scsi_host_template iscsi_iser_sht = {
+ 	.module                 = THIS_MODULE,
+ 	.name                   = "iSCSI Initiator over iSER",
+ 	.queuecommand           = iscsi_queuecommand,
++#ifdef HAVE_SCSCI_CHANGE_QUEUE_DEPTH
+ 	.change_queue_depth	= scsi_change_queue_depth,
++#else
++	.change_queue_depth	= iscsi_change_queue_depth,
++#endif
+ 	.sg_tablesize           = ISCSI_ISER_DEF_SG_TABLESIZE,
+ 	.cmd_per_lun            = ISER_DEF_CMD_PER_LUN,
+ 	.eh_abort_handler       = iscsi_eh_abort,
+@@ -1005,7 +1014,9 @@ static struct scsi_host_template iscsi_iser_sht = {
+ 	.slave_alloc            = iscsi_iser_slave_alloc,
+ 	.proc_name              = "iscsi_iser",
+ 	.this_id                = -1,
++#ifdef HAVE_SCSI_HOST_TEMPLATE_TRACK_QUEUE_DEPTH
+ 	.track_queue_depth	= 1,
++#endif
+ };
+ 
+ static struct iscsi_transport iscsi_iser_transport = {
