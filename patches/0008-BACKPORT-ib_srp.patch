@@ -1,0 +1,326 @@
+From: Israel Rukshin <israelr@mellanox.com>
+Subject: [PATCH] BACKPORT: ib_srp
+
+Signed-off-by: Israel Rukshin <israelr@mellanox.com>
+---
+ drivers/infiniband/ulp/srp/ib_srp.c | 105 ++++++++++++++++++++++++++++++++++++
+ drivers/infiniband/ulp/srp/ib_srp.h |   7 +++
+ 2 files changed, 112 insertions(+)
+
+diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/srp/ib_srp.c
++++ b/drivers/infiniband/ulp/srp/ib_srp.c
+@@ -129,10 +129,12 @@ MODULE_PARM_DESC(dev_loss_tmo,
+ 		 " if fast_io_fail_tmo has not been set. \"off\" means that"
+ 		 " this functionality is disabled.");
+ 
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ static unsigned ch_count;
+ module_param(ch_count, uint, 0444);
+ MODULE_PARM_DESC(ch_count,
+ 		 "Number of RDMA channels to use for communication with an SRP target. Using more than one channel improves performance if the HCA supports multiple completion vectors. The default value is the minimum of four times the number of online CPU sockets and the number of completion vectors supported by the HCA.");
++#endif
+ 
+ static void srp_add_one(struct ib_device *device);
+ static void srp_remove_one(struct ib_device *device, void *client_data);
+@@ -846,6 +848,9 @@ static int srp_alloc_req_data(struct srp_rdma_ch *ch)
+ 	dma_addr_t dma_addr;
+ 	int i, ret = -ENOMEM;
+ 
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++	INIT_LIST_HEAD(&ch->free_reqs);
++#endif
+ 	ch->req_ring = kcalloc(target->req_ring_size, sizeof(*ch->req_ring),
+ 			       GFP_KERNEL);
+ 	if (!ch->req_ring)
+@@ -877,6 +882,10 @@ static int srp_alloc_req_data(struct srp_rdma_ch *ch)
+ 			goto out;
+ 
+ 		req->indirect_dma_addr = dma_addr;
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++		req->index = i;
++		list_add_tail(&req->list, &ch->free_reqs);
++#endif
+ 	}
+ 	ret = 0;
+ 
+@@ -1130,6 +1139,9 @@ static void srp_free_req(struct srp_rdma_ch *ch, struct srp_request *req,
+ 
+ 	spin_lock_irqsave(&ch->lock, flags);
+ 	ch->req_lim += req_lim_delta;
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++	list_add_tail(&req->list, &ch->free_reqs);
++#endif
+ 	spin_unlock_irqrestore(&ch->lock, flags);
+ }
+ 
+@@ -1874,11 +1886,16 @@ static void srp_process_rsp(struct srp_rdma_ch *ch, struct srp_rsp *rsp)
+ 			ch->tsk_mgmt_status = rsp->data[3];
+ 		complete(&ch->tsk_mgmt_done);
+ 	} else {
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++		req = &ch->req_ring[rsp->tag];
++		scmnd = srp_claim_req(ch, req, NULL, NULL);
++#else
+ 		scmnd = scsi_host_find_tag(target->scsi_host, rsp->tag);
+ 		if (scmnd) {
+ 			req = (void *)scmnd->host_scribble;
+ 			scmnd = srp_claim_req(ch, req, NULL, scmnd);
+ 		}
++#endif
+ 		if (!scmnd) {
+ 			shost_printk(KERN_ERR, target->scsi_host,
+ 				     "Null scmnd for RSP w/tag %#016llx received on ch %td / QP %#x\n",
+@@ -2084,8 +2101,10 @@ static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ 	struct srp_cmd *cmd;
+ 	struct ib_device *dev;
+ 	unsigned long flags;
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	u32 tag;
+ 	u16 idx;
++#endif
+ 	int len, ret;
+ 	const bool in_scsi_eh = !in_interrupt() && current == shost->ehandler;
+ 
+@@ -2102,6 +2121,7 @@ static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ 	if (unlikely(scmnd->result))
+ 		goto err;
+ 
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	WARN_ON_ONCE(scmnd->request->tag < 0);
+ 	tag = blk_mq_unique_tag(scmnd->request);
+ 	ch = &target->ch[blk_mq_unique_tag_to_hwq(tag)];
+@@ -2109,15 +2129,26 @@ static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ 	WARN_ONCE(idx >= target->req_ring_size, "%s: tag %#x: idx %d >= %d\n",
+ 		  dev_name(&shost->shost_gendev), tag, idx,
+ 		  target->req_ring_size);
++#else
++	ch = &target->ch[0];
++#endif
+ 
+ 	spin_lock_irqsave(&ch->lock, flags);
+ 	iu = __srp_get_tx_iu(ch, SRP_IU_CMD);
+ 	spin_unlock_irqrestore(&ch->lock, flags);
+ 
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	if (!iu)
+ 		goto err;
+ 
+ 	req = &ch->req_ring[idx];
++#else
++	if (!iu)
++		goto err_unlock;
++
++	req = list_first_entry(&ch->free_reqs, struct srp_request, list);
++	list_del(&req->list);
++#endif
+ 	dev = target->srp_host->srp_dev->dev;
+ 	ib_dma_sync_single_for_cpu(dev, iu->dma, target->max_iu_len,
+ 				   DMA_TO_DEVICE);
+@@ -2129,7 +2160,11 @@ static int srp_queuecommand(struct Scsi_Host *shost, struct scsi_cmnd *scmnd)
+ 
+ 	cmd->opcode = SRP_CMD;
+ 	int_to_scsilun(scmnd->device->lun, &cmd->lun);
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	cmd->tag    = tag;
++#else
++	cmd->tag    = req->index;
++#endif
+ 	memcpy(cmd->cdb, scmnd->cmnd, scmnd->cmd_len);
+ 
+ 	req->scmnd    = scmnd;
+@@ -2178,6 +2213,14 @@ err_iu:
+ 	 */
+ 	req->scmnd = NULL;
+ 
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++	spin_lock_irqsave(&ch->lock, flags);
++	list_add(&req->list, &ch->free_reqs);
++
++err_unlock:
++	spin_unlock_irqrestore(&ch->lock, flags);
++
++#endif
+ err:
+ 	if (scmnd->result) {
+ 		scmnd->scsi_done(scmnd);
+@@ -2500,13 +2543,40 @@ static int srp_cm_handler(struct ib_cm_id *cm_id, struct ib_cm_event *event)
+  *
+  * Returns queue depth.
+  */
++#ifdef HAVE_SCSI_HOST_TEMPLATE_TRACK_QUEUE_DEPTH
+ static int
+ srp_change_queue_depth(struct scsi_device *sdev, int qdepth)
+ {
+ 	if (!sdev->tagged_supported)
+ 		qdepth = 1;
++#ifdef HAVE_SCSCI_CHANGE_QUEUE_DEPTH
+ 	return scsi_change_queue_depth(sdev, qdepth);
++#else
++	scsi_adjust_queue_depth(sdev, qdepth);
++	return sdev->queue_depth;
++#endif //HAVE_SCSCI_CHANGE_QUEUE_DEPTH
+ }
++#else
++static int
++srp_change_queue_depth(struct scsi_device *sdev, int qdepth, int reason)
++{
++	struct Scsi_Host *shost = sdev->host;
++	int max_depth;
++	if (reason == SCSI_QDEPTH_DEFAULT || reason == SCSI_QDEPTH_RAMP_UP) {
++		max_depth = shost->can_queue;
++		if (!sdev->tagged_supported)
++			max_depth = 1;
++		if (qdepth > max_depth)
++			qdepth = max_depth;
++		scsi_adjust_queue_depth(sdev, scsi_get_tag_type(sdev), qdepth);
++	} else if (reason == SCSI_QDEPTH_QFULL)
++		scsi_track_queue_full(sdev, qdepth);
++	else
++		return -EOPNOTSUPP;
++
++	return sdev->queue_depth;
++}
++#endif //HAVE_SCSI_HOST_TEMPLATE_TRACK_QUEUE_DEPTH
+ 
+ static int srp_send_tsk_mgmt(struct srp_rdma_ch *ch, u64 req_tag, u64 lun,
+ 			     u8 func)
+@@ -2569,8 +2639,10 @@ static int srp_abort(struct scsi_cmnd *scmnd)
+ {
+ 	struct srp_target_port *target = host_to_target(scmnd->device->host);
+ 	struct srp_request *req = (struct srp_request *) scmnd->host_scribble;
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	u32 tag;
+ 	u16 ch_idx;
++#endif
+ 	struct srp_rdma_ch *ch;
+ 	int ret;
+ 
+@@ -2578,6 +2650,7 @@ static int srp_abort(struct scsi_cmnd *scmnd)
+ 
+ 	if (!req)
+ 		return SUCCESS;
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	tag = blk_mq_unique_tag(scmnd->request);
+ 	ch_idx = blk_mq_unique_tag_to_hwq(tag);
+ 	if (WARN_ON_ONCE(ch_idx >= target->ch_count))
+@@ -2589,6 +2662,16 @@ static int srp_abort(struct scsi_cmnd *scmnd)
+ 		     "Sending SRP abort for tag %#x\n", tag);
+ 	if (srp_send_tsk_mgmt(ch, tag, scmnd->device->lun,
+ 			      SRP_TSK_ABORT_TASK) == 0)
++#else
++        ch = &target->ch[0];
++        if (!srp_claim_req(ch, req, NULL, scmnd))
++                return SUCCESS;
++        shost_printk(KERN_ERR, target->scsi_host,
++                     "Sending SRP abort for req index %#x\n", req->index);
++
++	if (srp_send_tsk_mgmt(ch, req->index, scmnd->device->lun,
++			      SRP_TSK_ABORT_TASK) == 0)
++#endif
+ 		ret = SUCCESS;
+ 	else if (target->rport->state == SRP_RPORT_LOST)
+ 		ret = FAST_IO_FAIL;
+@@ -2645,8 +2728,12 @@ static int srp_slave_alloc(struct scsi_device *sdev)
+ 	struct ib_device *ibdev = srp_dev->dev;
+ 
+ 	if (!(ibdev->attrs.device_cap_flags & IB_DEVICE_SG_GAPS_REG))
++#ifdef HAVE_BLK_QUEUE_VIRT_BOUNDARY
+ 		blk_queue_virt_boundary(sdev->request_queue,
+ 					~srp_dev->mr_page_mask);
++#else
++		queue_flag_set_unlocked(QUEUE_FLAG_SG_GAPS, sdev->request_queue);
++#endif
+ 
+ 	return 0;
+ }
+@@ -2857,7 +2944,9 @@ static struct scsi_host_template srp_template = {
+ 	.cmd_per_lun			= SRP_DEFAULT_CMD_SQ_SIZE,
+ 	.use_clustering			= ENABLE_CLUSTERING,
+ 	.shost_attrs			= srp_host_attrs,
++#ifdef HAVE_SCSI_HOST_TEMPLATE_TRACK_QUEUE_DEPTH
+ 	.track_queue_depth		= 1,
++#endif
+ };
+ 
+ static int srp_sdev_count(struct Scsi_Host *host)
+@@ -2906,8 +2995,13 @@ static int srp_add_target(struct srp_host *host, struct srp_target_port *target)
+ 	list_add_tail(&target->list, &host->target_list);
+ 	spin_unlock(&host->target_lock);
+ 
++#ifdef HAVE_SCSI_SCAN_INITIAL
+ 	scsi_scan_target(&target->scsi_host->shost_gendev,
+ 			 0, target->scsi_id, SCAN_WILD_CARD, SCSI_SCAN_INITIAL);
++#else
++        scsi_scan_target(&target->scsi_host->shost_gendev,
++                         0, target->scsi_id, SCAN_WILD_CARD, 0);
++#endif
+ 
+ 	if (srp_connected_ch(target) < target->ch_count ||
+ 	    target->qp_in_error) {
+@@ -3184,8 +3278,13 @@ static int srp_parse_options(const char *buf, struct srp_target_port *target)
+ 			break;
+ 
+ 		case SRP_OPT_SG_TABLESIZE:
++#ifdef HAVE_SG_MAX_SEGMENTS
+ 			if (match_int(args, &token) || token < 1 ||
+ 					token > SG_MAX_SEGMENTS) {
++#else
++			if (match_int(args, &token) || token < 1 ||
++					token > SCSI_MAX_SG_CHAIN_SEGMENTS) {
++#endif
+ 				pr_warn("bad max sg_tablesize parameter '%s'\n",
+ 					p);
+ 				goto out;
+@@ -3347,11 +3446,15 @@ static ssize_t srp_create_target(struct device *dev,
+ 		goto out;
+ 
+ 	ret = -ENOMEM;
++#ifdef HAVE_BLK_MQ_UNIQUE_TAG
+ 	target->ch_count = max_t(unsigned, num_online_nodes(),
+ 				 min(ch_count ? :
+ 				     min(4 * num_online_nodes(),
+ 					 ibdev->num_comp_vectors),
+ 				     num_online_cpus()));
++#else
++	target->ch_count = 1;
++#endif
+ 	target->ch = kcalloc(target->ch_count, sizeof(*target->ch),
+ 			     GFP_KERNEL);
+ 	if (!target->ch)
+@@ -3417,7 +3520,9 @@ static ssize_t srp_create_target(struct device *dev,
+ 	}
+ 
+ connected:
++#ifdef HAVE_SCSI_HOST_NR_HW_QUEUES
+ 	target->scsi_host->nr_hw_queues = target->ch_count;
++#endif
+ 
+ 	ret = srp_add_target(host, target);
+ 	if (ret)
+diff --git a/drivers/infiniband/ulp/srp/ib_srp.h b/drivers/infiniband/ulp/srp/ib_srp.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/ulp/srp/ib_srp.h
++++ b/drivers/infiniband/ulp/srp/ib_srp.h
+@@ -113,6 +113,10 @@ struct srp_host {
+ };
+ 
+ struct srp_request {
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++	struct list_head        list;
++	short                   index;
++#endif
+ 	struct scsi_cmnd       *scmnd;
+ 	struct srp_iu	       *cmd;
+ 	union {
+@@ -133,6 +137,9 @@ struct srp_request {
+ struct srp_rdma_ch {
+ 	/* These are RW in the hot path, and commonly used together */
+ 	struct list_head	free_tx;
++#ifndef HAVE_BLK_MQ_UNIQUE_TAG
++	struct list_head        free_reqs;
++#endif
+ 	spinlock_t		lock;
+ 	s32			req_lim;
+ 
