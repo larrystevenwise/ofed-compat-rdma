@@ -1,0 +1,258 @@
+diff -durp a/drivers/infiniband/hw/qib/qib_file_ops.c b/drivers/infiniband/hw/qib/qib_file_ops.c
+--- a/drivers/infiniband/hw/qib/qib_file_ops.c
++++ b/drivers/infiniband/hw/qib/qib_file_ops.c
+@@ -57,7 +57,12 @@
+ static int qib_open(struct inode *, struct file *);
+ static int qib_close(struct inode *, struct file *);
+ static ssize_t qib_write(struct file *, const char __user *, size_t, loff_t *);
++#ifdef HAVE_FILE_OPS_WRITE_ITER
+ static ssize_t qib_write_iter(struct kiocb *, struct iov_iter *);
++#else
++static ssize_t qib_aio_write(struct kiocb *, const struct iovec *,
++			     unsigned long, loff_t);
++#endif
+ static unsigned int qib_poll(struct file *, struct poll_table_struct *);
+ static int qib_mmapf(struct file *, struct vm_area_struct *);
+ 
+@@ -69,7 +74,11 @@ static int qib_mmapf(struct file *, stru
+ static const struct file_operations qib_file_ops = {
+ 	.owner = THIS_MODULE,
+ 	.write = qib_write,
++#ifdef HAVE_FILE_OPS_WRITE_ITER
+ 	.write_iter = qib_write_iter,
++#else
++	.aio_write = qib_aio_write,
++#endif
+ 	.open = qib_open,
+ 	.release = qib_close,
+ 	.poll = qib_poll,
+@@ -2261,6 +2270,7 @@ bail:
+ 	return ret;
+ }
+ 
++#ifdef HAVE_FILE_OPS_WRITE_ITER
+ static ssize_t qib_write_iter(struct kiocb *iocb, struct iov_iter *from)
+ {
+ 	struct qib_filedata *fp = iocb->ki_filp->private_data;
+@@ -2272,6 +2282,20 @@ static ssize_t qib_write_iter(struct kio
+ 			 
+ 	return qib_user_sdma_writev(rcd, pq, from->iov, from->nr_segs);
+ }
++#else
++static ssize_t qib_aio_write(struct kiocb *iocb, const struct iovec *iov,
++			     unsigned long dim, loff_t off)
++{
++	struct qib_filedata *fp = iocb->ki_filp->private_data;
++	struct qib_ctxtdata *rcd = ctxt_fp(iocb->ki_filp);
++	struct qib_user_sdma_queue *pq = fp->pq;
++
++	if (!dim || !pq)
++		return -EINVAL;
++
++	return qib_user_sdma_writev(rcd, pq, iov, dim);
++}
++#endif
+ 
+ static struct class *qib_class;
+ static dev_t qib_dev;
+diff -durp a/drivers/infiniband/hw/qib/qib_fs.c b/drivers/infiniband/hw/qib/qib_fs.c
+--- a/drivers/infiniband/hw/qib/qib_fs.c
++++ b/drivers/infiniband/hw/qib/qib_fs.c
+@@ -89,15 +89,23 @@ static int create_file(const char *name,
+ {
+ 	int error;
+ 
++#ifdef HAVE_INODE_LOCK
+ 	inode_lock(d_inode(parent));
++#else
++	*dentry = NULL;
++	mutex_lock(&parent->d_inode->i_mutex);
++#endif
+ 	*dentry = lookup_one_len(name, parent, strlen(name));
+ 	if (!IS_ERR(*dentry))
+ 		error = qibfs_mknod(d_inode(parent), *dentry,
+ 				    mode, fops, data);
+ 	else
+ 		error = PTR_ERR(*dentry);
++#ifdef HAVE_INODE_LOCK
+ 	inode_unlock(d_inode(parent));
+-
++#else
++	mutex_unlock(&parent->d_inode->i_mutex);
++#endif
+ 	return error;
+ }
+ 
+@@ -439,6 +447,7 @@ static int remove_file(struct dentry *pa
+ 	}
+ 
+ 	spin_lock(&tmp->d_lock);
++#ifdef HAVE_SIMPLE_POSITIVE
+ 	if (simple_positive(tmp)) {
+ 		__d_drop(tmp);
+ 		spin_unlock(&tmp->d_lock);
+@@ -447,7 +456,16 @@ static int remove_file(struct dentry *pa
+ 		spin_unlock(&tmp->d_lock);
+ 	}
+ 	dput(tmp);
+-
++#else
++	if (!(d_unhashed(tmp) && tmp->d_inode)) {
++		dget_dlock(tmp);
++		__d_drop(tmp);
++		spin_unlock(&tmp->d_lock);
++		simple_unlink(parent->d_inode, tmp);
++	} else {
++		spin_unlock(&tmp->d_lock);
++	}
++#endif
+ 	ret = 0;
+ bail:
+ 	/*
+@@ -465,7 +483,12 @@ static int remove_device_files(struct su
+ 	int ret, i;
+ 
+ 	root = dget(sb->s_root);
+-	inode_lock(d_inode(root));
++
++#ifdef HAVE_INODE_LOCK
++        inode_lock(d_inode(root));
++#else
++	mutex_lock(&root->d_inode->i_mutex);
++#endif
+ 	snprintf(unit, sizeof(unit), "%u", dd->unit);
+ 	dir = lookup_one_len(unit, root, strlen(unit));
+ 
+@@ -475,7 +498,11 @@ static int remove_device_files(struct su
+ 		goto bail;
+ 	}
+ 
++#ifdef HAVE_INODE_LOCK
+ 	inode_lock(d_inode(dir));
++#else
++	mutex_lock(&dir->d_inode->i_mutex);
++#endif
+ 	remove_file(dir, "counters");
+ 	remove_file(dir, "counter_names");
+ 	remove_file(dir, "portcounter_names");
+@@ -490,13 +517,22 @@ static int remove_device_files(struct su
+ 		}
+ 	}
+ 	remove_file(dir, "flash");
++
++#ifdef HAVE_INODE_LOCK
+ 	inode_unlock(d_inode(dir));
++#else
++        mutex_unlock(&dir->d_inode->i_mutex);
++#endif
+ 	ret = simple_rmdir(d_inode(root), dir);
+ 	d_delete(dir);
+ 	dput(dir);
+ 
+ bail:
++#ifdef HAVE_INODE_LOCK
+ 	inode_unlock(d_inode(root));
++#else
++	mutex_unlock(&root->d_inode->i_mutex);
++#endif
+ 	dput(root);
+ 	return ret;
+ }
+diff -durp a/drivers/infiniband/hw/qib/qib_init.c b/drivers/infiniband/hw/qib/qib_init.c
+--- a/driivers/infiniband/hw/qib/qib_init.c
++++ b/drivers/infiniband/hw/qib/qib_init.c
+@@ -1691,7 +1691,11 @@ int qib_setup_eagerbufs(struct qib_ctxtd
+ 	 * heavy filesystem activity makes these fail, and we can
+ 	 * use compound pages.
+ 	 */
++#ifdef HAVE_GFP_RECLAIM
+ 	gfp_flags = __GFP_RECLAIM | __GFP_IO | __GFP_COMP;
++#else
++	gfp_flags = __GFP_WAIT | __GFP_IO | __GFP_COMP;
++#endif
+ 
+ 	egrcnt = rcd->rcvegrcnt;
+ 	egroff = rcd->rcvegr_tid_base;
+diff -durp a/drivers/infiniband/hw/qib/qib_user_pages.c b/drivers/infiniband/hw/qib/qib_user_pages.c
+--- a/drivers/infiniband/hw/qib/qib_user_pages.c
++++ b/drivers/infiniband/hw/qib/qib_user_pages.c
+@@ -66,9 +66,16 @@ static int __qib_get_user_pages(unsigned
+ 	}
+ 
+ 	for (got = 0; got < num_pages; got += ret) {
++#ifdef HAVE_GET_USER_PAGES_6_PARAMS
+ 		ret = get_user_pages(start_page + got * PAGE_SIZE,
+ 				     num_pages - got, 1, 1,
+ 				     p + got, NULL);
++#else
++		ret = get_user_pages(current, current->mm,
++				     start_page + got * PAGE_SIZE,
++				     num_pages - got, 1, 1,
++				     p + got, NULL);
++#endif
+ 		if (ret < 0)
+ 			goto bail_release;
+ 	}
+diff -durp a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
+--- a/drivers/infiniband/hw/qib/qib_pcie.c
++++ b/drivers/infiniband/hw/qib/qib_pcie.c
+@@ -187,6 +187,7 @@ void qib_pcie_ddcleanup(struct qib_devda
+        pci_set_drvdata(dd->pcidev, NULL);
+ }
+
++#ifdef HAVE_PCI_MSIX_VEC_COUNT
+ static void qib_msix_setup(struct qib_devdata *dd, int pos, u32 *msixcnt,
+                           struct qib_msix_entry *qib_msix_entry)
+ {
+@@ -235,6 +236,53 @@ do_intx:
+        *msixcnt = 0;
+        qib_enable_intx(dd->pcidev);
+ }
++#else
++static void qib_msix_setup(struct qib_devdata *dd, int pos, u32 *msixcnt,
++                          struct qib_msix_entry *qib_msix_entry)
++{
++       int ret;
++       u32 tabsize = 0;
++       u16 msix_flags;
++       struct msix_entry *msix_entry;
++       int i;
++
++       /* We can't pass qib_msix_entry array to qib_msix_setup
++       * so use a dummy msix_entry array and copy the allocated
++       * irq back to the qib_msix_entry array. */
++       msix_entry = kmalloc(*msixcnt * sizeof(*msix_entry), GFP_KERNEL);
++       if (!msix_entry) {
++               ret = -ENOMEM;
++               goto do_intx;
++       }
++       for (i = 0; i < *msixcnt; i++)
++               msix_entry[i] = qib_msix_entry[i].msix;
++
++       pci_read_config_word(dd->pcidev, pos + PCI_MSIX_FLAGS, &msix_flags);
++       tabsize = 1 + (msix_flags & PCI_MSIX_FLAGS_QSIZE);
++       if (tabsize > *msixcnt)
++               tabsize = *msixcnt;
++       ret = pci_enable_msix(dd->pcidev, msix_entry, tabsize);
++       if (ret > 0) {
++               tabsize = ret;
++               ret = pci_enable_msix(dd->pcidev, msix_entry, tabsize);
++       }
++do_intx:
++       if (ret) {
++               qib_dev_err(dd,
++                       "pci_enable_msix %d vectors failed: %d, falling back to INTx\n",
++                       tabsize, ret);
++               tabsize = 0;
++       }
++       for (i = 0; i < tabsize; i++)
++               qib_msix_entry[i].msix = msix_entry[i];
++       kfree(msix_entry);
++       *msixcnt = tabsize;
++
++       if (ret)
++               qib_enable_intx(dd->pcidev);
++
++}
++#endif
+
