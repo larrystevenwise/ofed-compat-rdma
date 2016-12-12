@@ -11,8 +11,8 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/en_ethtool.c | 488 +++++++++++++++++++++++-
  drivers/net/ethernet/mellanox/mlx4/en_main.c    |   4 +
  drivers/net/ethernet/mellanox/mlx4/en_netdev.c  | 222 +++++++++++
- drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  58 +++
- drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  50 +++
+ drivers/net/ethernet/mellanox/mlx4/en_rx.c      |  76 ++++
+ drivers/net/ethernet/mellanox/mlx4/en_tx.c      |  54 +++
  drivers/net/ethernet/mellanox/mlx4/intf.c       |   4 +
  drivers/net/ethernet/mellanox/mlx4/main.c       |  47 +++
  drivers/net/ethernet/mellanox/mlx4/mlx4.h       |   4 +
@@ -20,7 +20,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/net/ethernet/mellanox/mlx4/pd.c         |   4 +
  include/linux/mlx4/cmd.h                        |   2 +
  include/linux/mlx4/device.h                     |   4 +
- 17 files changed, 994 insertions(+), 3 deletions(-)
+ 17 files changed, 1016 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/infiniband/hw/mlx4/main.c b/drivers/infiniband/hw/mlx4/main.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -2014,7 +2014,43 @@ index xxxxxxx..xxxxxxx xxxxxx
  	mlx4_free_hwq_res(mdev->dev, &ring->wqres, size * stride + TXBB_SIZE);
  	vfree(ring->rx_info);
  	ring->rx_info = NULL;
-@@ -781,10 +804,14 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -643,7 +666,9 @@ static struct sk_buff *mlx4_en_rx_skb(struct mlx4_en_priv *priv,
+ 		skb_copy_to_linear_data(skb, va, length);
+ 		skb->tail += length;
+ 	} else {
++#ifdef HAVE_ETH_GET_HEADLEN
+ 		unsigned int pull_len;
++#endif
+ 
+ 		/* Move relevant fragments to skb */
+ 		used_frags = mlx4_en_complete_rx_desc(priv, rx_desc, frags,
+@@ -654,6 +679,7 @@ static struct sk_buff *mlx4_en_rx_skb(struct mlx4_en_priv *priv,
+ 		}
+ 		skb_shinfo(skb)->nr_frags = used_frags;
+ 
++#ifdef HAVE_ETH_GET_HEADLEN
+ 		pull_len = eth_get_headlen(va, SMALL_PACKET_SIZE);
+ 		/* Copy headers into the skb linear buffer */
+ 		memcpy(skb->data, va, pull_len);
+@@ -665,6 +691,17 @@ static struct sk_buff *mlx4_en_rx_skb(struct mlx4_en_priv *priv,
+ 		/* Adjust size of first fragment */
+ 		skb_frag_size_sub(&skb_shinfo(skb)->frags[0], pull_len);
+ 		skb->data_len = length - pull_len;
++#else
++		memcpy(skb->data, va, HEADER_COPY_SIZE);
++		skb->tail += HEADER_COPY_SIZE;
++
++		/* Skip headers in first fragment */
++		skb_shinfo(skb)->frags[0].page_offset += HEADER_COPY_SIZE;
++
++		/* Adjust size of first fragment */
++		skb_frag_size_sub(&skb_shinfo(skb)->frags[0], HEADER_COPY_SIZE);
++		skb->data_len = length - HEADER_COPY_SIZE;
++#endif
+ 	}
+ 	return skb;
+ }
+@@ -781,10 +818,14 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  	struct mlx4_en_rx_ring *ring = priv->rx_ring[cq->ring];
  	struct mlx4_en_rx_alloc *frags;
  	struct mlx4_en_rx_desc *rx_desc;
@@ -2029,7 +2065,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	int index;
  	int nr;
  	unsigned int length;
-@@ -800,9 +827,11 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -800,9 +841,11 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  	if (budget <= 0)
  		return polled;
  
@@ -2041,7 +2077,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/* We assume a 1:1 mapping between CQEs and Rx descriptors, so Rx
  	 * descriptor offset can be deduced from the CQE index instead of
-@@ -880,6 +909,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -880,6 +923,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  		l2_tunnel = (dev->hw_enc_features & NETIF_F_RXCSUM) &&
  			(cqe->vlan_my_qpn & cpu_to_be32(MLX4_CQE_L2_TUNNEL));
  
@@ -2049,7 +2085,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		/* A bpf program gets first chance to drop the packet. It may
  		 * read bytes but not past the end of the frag.
  		 */
-@@ -916,6 +946,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -916,6 +960,7 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  				goto next;
  			}
  		}
@@ -2057,7 +2093,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  		if (likely(dev->features & NETIF_F_RXCSUM)) {
  			if (cqe->status & cpu_to_be16(MLX4_CQE_STATUS_TCP |
-@@ -977,7 +1008,11 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -977,7 +1022,11 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  			gro_skb->ip_summed = ip_summed;
  
  			if (l2_tunnel && ip_summed == CHECKSUM_UNNECESSARY)
@@ -2069,7 +2105,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  			if ((cqe->vlan_my_qpn &
  			    cpu_to_be32(MLX4_CQE_CVLAN_PRESENT_MASK)) &&
-@@ -1037,8 +1072,13 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
+@@ -1037,8 +1086,13 @@ int mlx4_en_process_rx_cq(struct net_device *dev, struct mlx4_en_cq *cq, int bud
  		skb->protocol = eth_type_trans(skb, dev);
  		skb_record_rx_queue(skb, cq->ring);
  
@@ -2083,7 +2119,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  		if (dev->features & NETIF_F_RXHASH)
  			skb_set_hash(skb,
-@@ -1068,7 +1108,9 @@ next:
+@@ -1068,7 +1122,9 @@ next:
  		for (nr = 0; nr < priv->num_frags; nr++)
  			mlx4_en_free_frag(priv, frags, nr);
  
@@ -2093,7 +2129,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  		++cq->mcq.cons_index;
  		index = (cq->mcq.cons_index) & ring->size_mask;
  		cqe = mlx4_en_get_cqe(cq->buf, index, priv->cqe_size) + factor;
-@@ -1077,8 +1119,10 @@ consumed:
+@@ -1077,8 +1133,10 @@ consumed:
  	}
  
  out:
@@ -2104,7 +2140,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	AVG_PERF_COUNTER(priv->pstats.rx_coal_avg, polled);
  	mlx4_cq_set_ci(&cq->mcq);
-@@ -1114,14 +1158,20 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
+@@ -1096,7 +1154,11 @@ void mlx4_en_rx_irq(struct mlx4_cq *mcq)
+ 	struct mlx4_en_priv *priv = netdev_priv(cq->dev);
+ 
+ 	if (likely(priv->port_up))
++#ifdef HAVE_NAPI_SCHEDULE_IRQOFF
+ 		napi_schedule_irqoff(&cq->napi);
++#else
++		napi_schedule(&cq->napi);
++#endif
+ 	else
+ 		mlx4_en_arm_cq(priv, cq);
+ }
+@@ -1114,14 +1176,20 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
  	/* If we used up all the quota - we're probably not done yet... */
  	if (done == budget) {
  		const struct cpumask *aff;
@@ -2125,7 +2173,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  		if (likely(cpumask_test_cpu(cpu_curr, aff)))
  			return budget;
-@@ -1133,7 +1183,11 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
+@@ -1133,7 +1201,11 @@ int mlx4_en_poll_rx_cq(struct napi_struct *napi, int budget)
  		done = 0;
  	}
  	/* Done for now */
@@ -2137,7 +2185,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	mlx4_en_arm_cq(priv, cq);
  	return done;
  }
-@@ -1155,6 +1209,7 @@ void mlx4_en_calc_rx_buf(struct net_device *dev)
+@@ -1155,6 +1227,7 @@ void mlx4_en_calc_rx_buf(struct net_device *dev)
  	int buf_size = 0;
  	int i = 0;
  
@@ -2145,7 +2193,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	/* bpf requires buffers to be set up as 1 packet per page.
  	 * This only works when num_frags == 1.
  	 */
-@@ -1166,6 +1221,7 @@ void mlx4_en_calc_rx_buf(struct net_device *dev)
+@@ -1166,6 +1239,7 @@ void mlx4_en_calc_rx_buf(struct net_device *dev)
  		align = PAGE_SIZE;
  		order = 0;
  	}
@@ -2153,7 +2201,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	while (buf_size < eff_mtu) {
  		priv->frag_info[i].order = order;
-@@ -1343,6 +1399,7 @@ int mlx4_en_config_rss_steer(struct mlx4_en_priv *priv)
+@@ -1343,6 +1417,7 @@ int mlx4_en_config_rss_steer(struct mlx4_en_priv *priv)
  
  	rss_context->flags = rss_mask;
  	rss_context->hash_fn = MLX4_RSS_HASH_TOP;
@@ -2161,7 +2209,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (priv->rss_hash_fn == ETH_RSS_HASH_XOR) {
  		rss_context->hash_fn = MLX4_RSS_HASH_XOR;
  	} else if (priv->rss_hash_fn == ETH_RSS_HASH_TOP) {
-@@ -1354,6 +1411,7 @@ int mlx4_en_config_rss_steer(struct mlx4_en_priv *priv)
+@@ -1354,6 +1429,7 @@ int mlx4_en_config_rss_steer(struct mlx4_en_priv *priv)
  		err = -EINVAL;
  		goto indir_err;
  	}
@@ -2189,7 +2237,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	}
 +#ifdef HAVE_NAPI_CONSUME_SKB
  	napi_consume_skb(skb, napi_mode);
-+#elif HAVE_DEV_CONSUME_SKB_ANY
++#elif defined(HAVE_DEV_CONSUME_SKB_ANY)
 +	dev_consume_skb_any(skb);
 +#else
 +	dev_kfree_skb_any(skb);
@@ -2259,7 +2307,19 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	netdev_tx_completed_queue(ring->tx_queue, packets, bytes);
  
-@@ -702,8 +728,16 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc,
+@@ -519,7 +545,11 @@ void mlx4_en_tx_irq(struct mlx4_cq *mcq)
+ 	struct mlx4_en_priv *priv = netdev_priv(cq->dev);
+ 
+ 	if (likely(priv->port_up))
++#ifdef HAVE_NAPI_SCHEDULE_IRQOFF
+ 		napi_schedule_irqoff(&cq->napi);
++#else
++		napi_schedule(&cq->napi);
++#endif
+ 	else
+ 		mlx4_en_arm_cq(priv, cq);
+ }
+@@ -702,8 +732,16 @@ static void build_inline_wqe(struct mlx4_en_tx_desc *tx_desc,
  	}
  }
  
@@ -2276,7 +2336,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	struct mlx4_en_priv *priv = netdev_priv(dev);
  	u16 rings_p_up = priv->num_tx_rings_p_up;
-@@ -715,7 +749,11 @@ u16 mlx4_en_select_queue(struct net_device *dev, struct sk_buff *skb,
+@@ -715,7 +753,11 @@ u16 mlx4_en_select_queue(struct net_device *dev, struct sk_buff *skb,
  	if (skb_vlan_tag_present(skb))
  		up = skb_vlan_tag_get(skb) >> VLAN_PRIO_SHIFT;
  
@@ -2288,7 +2348,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  }
  
  static void mlx4_bf_copy(void __iomem *dst, const void *src,
-@@ -842,7 +880,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -842,7 +884,13 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		bf_ok = false;
  	}
  
@@ -2302,7 +2362,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	/* Track current inflight packets for performance analysis */
  	AVG_PERF_COUNTER(priv->pstats.inflight_avg,
-@@ -1030,7 +1074,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
+@@ -1030,7 +1078,11 @@ netdev_tx_t mlx4_en_xmit(struct sk_buff *skb, struct net_device *dev)
  		netif_tx_stop_queue(ring->tx_queue);
  		ring->queue_stopped++;
  	}
@@ -2314,7 +2374,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	real_size = (real_size / 16) & 0x3f;
  
-@@ -1078,6 +1126,7 @@ tx_drop:
+@@ -1078,6 +1130,7 @@ tx_drop:
  	return NETDEV_TX_OK;
  }
  
@@ -2322,7 +2382,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  netdev_tx_t mlx4_en_xmit_frame(struct mlx4_en_rx_alloc *frame,
  			       struct net_device *dev, unsigned int length,
  			       int tx_ind, int *doorbell_pending)
-@@ -1182,3 +1231,4 @@ tx_drop_count:
+@@ -1182,3 +1235,4 @@ tx_drop_count:
  tx_drop:
  	return NETDEV_TX_BUSY;
  }
