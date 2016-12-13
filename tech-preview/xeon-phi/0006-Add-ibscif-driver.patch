@@ -1,4 +1,4 @@
-From c25781519bc040e9c3b298c6f43144c74a329559 Mon Sep 17 00:00:00 2001
+From a5a092dd4b1ec62e32643dcb2f51153aa51ce491 Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Thu, 1 Sep 2016 14:39:08 -0700
 Subject: [PATCH 6/7] Add ibscif driver
@@ -11,7 +11,7 @@ Subject: [PATCH 6/7] Add ibscif driver
  drivers/infiniband/hw/scif/ibscif_ah.c        |   50 +
  drivers/infiniband/hw/scif/ibscif_cm.c        |  515 +++++
  drivers/infiniband/hw/scif/ibscif_cq.c        |  308 +++
- drivers/infiniband/hw/scif/ibscif_driver.h    |  774 +++++++
+ drivers/infiniband/hw/scif/ibscif_driver.h    |  775 +++++++
  drivers/infiniband/hw/scif/ibscif_loopback.c  |  582 +++++
  drivers/infiniband/hw/scif/ibscif_main.c      |  332 +++
  drivers/infiniband/hw/scif/ibscif_mr.c        |  486 +++++
@@ -24,7 +24,7 @@ Subject: [PATCH 6/7] Add ibscif driver
  drivers/infiniband/hw/scif/ibscif_qp.c        |  872 ++++++++
  drivers/infiniband/hw/scif/ibscif_scheduler.c |  195 ++
  drivers/infiniband/hw/scif/ibscif_util.c      |  629 ++++++
- 20 files changed, 8913 insertions(+)
+ 20 files changed, 8914 insertions(+)
  create mode 100644 drivers/infiniband/hw/scif/Kconfig
  create mode 100644 drivers/infiniband/hw/scif/Makefile
  create mode 100644 drivers/infiniband/hw/scif/ibscif_ah.c
@@ -998,10 +998,10 @@ index 0000000..85a3442
 +}
 diff --git a/drivers/infiniband/hw/scif/ibscif_driver.h b/drivers/infiniband/hw/scif/ibscif_driver.h
 new file mode 100644
-index 0000000..ecca3b7
+index 0000000..56a3d36
 --- /dev/null
 +++ b/drivers/infiniband/hw/scif/ibscif_driver.h
-@@ -0,0 +1,774 @@
+@@ -0,0 +1,775 @@
 +/*
 + * Copyright (c) 2008 Intel Corporation.  All rights reserved.
 + *
@@ -1046,6 +1046,7 @@ index 0000000..ecca3b7
 +#include <linux/poll.h>
 +#include <linux/workqueue.h>
 +#include <linux/semaphore.h>
++#include <linux/interrupt.h>	/* for tasklet_struct */
 +
 +/* these macros are defined in "linux/semaphore.h".
 + * however, they may be missing on older systems.
@@ -1656,13 +1657,13 @@ index 0000000..ecca3b7
 +static inline void ibscif_unmap_src(struct page *page, void *addr)
 +{
 +	if (likely(addr))
-+		kunmap(addr);
++		kunmap_atomic(addr);
 +}
 +
 +static inline void ibscif_unmap_dst(struct page *page, void *addr)
 +{
 +	if (likely(addr))
-+		kunmap(addr);
++		kunmap_atomic(addr);
 +	if (likely(page)) {
 +		flush_dcache_page(page);
 +		if (!PageReserved(page))
@@ -9085,5 +9086,5 @@ index 0000000..b395f2f
 +}
 +
 -- 
-2.7.0
+1.8.3.1
 
