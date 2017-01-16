@@ -3,6 +3,7 @@ Subject: [PATCH] BACKPORT: ib_core
 
 Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
 ---
+ drivers/infiniband/core/addr.c          |  8 +++
  drivers/infiniband/core/cma.c           | 23 ++++++++
  drivers/infiniband/core/cma_configfs.c  | 97 ++++++++++++++++++++++++++++++++-
  drivers/infiniband/core/core_priv.h     | 28 ++++++----
@@ -10,14 +11,35 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/mad.c           |  3 +
  drivers/infiniband/core/netlink.c       |  3 +
  drivers/infiniband/core/roce_gid_mgmt.c | 27 +++++++++
- drivers/infiniband/core/sa_query.c      | 19 +++++++
+ drivers/infiniband/core/sa_query.c      | 35 ++++++++++++
  drivers/infiniband/core/umem.c          | 17 +++++-
  drivers/infiniband/core/user_mad.c      |  3 +
  drivers/infiniband/core/verbs.c         |  4 ++
  include/rdma/ib_addr.h                  | 23 ++++++++
  include/rdma/ib_verbs.h                 | 22 ++++++++
- 13 files changed, 262 insertions(+), 13 deletions(-)
+ 14 files changed, 286 insertions(+), 13 deletions(-)
 
+diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/addr.c
++++ b/drivers/infiniband/core/addr.c
+@@ -134,8 +134,16 @@ int ib_nl_handle_ip_res_resp(struct sk_buff *skb,
+ 	const struct nlmsghdr *nlh = (struct nlmsghdr *)cb->nlh;
+ 
+ 	if ((nlh->nlmsg_flags & NLM_F_REQUEST) ||
++#ifdef HAVE_NETLINK_CAPABLE
++#ifdef HAVE_NETLINK_SKB_PARMS_SK
+ 	    !(NETLINK_CB(skb).sk) ||
++#else
++	    !(NETLINK_CB(skb).ssk) ||
++#endif
+ 	    !netlink_capable(skb, CAP_NET_ADMIN))
++#else
++	    sock_net(skb->sk) != &init_net)
++#endif
+ 		return -EPERM;
+ 
+ 	if (ib_nl_is_good_ip_resp(nlh))
 diff --git a/drivers/infiniband/core/cma.c b/drivers/infiniband/core/cma.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/cma.c
@@ -509,7 +531,41 @@ diff --git a/drivers/infiniband/core/sa_query.c b/drivers/infiniband/core/sa_que
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/sa_query.c
 +++ b/drivers/infiniband/core/sa_query.c
-@@ -1238,10 +1238,17 @@ static void init_mad(struct ib_sa_mad *mad, struct ib_mad_agent *agent)
+@@ -803,8 +803,16 @@ int ib_nl_handle_set_timeout(struct sk_buff *skb,
+ 	int ret;
+ 
+ 	if (!(nlh->nlmsg_flags & NLM_F_REQUEST) ||
++#ifdef HAVE_NETLINK_CAPABLE
++#ifdef HAVE_NETLINK_SKB_PARMS_SK
+ 	    !(NETLINK_CB(skb).sk) ||
++#else
++	    !(NETLINK_CB(skb).ssk) ||
++#endif
+ 	    !netlink_capable(skb, CAP_NET_ADMIN))
++#else
++	    sock_net(skb->sk) != &init_net)
++#endif
+ 		return -EPERM;
+ 
+ 	ret = nla_parse(tb, LS_NLA_TYPE_MAX - 1, nlmsg_data(nlh),
+@@ -879,8 +887,16 @@ int ib_nl_handle_resolve_resp(struct sk_buff *skb,
+ 	int ret;
+ 
+ 	if ((nlh->nlmsg_flags & NLM_F_REQUEST) ||
++#ifdef HAVE_NETLINK_CAPABLE
++#ifdef HAVE_NETLINK_SKB_PARMS_SK
+ 	    !(NETLINK_CB(skb).sk) ||
++#else
++	    !(NETLINK_CB(skb).ssk) ||
++#endif
+ 	    !netlink_capable(skb, CAP_NET_ADMIN))
++#else
++	    sock_net(skb->sk) != &init_net)
++#endif
+ 		return -EPERM;
+ 
+ 	spin_lock_irqsave(&ib_nl_request_lock, flags);
+@@ -1238,10 +1254,17 @@ static void init_mad(struct ib_sa_mad *mad, struct ib_mad_agent *agent)
  
  static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
  {
@@ -527,7 +583,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	if (preload)
  		idr_preload(gfp_mask);
  	spin_lock_irqsave(&idr_lock, flags);
-@@ -1253,6 +1260,18 @@ static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
+@@ -1253,6 +1276,18 @@ static int send_mad(struct ib_sa_query *query, int timeout_ms, gfp_t gfp_mask)
  		idr_preload_end();
  	if (id < 0)
  		return id;
