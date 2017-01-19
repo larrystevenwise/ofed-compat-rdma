@@ -237,7 +237,7 @@ cp -a $GIT_COMPAT_TREE/udev/ .
 cp -a $GIT_COMPAT_TREE/scripts/ $COMPAT/
 cp -a $GIT_COMPAT_TREE/include/linux/* include/linux/
 cp -a $GIT_COMPAT_TREE/include/net/* include/net/
-# cp -a $GIT_COMPAT_TREE/include/scsi/* include/scsi/
+cp -a $GIT_COMPAT_TREE/include/scsi/* include/scsi/
 rm -f $COMPAT/*.mod.c
 
 # Stable pending, if -n was passed

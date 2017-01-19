@@ -8,6 +8,7 @@ include/linux/mlx5/
 include/rdma/
 include/uapi/rdma/
 include/scsi/srp.h
+include/scsi/iser.h
 net/rds/
 include/uapi/linux/rds.h
 net/sunrpc/xprtrdma
