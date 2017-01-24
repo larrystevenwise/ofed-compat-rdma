@@ -1,4 +1,4 @@
-From 9f6bb49327fb7179785b10a845cf5070494bd988 Mon Sep 17 00:00:00 2001
+From 3da8ce605b1942b5a7705f10cbadd2afe3b5b810 Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Fri, 20 May 2016 16:17:43 -0700
 Subject: [PATCH 3/7] add the ibp client and server drivers
@@ -8,6 +8,7 @@ infiniband.  It includes the base ib proxy driver, the mlx4
 and mlx5 client drivers, and sa and cm proxy drivers.
 
 Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
+Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
 ---
  drivers/infiniband/Kconfig                  |    2 +
  drivers/infiniband/Makefile                 |    2 +
@@ -21,12 +22,12 @@ Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
  drivers/infiniband/ibp/cm/cm_client_msg.c   |  785 ++++++++
  drivers/infiniband/ibp/cm/cm_ibp_abi.h      |  405 ++++
  drivers/infiniband/ibp/cm/cm_proxy.c        |  752 +++++++
- drivers/infiniband/ibp/cm/cm_server_msg.c   | 1044 ++++++++++
+ drivers/infiniband/ibp/cm/cm_server_msg.c   | 1065 ++++++++++
  drivers/infiniband/ibp/cm/common.h          |   55 +
  drivers/infiniband/ibp/cm/ibp-abi.h         |   94 +
  drivers/infiniband/ibp/cm/ibp_exports.h     |   50 +
  drivers/infiniband/ibp/cm/server.c          |  221 +++
- drivers/infiniband/ibp/cm/server.h          |  129 ++
+ drivers/infiniband/ibp/cm/server.h          |  128 ++
  drivers/infiniband/ibp/cm/server_msg.c      |  176 ++
  drivers/infiniband/ibp/compat.h             |  101 +
  drivers/infiniband/ibp/drv/Makefile         |   10 +
@@ -71,7 +72,7 @@ Signed-off-by: Jerrie Coffman <jerrie.l.coffman@intel.com>
  drivers/infiniband/ibp/sa/server.c          |  218 +++
  drivers/infiniband/ibp/sa/server.h          |  173 ++
  drivers/infiniband/ibp/sa/server_msg.c      |  185 ++
- 62 files changed, 22315 insertions(+)
+ 62 files changed, 22335 insertions(+)
  create mode 100644 drivers/infiniband/ibp/Kconfig
  create mode 100644 drivers/infiniband/ibp/Makefile
  create mode 100644 drivers/infiniband/ibp/cm/Makefile
@@ -2770,10 +2771,10 @@ index 0000000..f08608e
 +EXPORT_SYMBOL(ib_cm_init_qp_attr);
 diff --git a/drivers/infiniband/ibp/cm/cm_server_msg.c b/drivers/infiniband/ibp/cm/cm_server_msg.c
 new file mode 100644
-index 0000000..884be47
+index 0000000..02b3fb3
 --- /dev/null
 +++ b/drivers/infiniband/ibp/cm/cm_server_msg.c
-@@ -0,0 +1,1044 @@
+@@ -0,0 +1,1065 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -2866,19 +2867,9 @@ index 0000000..884be47
 +	a->preference			= b->preference;
 +}
 +
-+void cleanup_cm_entry_list(void)
-+{
-+	struct cm_entry *entry, *next;
-+
-+	down_write(&list_rwsem);
-+	list_for_each_entry_safe(entry, next, &cm_entry_list, list)
-+		kfree(entry);
-+	up_write(&list_rwsem);
-+}
-+
 +static struct cm_entry *find_cm_entry(struct ib_cm_id *cm_id)
 +{
-+	struct cm_entry *entry;
++	struct cm_entry	*entry;
 +
 +	down_read(&list_rwsem);
 +
@@ -2888,10 +2879,34 @@ index 0000000..884be47
 +
 +	print_err("Could not find cm id %p\n", cm_id);
 +	entry = NULL;
++
 +out:
 +	up_read(&list_rwsem);
 +
 +	return entry;
++}
++
++static struct cm_entry *remove_cm_entry(struct ib_cm_id *cm_id)
++{
++	struct cm_entry				*entry, *found = NULL;
++
++	down_write(&list_rwsem);
++
++	list_for_each_entry(entry, &cm_entry_list, list)
++		if (entry->cm_id == cm_id) {
++			found = entry;
++			break;
++		}
++
++	if (!found) {
++		print_err("could not find cm id %p\n", cm_id);
++	} else {
++		list_del(&found->list);
++	}
++
++	up_write(&list_rwsem);
++
++	return found;
 +}
 +
 +/* find the entry id for the listen cm id so we can add the new cm id
@@ -2900,27 +2915,36 @@ index 0000000..884be47
 +static struct cm_entry *find_cm_entry_and_add(struct ib_cm_id *listen_id,
 +					      struct ib_cm_id *cm_id)
 +{
-+	struct cm_entry	*listen_entry, *entry;
++	struct cm_entry				*entry;
++	struct cm_entry				*listen_entry = NULL;
 +
-+	listen_entry = find_cm_entry(listen_id);
++	down_write(&list_rwsem);
++
++	list_for_each_entry(entry, &cm_entry_list, list)
++		if (entry->cm_id == listen_id) {
++			listen_entry = entry;
++			break;
++		}
++
 +	if (!listen_entry) {
 +		print_err("Could not find listen id %p\n", listen_id);
-+		return NULL;
++		goto out;
 +	}
 +
 +	entry = kzalloc(sizeof(struct cm_entry), GFP_KERNEL);
 +	if (!entry) {
 +		print_err("kzalloc failed\n");
-+		return NULL;
++		listen_entry = NULL;
++		goto out;
 +	}
 +
 +	entry->client = listen_entry->client;
 +	entry->cm_id = cm_id;
 +
-+	down_write(&list_rwsem);
 +	list_add(&entry->list, &cm_entry_list);
-+	up_write(&list_rwsem);
 +
++out:
++	up_write(&list_rwsem);
 +	return listen_entry;
 +}
 +
@@ -3063,7 +3087,7 @@ index 0000000..884be47
 +			     data_length + info_length, GFP_KERNEL);
 +	if (!event_work) {
 +		print_err("kzalloc failed\n");
-+		return -ENOMEM;
++		return 0;
 +	}
 +
 +	if (ib_cm_event->event == IB_CM_REQ_RECEIVED) {
@@ -3078,8 +3102,9 @@ index 0000000..884be47
 +		entry = find_cm_entry(cm_id);
 +
 +	if (!entry) {
++		print_err("event (%d) on non-existent id: %p\n", ib_cm_event->event, cm_id);
 +		kfree(event_work);
-+		return -EINVAL;
++		return 0;
 +	}
 +
 +	client = entry->client;
@@ -3280,16 +3305,13 @@ index 0000000..884be47
 +	msg	= (struct ibp_response_msg *) client->tx_buf;
 +	len	= sizeof(*msg);
 +
-+	entry = find_cm_entry(cm_id);
-+	if (!entry)
++	entry = remove_cm_entry(cm_id);
++	if (!entry) {
++		ret = -EINVAL;
 +		goto send_resp;
-+
-+	down_write(&list_rwsem);
-+	list_del(&entry->list);
-+	up_write(&list_rwsem);
++	}
 +
 +	kfree(entry);
-+
 +	ib_destroy_cm_id(cm_id);
 +
 +send_resp:
@@ -4264,10 +4286,10 @@ index 0000000..08fe284
 +module_exit(ibp_cm_server_exit);
 diff --git a/drivers/infiniband/ibp/cm/server.h b/drivers/infiniband/ibp/cm/server.h
 new file mode 100644
-index 0000000..cd71a90
+index 0000000..362e4e4a
 --- /dev/null
 +++ b/drivers/infiniband/ibp/cm/server.h
-@@ -0,0 +1,129 @@
+@@ -0,0 +1,128 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -4372,7 +4394,6 @@ index 0000000..cd71a90
 +	} while (0)
 +
 +int ibp_process_recvs(void *p);
-+void cleanup_cm_entry_list(void);
 +
 +int ibp_cmd_create_cm_id(struct ibp_client *client, struct ibp_msg_header *hdr);
 +int ibp_cmd_destroy_cm_id(struct ibp_client *client,
@@ -22828,5 +22849,5 @@ index 0000000..2d396d8
 +	return ret;
 +}
 -- 
-2.7.0
+1.8.3.1
 

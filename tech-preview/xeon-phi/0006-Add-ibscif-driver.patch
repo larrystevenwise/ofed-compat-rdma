@@ -1,4 +1,4 @@
-From a5a092dd4b1ec62e32643dcb2f51153aa51ce491 Mon Sep 17 00:00:00 2001
+From 0cb3f19158193f0dbf649b0b68c95b42498c02eb Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Thu, 1 Sep 2016 14:39:08 -0700
 Subject: [PATCH 6/7] Add ibscif driver
@@ -6943,7 +6943,7 @@ index 0000000..3ce5763
 +#endif /* IBSCIF_PROTOCOL_H */
 diff --git a/drivers/infiniband/hw/scif/ibscif_provider.c b/drivers/infiniband/hw/scif/ibscif_provider.c
 new file mode 100644
-index 0000000..9954532
+index 0000000..f17404b
 --- /dev/null
 +++ b/drivers/infiniband/hw/scif/ibscif_provider.c
 @@ -0,0 +1,424 @@
@@ -7279,7 +7279,7 @@ index 0000000..9954532
 +
 +	node_cnt = ret;
 +	dev->node_id = my_node_id;
-+	printk(KERN_ALERT PFX "%s: my node_id is %d\n", __func__, dev->node_id);
++	printk(KERN_INFO PFX "%s: my node_id is %d\n", __func__, dev->node_id);
 +
 +	ret = scif_bind(dev->listen_ep, SCIF_OFED_PORT_0);
 +	if (ret < 0) {
