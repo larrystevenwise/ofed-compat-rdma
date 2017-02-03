@@ -41,4 +41,6 @@ ib_iser.ko external
 ib_ipoib.ko external
 ocrdma.ko external
 be2net.ko external
+i40iw.ko external
+i40e.ko external
 compat.ko external

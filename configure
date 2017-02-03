@@ -157,6 +157,9 @@ Usage:  `basename $0` [options]
     --with-cxgb4-mod    make CONFIG_INFINIBAND_CXGB4=m [no]
     --without-cxgb4-mod    [yes]
 
+    --with-i40iw-mod    make CONFIG_INFINIBAND_I40IW=m [no]
+    --without-i40iw-mod    [yes]
+
     --with-nes-mod    make CONFIG_INFINIBAND_NES=m [no]
     --without-nes-mod    [yes]
 
@@ -670,6 +673,15 @@ main()
                         --without-cxgb4i-mod)
                             CONFIG_SCSI_CXGB4_ISCSI=
                         ;;
+                        --with-i40iw-mod)
+                            CONFIG_INFINIBAND_I40IW="m"
+                            CONFIG_I40E="m"
+                            add_conf "# Load I40IW modules" "I40IW_LOAD=yes"
+                        ;;
+                        --without-i40iw-mod)
+                            CONFIG_INFINIBAND_I40IW=
+                            CONFIG_I40E=
+                        ;;
                         --with-nes-mod)
                             CONFIG_INFINIBAND_NES="m"
                             add_conf "# Load NES modules" "NES_LOAD=yes"
@@ -849,6 +861,8 @@ CONFIG_INFINIBAND_CXGB4=${CONFIG_INFINIBAND_CXGB4:-''}
 CONFIG_CHELSIO_T4=${CONFIG_CHELSIO_T4:-''}
 CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI:-''}
 CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI:-''}
+CONFIG_INFINIBAND_I40IW=${CONFIG_INFINIBAND_I40IW:-''}
+CONFIG_I40E=${CONFIG_I40E:-''}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES:-''}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA:-''}
 CONFIG_BE2NET=${CONFIG_BE2NET:-''}
@@ -984,6 +998,8 @@ CONFIG_INFINIBAND_CXGB4=${CONFIG_INFINIBAND_CXGB4}
 CONFIG_CHELSIO_T4=${CONFIG_CHELSIO_T4}
 CONFIG_SCSI_CXGB3_ISCSI=${CONFIG_SCSI_CXGB3_ISCSI}
 CONFIG_SCSI_CXGB4_ISCSI=${CONFIG_SCSI_CXGB4_ISCSI}
+CONFIG_INFINIBAND_I40IW=${CONFIG_INFINIBAND_I40IW}
+CONFIG_I40E=${CONFIG_I40E}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA}
 CONFIG_BE2NET=${CONFIG_BE2NET}
@@ -1271,6 +1287,16 @@ if [ "X${CONFIG_SCSI_CXGB4_ISCSI}" == "Xm" ]; then
 else
         DEFINE_SCSI_CXGB4_ISCSI="#undef CONFIG_SCSI_CXGB4_ISCSI"
 fi
+if [ "X${CONFIG_INFINIBAND_I40IW}" == "Xm" ]; then
+        DEFINE_INFINIBAND_I40IW="#undef CONFIG_INFINIBAND_I40IW\n#define CONFIG_INFINIBAND_I40IW 1"
+else
+        DEFINE_INFINIBAND_I40IW="#undef CONFIG_INFINIBAND_I40IW"
+fi
+if [ "X${CONFIG_I40E}" == "Xm" ]; then
+        DEFINE_I40E="#undef CONFIG_I40E\n#define CONFIG_I40E 1"
+else
+        DEFINE_I40E="#undef CONFIG_I40E"
+fi
 if [ "X${CONFIG_INFINIBAND_NES}" == "Xm" ]; then
         DEFINE_INFINIBAND_NES="#undef CONFIG_INFINIBAND_NES\n#define CONFIG_INFINIBAND_NES 1"
 else
@@ -1362,6 +1388,8 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB3}" | grep -v undef)
 $(echo -e "${DEFINE_CHELSIO_T3}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_CXGB4}" | grep -v undef)
 $(echo -e "${DEFINE_CHELSIO_T4}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_I40IW}" | grep -v undef)
+$(echo -e "${DEFINE_I40E}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}" | grep -v undef)
 $(echo -e "${DEFINE_BE2NET}" | grep -v undef)
@@ -1467,6 +1495,8 @@ $(echo -e "${DEFINE_NVME_FABRICS}" | grep -v undef)
 #undef CONFIG_CHELSIO_T4
 #undef CONFIG_SCSI_CXGB3_ISCSI
 #undef CONFIG_SCSI_CXGB4_ISCSI
+#undef CONFIG_INFINIBAND_I40IW
+#undef CONFIG_I40E
 #undef CONFIG_INFINIBAND_NES
 #undef CONFIG_INFINIBAND_NES_DEBUG
 #undef CONFIG_INFINIBAND_OCRDMA
@@ -1510,6 +1540,8 @@ $(echo -e "${DEFINE_INFINIBAND_CXGB3}")
 $(echo -e "${DEFINE_CHELSIO_T3}")
 $(echo -e "${DEFINE_INFINIBAND_CXGB4}")
 $(echo -e "${DEFINE_CHELSIO_T4}")
+$(echo -e "${DEFINE_INFINIBAND_I40IW}")
+$(echo -e "${DEFINE_I40E}")
 $(echo -e "${DEFINE_INFINIBAND_NES}")
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}")
 $(echo -e "${DEFINE_BE2NET}")
