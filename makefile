@@ -26,7 +26,7 @@ CFLAGS += \
 	-DCOMPAT_VERSION="\"$(shell cat compat_version)\"" \
 
 DEPMOD  = /sbin/depmod
-INSTALL_MOD_DIR ?= $(shell test -f /etc/redhat-release && echo extra/ofa_kernel || echo updates)
+INSTALL_MOD_DIR ?= updates
 
 ifeq ($(CONFIG_MEMTRACK),m)
         export KERNEL_MEMTRACK_CFLAGS = -include $(CWD)/drivers/infiniband/debug/mtrack.h
