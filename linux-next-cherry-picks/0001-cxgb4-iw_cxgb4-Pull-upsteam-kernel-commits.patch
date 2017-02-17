@@ -1,0 +1,333 @@
+From 7bc978805110ba9968a517048ec42299da08cae4 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Thu, 16 Feb 2017 23:09:06 +0530
+Subject: cxgb4/iw_cxgb4: Pull upsteam kernel commits.
+
+Pulled the following commits from upstream:
+commit 086de575c14239f77ea0dbf2370738a105c753ea
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Fri Sep 16 07:54:49 2016 -0700
+
+    cxgb4: advertise support for FR_NSMR_TPTE_WR
+
+    Query firmware for the FW_PARAMS_PARAM_DEV_RI_FR_NSMR_TPTE_WR parameter.
+    If it exists and is 1, then advertise support for FR_NSMR_TPTE_WR to
+    the ULDs.
+
+commit 49b53a93a64ab0aaec10851b004297a3ac885433
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Fri Sep 16 07:54:52 2016 -0700
+
+    iw_cxgb4: add fast-path for small REG_MR operations
+
+    When processing a REG_MR work request, if fw supports the
+    FW_RI_NSMR_TPTE_WR work request, and if the page list for this
+    registration is <= 2 pages, and the current state of the mr is INVALID,
+    then use FW_RI_NSMR_TPTE_WR to pass down a fully populated TPTE for FW
+    to write.  This avoids FW having to do an async read of the TPTE blocking
+    the SQ until the read completes.
+
+    To know if the current MR state is INVALID or not, iw_cxgb4 must track the
+    state of each fastreg MR.  The c4iw_mr struct state is updated as REG_MR
+    and LOCAL_INV WRs are posted and completed, when a reg_mr is destroyed,
+    and when RECV completions are processed that include a local invalidation.
+
+    This optimization increases small IO IOPS for both iSER and NVMF.
+
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Doug Ledford <dledford@redhat.com>
+
+Signed-off-by: Potnuri Bharat Teja <bharat@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb4/cq.c                | 17 +++++++
+ drivers/infiniband/hw/cxgb4/mem.c               |  2 +-
+ drivers/infiniband/hw/cxgb4/qp.c                | 67 +++++++++++++++++++++----
+ drivers/infiniband/hw/cxgb4/t4.h                |  4 +-
+ drivers/infiniband/hw/cxgb4/t4fw_ri_api.h       | 12 +++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4.h      |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c |  7 +++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h  |  1 +
+ drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h   |  2 +
+ 9 files changed, 102 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cq.c b/drivers/infiniband/hw/cxgb4/cq.c
+index ac926c942fee..867b8cf82be8 100644
+--- a/drivers/infiniband/hw/cxgb4/cq.c
++++ b/drivers/infiniband/hw/cxgb4/cq.c
+@@ -666,6 +666,18 @@ skip_cqe:
+ 	return ret;
+ }
+ 
++static void invalidate_mr(struct c4iw_dev *rhp, u32 rkey)
++{
++	struct c4iw_mr *mhp;
++	unsigned long flags;
++
++	spin_lock_irqsave(&rhp->lock, flags);
++	mhp = get_mhp(rhp, rkey >> 8);
++	if (mhp)
++		mhp->attr.state = 0;
++	spin_unlock_irqrestore(&rhp->lock, flags);
++}
++
+ /*
+  * Get one cq entry from c4iw and map it to openib.
+  *
+@@ -721,6 +733,7 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
+ 		    CQE_OPCODE(&cqe) == FW_RI_SEND_WITH_SE_INV) {
+ 			wc->ex.invalidate_rkey = CQE_WRID_STAG(&cqe);
+ 			wc->wc_flags |= IB_WC_WITH_INVALIDATE;
++			invalidate_mr(qhp->rhp, wc->ex.invalidate_rkey);
+ 		}
+ 	} else {
+ 		switch (CQE_OPCODE(&cqe)) {
+@@ -746,6 +759,10 @@ static int c4iw_poll_cq_one(struct c4iw_cq *chp, struct ib_wc *wc)
+ 			break;
+ 		case FW_RI_FAST_REGISTER:
+ 			wc->opcode = IB_WC_REG_MR;
++
++			/* Invalidate the MR if the fastreg failed */
++			if (CQE_STATUS(&cqe) != T4_ERR_SUCCESS)
++				invalidate_mr(qhp->rhp, CQE_WRID_FR_STAG(&cqe));
+ 			break;
+ 		default:
+ 			printk(KERN_ERR MOD "Unexpected opcode %d "
+diff --git a/drivers/infiniband/hw/cxgb4/mem.c b/drivers/infiniband/hw/cxgb4/mem.c
+index 0b91b0f4df71..80e27749420a 100644
+--- a/drivers/infiniband/hw/cxgb4/mem.c
++++ b/drivers/infiniband/hw/cxgb4/mem.c
+@@ -695,7 +695,7 @@ struct ib_mr *c4iw_alloc_mr(struct ib_pd *pd,
+ 	mhp->attr.pdid = php->pdid;
+ 	mhp->attr.type = FW_RI_STAG_NSMR;
+ 	mhp->attr.stag = stag;
+-	mhp->attr.state = 1;
++	mhp->attr.state = 0;
+ 	mmid = (stag) >> 8;
+ 	mhp->ibmr.rkey = mhp->ibmr.lkey = stag;
+ 	if (insert_handle(rhp, &rhp->mmidr, mhp, mmid)) {
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index 690435229be7..f57deba6717c 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -609,10 +609,42 @@ static int build_rdma_recv(struct c4iw_qp *qhp, union t4_recv_wr *wqe,
+ 	return 0;
+ }
+ 
++static void build_tpte_memreg(struct fw_ri_fr_nsmr_tpte_wr *fr,
++			      struct ib_reg_wr *wr, struct c4iw_mr *mhp,
++			      u8 *len16)
++{
++	__be64 *p = (__be64 *)fr->pbl;
++
++	fr->r2 = cpu_to_be32(0);
++	fr->stag = cpu_to_be32(mhp->ibmr.rkey);
++
++	fr->tpte.valid_to_pdid = cpu_to_be32(FW_RI_TPTE_VALID_F |
++		FW_RI_TPTE_STAGKEY_V((mhp->ibmr.rkey & FW_RI_TPTE_STAGKEY_M)) |
++		FW_RI_TPTE_STAGSTATE_V(1) |
++		FW_RI_TPTE_STAGTYPE_V(FW_RI_STAG_NSMR) |
++		FW_RI_TPTE_PDID_V(mhp->attr.pdid));
++	fr->tpte.locread_to_qpid = cpu_to_be32(
++		FW_RI_TPTE_PERM_V(c4iw_ib_to_tpt_access(wr->access)) |
++		FW_RI_TPTE_ADDRTYPE_V(FW_RI_VA_BASED_TO) |
++		FW_RI_TPTE_PS_V(ilog2(wr->mr->page_size) - 12));
++	fr->tpte.nosnoop_pbladdr = cpu_to_be32(FW_RI_TPTE_PBLADDR_V(
++		PBL_OFF(&mhp->rhp->rdev, mhp->attr.pbl_addr)>>3));
++	fr->tpte.dca_mwbcnt_pstag = cpu_to_be32(0);
++	fr->tpte.len_hi = cpu_to_be32(0);
++	fr->tpte.len_lo = cpu_to_be32(mhp->ibmr.length);
++	fr->tpte.va_hi = cpu_to_be32(mhp->ibmr.iova >> 32);
++	fr->tpte.va_lo_fbo = cpu_to_be32(mhp->ibmr.iova & 0xffffffff);
++
++	p[0] = cpu_to_be64((u64)mhp->mpl[0]);
++	p[1] = cpu_to_be64((u64)mhp->mpl[1]);
++
++	*len16 = DIV_ROUND_UP(sizeof(*fr), 16);
++}
++
+ static int build_memreg(struct t4_sq *sq, union t4_wr *wqe,
+-			struct ib_reg_wr *wr, u8 *len16, bool dsgl_supported)
++			struct ib_reg_wr *wr, struct c4iw_mr *mhp, u8 *len16,
++			bool dsgl_supported)
+ {
+-	struct c4iw_mr *mhp = to_c4iw_mr(wr->mr);
+ 	struct fw_ri_immd *imdp;
+ 	__be64 *p;
+ 	int i;
+@@ -674,9 +706,12 @@ static int build_memreg(struct t4_sq *sq, union t4_wr *wqe,
+ 	return 0;
+ }
+ 
+-static int build_inv_stag(union t4_wr *wqe, struct ib_send_wr *wr,
+-			  u8 *len16)
++static int build_inv_stag(struct c4iw_dev *dev, union t4_wr *wqe,
++			  struct ib_send_wr *wr, u8 *len16)
+ {
++	struct c4iw_mr *mhp = get_mhp(dev, wr->ex.invalidate_rkey >> 8);
++
++	mhp->attr.state = 0;
+ 	wqe->inv.stag_inv = cpu_to_be32(wr->ex.invalidate_rkey);
+ 	wqe->inv.r2 = 0;
+ 	*len16 = DIV_ROUND_UP(sizeof wqe->inv, 16);
+@@ -816,18 +851,32 @@ int c4iw_post_send(struct ib_qp *ibqp, struct ib_send_wr *wr,
+ 			if (!qhp->wq.sq.oldest_read)
+ 				qhp->wq.sq.oldest_read = swsqe;
+ 			break;
+-		case IB_WR_REG_MR:
+-			fw_opcode = FW_RI_FR_NSMR_WR;
++		case IB_WR_REG_MR: {
++			struct c4iw_mr *mhp = to_c4iw_mr(reg_wr(wr)->mr);
++
+ 			swsqe->opcode = FW_RI_FAST_REGISTER;
+-			err = build_memreg(&qhp->wq.sq, wqe, reg_wr(wr), &len16,
+-				qhp->rhp->rdev.lldi.ulptx_memwrite_dsgl);
++			if (qhp->rhp->rdev.lldi.fr_nsmr_tpte_wr_support &&
++			    !mhp->attr.state && mhp->mpl_len <= 2) {
++				fw_opcode = FW_RI_FR_NSMR_TPTE_WR;
++				build_tpte_memreg(&wqe->fr_tpte, reg_wr(wr),
++						  mhp, &len16);
++			} else {
++				fw_opcode = FW_RI_FR_NSMR_WR;
++				err = build_memreg(&qhp->wq.sq, wqe, reg_wr(wr),
++				       mhp, &len16,
++				       qhp->rhp->rdev.lldi.ulptx_memwrite_dsgl);
++				if (err)
++					break;
++			}
++			mhp->attr.state = 1;
+ 			break;
++		}
+ 		case IB_WR_LOCAL_INV:
+ 			if (wr->send_flags & IB_SEND_FENCE)
+ 				fw_flags |= FW_RI_LOCAL_FENCE_FLAG;
+ 			fw_opcode = FW_RI_INV_LSTAG_WR;
+ 			swsqe->opcode = FW_RI_LOCAL_INV;
+-			err = build_inv_stag(wqe, wr, &len16);
++			err = build_inv_stag(qhp->rhp, wqe, wr, &len16);
+ 			break;
+ 		default:
+ 			PDBG("%s post of type=%d TBD!\n", __func__,
+diff --git a/drivers/infiniband/hw/cxgb4/t4.h b/drivers/infiniband/hw/cxgb4/t4.h
+index 02173f4315fa..862381aa83c8 100644
+--- a/drivers/infiniband/hw/cxgb4/t4.h
++++ b/drivers/infiniband/hw/cxgb4/t4.h
+@@ -95,6 +95,7 @@ union t4_wr {
+ 	struct fw_ri_rdma_read_wr read;
+ 	struct fw_ri_bind_mw_wr bind;
+ 	struct fw_ri_fr_nsmr_wr fr;
++	struct fw_ri_fr_nsmr_tpte_wr fr_tpte;
+ 	struct fw_ri_inv_lstag_wr inv;
+ 	struct t4_status_page status;
+ 	__be64 flits[T4_EQ_ENTRY_SIZE / sizeof(__be64) * T4_SQ_NUM_SLOTS];
+@@ -170,7 +171,7 @@ struct t4_cqe {
+ 			__be32 msn;
+ 		} rcqe;
+ 		struct {
+-			u32 nada1;
++			u32 stag;
+ 			u16 nada2;
+ 			u16 cidx;
+ 		} scqe;
+@@ -232,6 +233,7 @@ struct t4_cqe {
+ 
+ /* used for SQ completion processing */
+ #define CQE_WRID_SQ_IDX(x)	((x)->u.scqe.cidx)
++#define CQE_WRID_FR_STAG(x)     (be32_to_cpu((x)->u.scqe.stag))
+ 
+ /* generic accessor macros */
+ #define CQE_WRID_HI(x)		(be32_to_cpu((x)->u.gen.wrid_hi))
+diff --git a/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h b/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
+index 1e26669793c3..010c709ba3bb 100644
+--- a/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
++++ b/drivers/infiniband/hw/cxgb4/t4fw_ri_api.h
+@@ -669,6 +669,18 @@ struct fw_ri_fr_nsmr_wr {
+ #define FW_RI_FR_NSMR_WR_DCACPU_G(x)	\
+ 	(((x) >> FW_RI_FR_NSMR_WR_DCACPU_S) & FW_RI_FR_NSMR_WR_DCACPU_M)
+ 
++struct fw_ri_fr_nsmr_tpte_wr {
++	__u8	opcode;
++	__u8   flags;
++	__u16  wrid;
++	__u8   r1[3];
++	__u8   len16;
++	__u32  r2;
++	__u32  stag;
++	struct fw_ri_tpte tpte;
++	__u64  pbl[2];
++};
++
+ struct fw_ri_inv_lstag_wr {
+ 	__u8   opcode;
+ 	__u8   flags;
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+index edd23386b47d..559be290664b 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4.h
+@@ -346,6 +346,7 @@ struct adapter_params {
+ 
+ 	unsigned int max_ordird_qp;       /* Max read depth per RDMA QP */
+ 	unsigned int max_ird_adapter;     /* Max read depth per adapter */
++	bool fr_nsmr_tpte_wr_support;	  /* FW support for FR_NSMR_TPTE_WR */
+ };
+ 
+ /* State needed to monitor the forward progress of SGE Ingress DMA activities
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 796320da0ee0..9f97fd108010 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -2517,6 +2517,7 @@ static void uld_attach(struct adapter *adap, unsigned int uld)
+ 	lli.max_ird_adapter = adap->params.max_ird_adapter;
+ 	lli.ulptx_memwrite_dsgl = adap->params.ulptx_memwrite_dsgl;
+ 	lli.nodeid = dev_to_node(adap->pdev_dev);
++	lli.fr_nsmr_tpte_wr_support = adap->params.fr_nsmr_tpte_wr_support;
+ 
+ 	handle = ulds[uld].add(&lli);
+ 	if (IS_ERR(handle)) {
+@@ -4016,6 +4017,12 @@ static int adap_init0(struct adapter *adap)
+ 		adap->params.ulptx_memwrite_dsgl = (ret == 0 && val[0] != 0);
+ 	}
+ 
++	/* See if FW supports FW_RI_FR_NSMR_TPTE_WR work request */
++	params[0] = FW_PARAM_DEV(RI_FR_NSMR_TPTE_WR);
++	ret = t4_query_params(adap, adap->mbox, adap->pf, 0,
++			      1, params, val);
++	adap->params.fr_nsmr_tpte_wr_support = (ret == 0 && val[0] != 0);
++
+ 	/*
+ 	 * Get device capabilities so we can determine what resources we need
+ 	 * to manage.
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+index f3c58aaa932d..42e73f7aa0d5 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_uld.h
+@@ -280,6 +280,7 @@ struct cxgb4_lld_info {
+ 	unsigned int iscsi_llimit;	     /* chip's iscsi region llimit */
+ 	void **iscsi_ppm;		     /* iscsi page pod manager */
+ 	int nodeid;			     /* device numa node id */
++	bool fr_nsmr_tpte_wr_support;	     /* FW supports FR_NSMR_TPTE_WR */
+ };
+ 
+ struct cxgb4_uld_info {
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+index 30507d44422c..bdd09efce378 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4fw_api.h
+@@ -100,6 +100,7 @@ enum fw_wr_opcodes {
+ 	FW_RI_RECV_WR                  = 0x17,
+ 	FW_RI_BIND_MW_WR               = 0x18,
+ 	FW_RI_FR_NSMR_WR               = 0x19,
++	FW_RI_FR_NSMR_TPTE_WR	       = 0x20,
+ 	FW_RI_INV_LSTAG_WR             = 0x1a,
+ 	FW_ISCSI_TX_DATA_WR	       = 0x45,
+ 	FW_LASTC2E_WR                  = 0x70
+@@ -1119,6 +1120,7 @@ enum fw_params_param_dev {
+ 	FW_PARAMS_PARAM_DEV_MAXIRD_ADAPTER = 0x14, /* max supported adap IRD */
+ 	FW_PARAMS_PARAM_DEV_ULPTX_MEMWRITE_DSGL = 0x17,
+ 	FW_PARAMS_PARAM_DEV_FWCACHE = 0x18,
++	FW_PARAMS_PARAM_DEV_RI_FR_NSMR_TPTE_WR	= 0x1C,
+ };
+ 
+ /*
+-- 
+2.5.3
+

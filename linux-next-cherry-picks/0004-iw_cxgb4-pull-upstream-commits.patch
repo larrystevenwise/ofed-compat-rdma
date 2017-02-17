@@ -1,0 +1,99 @@
+From 4f5a8b09cc98dbbb0efbad865e6e39562139414b Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Thu, 16 Feb 2017 23:36:33 +0530
+Subject: iw_cxgb4: pull upstream commits.
+
+commit b414fa01c31318383ae29d9d23cb9ca4184bbd86
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Thu Dec 15 08:09:35 2016 -0800
+
+    iw_cxgb4: set correct FetchBurstMax for QPs
+
+    The current QP FetchBurstMax value is 256B, which
+    is incorrect since a WR can exceed that value.  The
+    result being a partial WR fetched by hardware, and
+    a fatal "bad WR" error posted by the SGE.
+
+    So bump the FetchBurstMax to 512B.
+
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Doug Ledford <dledford@redhat.com>
+
+commit 3bcf96e0183f5c863657cb6ae9adad307a0f6071
+Author: Steve Wise <swise@opengridcomputing.com>
+Date:   Thu Dec 22 07:40:37 2016 -0800
+
+    iw_cxgb4: do not send RX_DATA_ACK CPLs after close/abort
+
+    Function rx_data(), which handles ingress CPL_RX_DATA messages, was
+    always sending an RX_DATA_ACK with the goal of updating the credits.
+    However, if the RDMA connection is moved out of FPDU mode abruptly,
+    then it is possible for iw_cxgb4 to process queued RX_DATA CPLs after HW
+    has aborted the connection.  These CPLs should not trigger RX_DATA_ACKS.
+    If they do, HW can see a READ after DELETE of the DB_LE hash entry for
+    the tid and post a LE_DB HashTblMemCrcError.
+
+    Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+    Signed-off-by: Doug Ledford <dledford@redhat.com>
+
+Signed-off-by: Potnuri Bharat Teja <bharat@chelsio.com>
+---
+ drivers/infiniband/hw/cxgb4/cm.c | 7 ++++---
+ drivers/infiniband/hw/cxgb4/qp.c | 5 +++--
+ 2 files changed, 7 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/infiniband/hw/cxgb4/cm.c b/drivers/infiniband/hw/cxgb4/cm.c
+index 80f988984f44..e2211b6de70a 100644
+--- a/drivers/infiniband/hw/cxgb4/cm.c
++++ b/drivers/infiniband/hw/cxgb4/cm.c
+@@ -1898,20 +1898,21 @@ static int rx_data(struct c4iw_dev *dev, struct sk_buff *skb)
+ 	skb_trim(skb, dlen);
+ 	mutex_lock(&ep->com.mutex);
+ 
+-	/* update RX credits */
+-	update_rx_credits(ep, dlen);
+-
+ 	switch (ep->com.state) {
+ 	case MPA_REQ_SENT:
++		update_rx_credits(ep, dlen);
+ 		ep->rcv_seq += dlen;
+ 		disconnect = process_mpa_reply(ep, skb);
+ 		break;
+ 	case MPA_REQ_WAIT:
++		update_rx_credits(ep, dlen);
+ 		ep->rcv_seq += dlen;
+ 		disconnect = process_mpa_request(ep, skb);
+ 		break;
+ 	case FPDU_MODE: {
+ 		struct c4iw_qp_attributes attrs;
++
++		update_rx_credits(ep, dlen);
+ 		BUG_ON(!ep->com.qp);
+ 		if (status)
+ 			pr_err("%s Unexpected streaming data." \
+diff --git a/drivers/infiniband/hw/cxgb4/qp.c b/drivers/infiniband/hw/cxgb4/qp.c
+index b7ac97b27c88..cda5542e13a2 100644
+--- a/drivers/infiniband/hw/cxgb4/qp.c
++++ b/drivers/infiniband/hw/cxgb4/qp.c
+@@ -321,7 +321,8 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		FW_RI_RES_WR_DCAEN_V(0) |
+ 		FW_RI_RES_WR_DCACPU_V(0) |
+ 		FW_RI_RES_WR_FBMIN_V(2) |
+-		FW_RI_RES_WR_FBMAX_V(2) |
++		(t4_sq_onchip(&wq->sq) ? FW_RI_RES_WR_FBMAX_V(2) :
++					 FW_RI_RES_WR_FBMAX_V(3)) |
+ 		FW_RI_RES_WR_CIDXFTHRESHO_V(0) |
+ 		FW_RI_RES_WR_CIDXFTHRESH_V(0) |
+ 		FW_RI_RES_WR_EQSIZE_V(eqsize));
+@@ -345,7 +346,7 @@ static int create_qp(struct c4iw_rdev *rdev, struct t4_wq *wq,
+ 		FW_RI_RES_WR_DCAEN_V(0) |
+ 		FW_RI_RES_WR_DCACPU_V(0) |
+ 		FW_RI_RES_WR_FBMIN_V(2) |
+-		FW_RI_RES_WR_FBMAX_V(2) |
++		FW_RI_RES_WR_FBMAX_V(3) |
+ 		FW_RI_RES_WR_CIDXFTHRESHO_V(0) |
+ 		FW_RI_RES_WR_CIDXFTHRESH_V(0) |
+ 		FW_RI_RES_WR_EQSIZE_V(eqsize));
+-- 
+2.5.3
+

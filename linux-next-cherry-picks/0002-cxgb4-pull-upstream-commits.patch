@@ -1,0 +1,54 @@
+From 96abf2fecaba1100aa72ede63f95799299dc3a82 Mon Sep 17 00:00:00 2001
+From: Potnuri Bharat Teja <bharat@chelsio.com>
+Date: Thu, 16 Feb 2017 23:22:11 +0530
+Subject: cxgb4: pull upstream commits
+
+commit 0b53df1e9e07984a93ad3454686740fc2f4d6b4b
+Author: Hariprasad Shenai <hariprasad@chelsio.com>
+Date:   Wed Nov 2 10:52:53 2016 +0530
+
+    cxgb4: correct device ID of T6 adapter
+
+    Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+commit bb83d62fa83405d7c325873a317c9374f98eedef
+Author: Hariprasad Shenai <hariprasad@chelsio.com>
+Date:   Tue Nov 29 17:14:52 2016 +0530
+
+    cxgb4: Add PCI device ID for new adapter
+
+    Signed-off-by: Hariprasad Shenai <hariprasad@chelsio.com>
+    Signed-off-by: David S. Miller <davem@davemloft.net>
+
+Signed-off-by: Potnuri Bharat Teja <bharat@chelsio.com>
+---
+ drivers/net/ethernet/chelsio/cxgb4/t4_pci_id_tbl.h | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_pci_id_tbl.h b/drivers/net/ethernet/chelsio/cxgb4/t4_pci_id_tbl.h
+index 50812a1d67bd..ecf3ccc257bc 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/t4_pci_id_tbl.h
++++ b/drivers/net/ethernet/chelsio/cxgb4/t4_pci_id_tbl.h
+@@ -168,6 +168,7 @@ CH_PCI_DEVICE_ID_TABLE_DEFINE_BEGIN
+ 	CH_PCI_ID_TABLE_FENTRY(0x509a),	/* Custom T520-CR */
+ 	CH_PCI_ID_TABLE_FENTRY(0x509b),	/* Custom T540-CR LOM */
+ 	CH_PCI_ID_TABLE_FENTRY(0x509c),	/* Custom T520-CR*/
++	CH_PCI_ID_TABLE_FENTRY(0x509d),	/* Custom T540-CR*/
+ 
+ 	/* T6 adapters:
+ 	 */
+@@ -178,9 +179,9 @@ CH_PCI_DEVICE_ID_TABLE_DEFINE_BEGIN
+ 	CH_PCI_ID_TABLE_FENTRY(0x6005),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6006),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6007),
++	CH_PCI_ID_TABLE_FENTRY(0x6008),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6009),
+ 	CH_PCI_ID_TABLE_FENTRY(0x600d),
+-	CH_PCI_ID_TABLE_FENTRY(0x6010),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6011),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6014),
+ 	CH_PCI_ID_TABLE_FENTRY(0x6015),
+-- 
+2.5.3
+
