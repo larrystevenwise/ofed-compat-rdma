@@ -1,17 +1,18 @@
-From 3737efd52aefe51ac6650db18698c3083b22eac0 Mon Sep 17 00:00:00 2001
+From 1fafac5794817725b34192e69e6229784d6514f8 Mon Sep 17 00:00:00 2001
 From: root <root@stevo3.asicdesigners.com>
 Date: Tue, 11 Oct 2016 15:55:07 -0700
-Subject: [PATCH] BACKPORT: cxgb4
+Subject: BACKPORT: cxgb4
 
 Signed-off-by: Steve Wise <swise@opengridcomputing.com>
 ---
  drivers/infiniband/hw/cxgb4/Makefile               |   2 +-
  drivers/net/ethernet/chelsio/cxgb4/clip_tbl.c      |  19 ++
  drivers/net/ethernet/chelsio/cxgb4/cxgb4_debugfs.c |  15 +-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c | 232 ++++++++++++++++++++-
- drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |  23 +-
- drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         |   3 +-
- 6 files changed, 287 insertions(+), 7 deletions(-)
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c | 255 ++++++++++++++++++++-
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c    |  39 +++-
+ drivers/net/ethernet/chelsio/cxgb4/sge.c           |  12 +
+ drivers/net/ethernet/chelsio/cxgb4/t4_hw.c         |   8 +-
+ 7 files changed, 340 insertions(+), 10 deletions(-)
 
 diff --git a/drivers/infiniband/hw/cxgb4/Makefile b/drivers/infiniband/hw/cxgb4/Makefile
 index e11cf72..2f9fbf3 100644
@@ -92,7 +93,7 @@ index 91fb508..ed4f506 100644
  	return 0;
  }
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
-index 02f80fe..194c50b 100644
+index 02f80fe..fef162d 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_ethtool.c
 @@ -201,6 +201,12 @@ static int get_eeprom_len(struct net_device *dev)
@@ -362,7 +363,65 @@ index 02f80fe..194c50b 100644
  
  static void get_pauseparam(struct net_device *dev,
  			   struct ethtool_pauseparam *epause)
-@@ -1208,8 +1431,13 @@ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+@@ -1104,13 +1327,21 @@ static u32 get_rss_table_size(struct net_device *dev)
+ 	return pi->rss_size;
+ }
+ 
+-static int get_rss_table(struct net_device *dev, u32 *p, u8 *key, u8 *hfunc)
++#if defined(HAVE_GET_SET_RXFH) && !defined(HAVE_GET_SET_RXFH_INDIR_EXT)
++static int get_rss_table(struct net_device *dev, u32 *p,
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
++			 u8 *key, u8 *hfunc)
++#else
++			 u8 *key)
++#endif
+ {
+ 	const struct port_info *pi = netdev_priv(dev);
+ 	unsigned int n = pi->rss_size;
+ 
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
+ 	if (hfunc)
+ 		*hfunc = ETH_RSS_HASH_TOP;
++#endif
+ 	if (!p)
+ 		return 0;
+ 	while (n--)
+@@ -1118,18 +1349,24 @@ static int get_rss_table(struct net_device *dev, u32 *p, u8 *key, u8 *hfunc)
+ 	return 0;
+ }
+ 
+-static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key,
+-			 const u8 hfunc)
++static int set_rss_table(struct net_device *dev, const u32 *p,
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
++			 const u8 *key, const u8 hfunc)
++#else
++			 const u8 *key)
++#endif
+ {
+ 	unsigned int i;
+ 	struct port_info *pi = netdev_priv(dev);
+ 
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
+ 	/* We require at least one supported parameter to be changed and no
+ 	 * change in any of the unsupported parameters
+ 	 */
+ 	if (key ||
+ 	    (hfunc != ETH_RSS_HASH_NO_CHANGE && hfunc != ETH_RSS_HASH_TOP))
+ 		return -EOPNOTSUPP;
++#endif
+ 	if (!p)
+ 		return 0;
+ 
+@@ -1143,6 +1380,7 @@ static int set_rss_table(struct net_device *dev, const u32 *p, const u8 *key,
+ 
+ 	return -EPERM;
+ }
++#endif
+ 
+ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
+ 		     u32 *rules)
+@@ -1208,8 +1446,13 @@ static int get_rxnfc(struct net_device *dev, struct ethtool_rxnfc *info,
  }
  
  static const struct ethtool_ops cxgb_ethtool_ops = {
@@ -376,8 +435,19 @@ index 02f80fe..194c50b 100644
  	.get_drvinfo       = get_drvinfo,
  	.get_msglevel      = get_msglevel,
  	.set_msglevel      = set_msglevel,
+@@ -1232,8 +1475,10 @@ static const struct ethtool_ops cxgb_ethtool_ops = {
+ 	.get_regs          = get_regs,
+ 	.get_rxnfc         = get_rxnfc,
+ 	.get_rxfh_indir_size = get_rss_table_size,
++#if defined(HAVE_GET_SET_RXFH) && !defined(HAVE_GET_SET_RXFH_INDIR_EXT)
+ 	.get_rxfh	   = get_rss_table,
+ 	.set_rxfh	   = set_rss_table,
++#endif
+ 	.flash_device      = set_flash,
+ 	.get_ts_info       = get_ts_info
+ };
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
-index 3ceafb5..1a4cc34 100644
+index 3ceafb5..323525e 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
 @@ -32,6 +32,9 @@
@@ -443,8 +513,79 @@ index 3ceafb5..1a4cc34 100644
  	if (ret < 0) {
  		/* For adapters without FLASH attached to PHY for their
  		 * firmware, it's obviously a fatal error if we can't get the
+@@ -4542,6 +4563,7 @@ static int enable_msix(struct adapter *adap)
+ #else
+ 	need = adap->params.nports + EXTRA_VECS + ofld_need;
+ #endif
++#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
+ 	allocated = pci_enable_msix_range(adap->pdev, entries, need, want);
+ 	if (allocated < 0) {
+ 		dev_info(adap->pdev_dev, "not enough MSI-X vectors left,"
+@@ -4549,7 +4571,22 @@ static int enable_msix(struct adapter *adap)
+ 		kfree(entries);
+ 		return allocated;
+ 	}
++#else
++{
++	int err;
++
++	while ((err = pci_enable_msix(adap->pdev, entries, want)) >= need)
++		want = err;
++	allocated = want;
+ 
++	if (err) {
++		if (err > 0)
++			dev_info(adap->pdev_dev, "only %d MSI-X vectors left, "
++				 "not using MSI-X\n", err);
++	return err;
++	}
++}
++#endif
+ 	/* Distribute available vectors to the various queue groups.
+ 	 * Every group gets its minimum requirement and NIC gets top
+ 	 * priority for leftovers.
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/sge.c b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+index ad3552d..8fea9ae 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/sge.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/sge.c
+@@ -389,7 +389,11 @@ static void free_tx_desc(struct adapter *adap, struct sge_txq *q,
+ 		if (d->skb) {                       /* an SGL is present */
+ 			if (unmap)
+ 				unmap_sgl(dev, d->skb, d->sgl, q);
++#ifdef HAVE_DEV_CONSUME_SKB_ANY
+ 			dev_consume_skb_any(d->skb);
++#else
++			dev_kfree_skb_any(d->skb);
++#endif
+ 			d->skb = NULL;
+ 		}
+ 		++d;
+@@ -1316,7 +1320,11 @@ out_free:	dev_kfree_skb_any(skb);
+ 
+ 	if (immediate) {
+ 		inline_tx_skb(skb, &q->q, cpl + 1);
++#ifdef HAVE_DEV_CONSUME_SKB_ANY
+ 		dev_consume_skb_any(skb);
++#else
++		dev_kfree_skb_any(skb);
++#endif
+ 	} else {
+ 		int last_desc;
+ 
+@@ -2291,7 +2299,11 @@ static int napi_rx_handler(struct napi_struct *napi, int budget)
+ 	if (likely(work_done < budget)) {
+ 		int timer_index;
+ 
++#ifdef HAVE_NAPI_COMPLETE_DONE
+ 		napi_complete_done(napi, work_done);
++#else
++		napi_complete(napi);
++#endif
+ 		timer_index = QINTR_TIMER_IDX_G(q->next_intr_params);
+ 
+ 		if (q->adaptive_rx) {
 diff --git a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
-index 660204b..3dd5302 100644
+index 660204b..f44d05c 100644
 --- a/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 +++ b/drivers/net/ethernet/chelsio/cxgb4/t4_hw.c
 @@ -2634,6 +2634,7 @@ int t4_get_raw_vpd_params(struct adapter *adapter, struct vpd_params *p)
@@ -464,6 +605,26 @@ index 660204b..3dd5302 100644
  	/* Card information normally starts at VPD_BASE but early cards had
  	 * it at 0.
  	 */
+@@ -7379,6 +7380,9 @@ static void set_pcie_completion_timeout(struct adapter *adapter, u8 range)
+ 	if (pcie_cap) {
+ 		pci_read_config_word(adapter->pdev,
+ 				     pcie_cap + PCI_EXP_DEVCTL2, &val);
++#ifdef CONFIG_COMPAT_SLES_12_0
++#define PCI_EXP_DEVCTL2_COMP_TIMEOUT    0x000f
++#endif
+ 		val &= ~PCI_EXP_DEVCTL2_COMP_TIMEOUT;
+ 		val |= range;
+ 		pci_write_config_word(adapter->pdev,
+@@ -7851,7 +7855,9 @@ int t4_port_init(struct adapter *adap, int mbox, int pf, int vf)
+ 			return ret;
+ 
+ 		memcpy(adap->port[i]->dev_addr, addr, ETH_ALEN);
++#ifdef HAVE_NET_DEVICE_DEV_PORT
+ 		adap->port[i]->dev_port = j;
++#endif
+ 		j++;
+ 	}
+ 	return 0;
 -- 
-2.10.2
+1.8.3.1
 
