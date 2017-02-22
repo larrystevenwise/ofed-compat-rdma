@@ -1,0 +1,25 @@
+From 80035ef4d6c33d57e510022ca913be0d8eea0ee0 Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Date: Tue, 21 Feb 2017 23:03:31 -0600
+Subject: [PATCH] nes: Backports for RHEL 7 and SLES 12
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes.h | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/infiniband/hw/nes/nes.h b/drivers/infiniband/hw/nes/nes.h
+index bd9d132..73cd47c 100644
+--- a/drivers/infiniband/hw/nes/nes.h
++++ b/drivers/infiniband/hw/nes/nes.h
+@@ -45,6 +45,7 @@
+ #include <linux/slab.h>
+ #include <asm/io.h>
+ #include <linux/crc32c.h>
++#include <linux/interrupt.h>
+ 
+ #include <rdma/ib_smi.h>
+ #include <rdma/ib_verbs.h>
+-- 
+1.8.5.2
+
