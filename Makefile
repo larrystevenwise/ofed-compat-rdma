@@ -8,3 +8,4 @@ obj-$(CONFIG_BE2NET)            += drivers/net/ethernet/emulex/benet/
 obj-$(CONFIG_RDS)               += net/rds/
 obj-$(CONFIG_SUNRPC_XPRT_RDMA)  += net/sunrpc/xprtrdma/
 obj-$(CONFIG_SCSI_SRP_ATTRS)    += drivers/scsi/
+obj-$(CONFIG_NVME_CORE)		+= drivers/nvme/
