@@ -181,6 +181,15 @@ Usage:  `basename $0` [options]
     --with-vmw_pvrdma-mod    make CONFIG_INFINIBAND_VMWARE_PVRDMA=m [no]
     --without-vmw_pvrdma-mod    [yes]
 
+    --with-nvme-mod    make CONFIG_NVME_CORE=m [no]
+    --without-nvme-mod    [yes]
+
+    --with-nvme-host-mod    make CONFIG_NVME_CORE=m [no]
+    --without-nvme-host-mod    [yes]
+
+    --with-nvme-target-mod    make CONFIG_NVME_TARGET_RDMA=m [no]
+    --without-nvme-target-mod    [yes]
+
     --help - print out options
 
 
@@ -704,6 +713,30 @@ main()
                         --without-vmw_pvrdma-mod)
                             CONFIG_INFINIBAND_VMWARE_PVRDMA=
                         ;;
+			--with-nvme-mod)
+			    CONFIG_NVME_CORE="m"
+			    CONFIG_BLK_DEV_NVME="m"
+			;;
+			--without-nvme-mod)
+			    CONFIG_NVME_CORE=
+			    CONFIG_BLK_DEV_NVME=
+			;;
+			--with-nvme-host-mod)
+			    CONFIG_NVME_RDMA="m"
+			    CONFIG_NVME_FABRICS="m"
+			;;
+			--without-nvme-host-mod)
+			    CONFIG_NVME_RDMA=
+			    CONFIG_NVME_FABRICS=
+			;;
+			--with-nvme-target-mod)
+			    CONFIG_NVME_TARGET="m"
+			    CONFIG_NVME_TARGET_RDMA="m"
+			;;
+			--without-nvme-target-mod)
+			    CONFIG_NVME_TARGET=
+			    CONFIG_NVME_TARGET_RDMA=
+			;;
                         -h | --help)
                                 usage
                                 exit 0
@@ -835,6 +868,14 @@ CONFIG_INFINIBAND_QLGC_VNIC_STATS=${CONFIG_INFINIBAND_QLGC_VNIC_STATS:-''}
 CONFIG_INFINIBAND_CXGB3_DEBUG=${CONFIG_INFINIBAND_CXGB3_DEBUG:-''}
 CONFIG_INFINIBAND_NES_DEBUG=${CONFIG_INFINIBAND_NES_DEBUG:-''}
 CONFIG_INFINIBAND_AMSO1100=${CONFIG_INFINIBAND_AMSO1100:-''}
+
+CONFIG_NVME_CORE=${CONFIG_NVME_CORE:-''}
+CONFIG_BLK_DEV_NVME=${CONFIG_BLK_DEV_NVME:-''}
+CONFIG_NVME_FABRICS=${CONFIG_NVME_FABRICS:-''}
+CONFIG_NVME_RDMA=${CONFIG_NVME_RDMA:-''}
+CONFIG_NVME_TARGET=${CONFIG_NVME_TARGET:-''}
+CONFIG_NVME_TARGET_RDMA=${CONFIG_NVME_TARGET_RDMA:-''}
+
 CONFIG_MLX4_EN_DCB=''
 if [ "X${CONFIG_MLX4_EN}" == "Xm" ]; then
     check_autofconf CONFIG_DCB
@@ -963,6 +1004,14 @@ CONFIG_INFINIBAND_QLGC_VNIC_STATS=${CONFIG_INFINIBAND_QLGC_VNIC_STATS}
 CONFIG_INFINIBAND_CXGB3_DEBUG=${CONFIG_INFINIBAND_CXGB3_DEBUG}
 CONFIG_INFINIBAND_NES_DEBUG=${CONFIG_INFINIBAND_NES_DEBUG}
 CONFIG_INFINIBAND_AMSO1100=${CONFIG_INFINIBAND_AMSO1100}
+
+CONFIG_NVME_CORE=${CONFIG_NVME_CORE}
+CONFIG_BLK_DEV_NVME=${CONFIG_BLK_DEV_NVME}
+CONFIG_NVME_FABRICS=${CONFIG_NVME_FABRICS}
+CONFIG_NVME_RDMA=${CONFIG_NVME_RDMA}
+CONFIG_NVME_TARGET=${CONFIG_NVME_TARGET}
+CONFIG_NVME_TARGET_RDMA=${CONFIG_NVME_TARGET_RDMA}
+
 CONFIG_MLX4_EN_DCB=${CONFIG_MLX4_EN_DCB}
 
 EOFCONFIG
@@ -1273,6 +1322,26 @@ else
         DEFINE_INFINIBAND_VMWARE_PVRDMA="#undef CONFIG_INFINIBAND_VMWARE_PVRDMA"
 fi
 
+DEFINE_NVME_CORE="#undef CONFIG_NVME_CORE"
+DEFINE_BLK_DEV_NVME="#undef CONFIG_BLK_DEV_NVME"
+DEFINE_NVME_FABRICS="#undef CONFIG_NVME_FABRICS"
+DEFINE_NVME_RDMA="#undef CONFIG_NVME_RDMA"
+DEFINE_NVME_TARGET="#undef CONFIG_NVME_TARGET"
+DEFINE_NVME_TARGET_RDMA="#undef CONFIG_NVME_TARGET_RDMA"
+
+if [ "X${CONFIG_NVME_CORE}" == "Xm" ]; then
+	DEFINE_NVME_CORE="#undef CONFIG_NVME_CORE\n#define CONFIG_NVME_CORE 1"
+	DEFINE_BLK_DEV_NVME="#undef CONFIG_BLK_DEV_NVME\n#define CONFIG_BLK_DEV_NVME 1"
+fi
+if [ "X${CONFIG_NVME_RDMA}" == "Xm" ]; then
+	DEFINE_NVME_FABRICS="#undef CONFIG_NVME_FABRICS\n#define CONFIG_NVME_FABRICS 1"
+	DEFINE_NVME_RDMA="#undef CONFIG_NVME_RDMA\n#define CONFIG_NVME_RDMA 1"
+fi
+if [ "X${CONFIG_NVME_TARGET_RDMA}" == "Xm" ]; then
+	DEFINE_NVME_TARGET="#undef CONFIG_NVME_TARGET\n#define CONFIG_NVME_TARGET 1"
+	DEFINE_NVME_TARGET_RDMA="#undef CONFIG_NVME_TARGET_RDMA\n#define CONFIG_NVME_TARGET_RDMA 1"
+fi
+
 cat > ${AUTOCONF_H} << EOFAUTOCONF
 #ifndef __OFED_BUILD__
 #include_next <$AUTOCONF_PREFIX/autoconf.h>
@@ -1340,6 +1409,12 @@ $(echo -e "${DEFINE_INFINIBAND_RXE}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_MTHCA_DEBUG}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_MADEYE}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
+$(echo -e "${DEFINE_NVME_CORE}" | grep -v undef)
+$(echo -e "${DEFINE_NVME_RDMA}" | grep -v undef)
+$(echo -e "${DEFINE_BLK_DEV_NVME}" | grep -v undef)
+$(echo -e "${DEFINE_NVME_TARGET}" | grep -v undef)
+$(echo -e "${DEFINE_NVME_TARGET_RDMA}" | grep -v undef)
+$(echo -e "${DEFINE_NVME_FABRICS}" | grep -v undef)
 #else
 #undef CONFIG_MEMTRACK
 #undef CONFIG_DEBUG_INFO
@@ -1412,6 +1487,13 @@ $(echo -e "${DEFINE_INFINIBAND_AMSO1100}" | grep -v undef)
 #undef CONFIG_INFINIBAND_AMSO1100
 #undef CONFIG_MLX4_EN_DCB
 
+#undef CONFIG_NVME_CORE
+#undef CONFIG_BLK_DEV_NVME
+#undef CONFIG_NVME_FABRICS
+#undef CONFIG_NVME_RDMA
+#undef CONFIG_NVME_TARGET
+#undef CONFIG_NVME_TARGET_RDMA
+
 $(echo -e "${DEFINE_INFINIBAND}")
 $(echo -e "${DEFINE_INFINIBAND_IPOIB}")
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_CM}")
@@ -1476,6 +1558,12 @@ $(echo -e "${DEFINE_INFINIBAND_MTHCA_DEBUG}")
 $(echo -e "${DEFINE_INFINIBAND_MADEYE}")
 $(echo -e "${DEFINE_INFINIBAND_AMSO1100}")
 $(echo -e "${DEFINE_MLX4_EN_DCB}")
+$(echo -e "${DEFINE_NVME_CORE}")
+$(echo -e "${DEFINE_NVME_RDMA}")
+$(echo -e "${DEFINE_BLK_DEV_NVME}")
+$(echo -e "${DEFINE_NVME_TARGET}")
+$(echo -e "${DEFINE_NVME_TARGET_RDMA}")
+$(echo -e "${DEFINE_NVME_TARGET_FABRICS}")
 #endif
 
 EOFAUTOCONF

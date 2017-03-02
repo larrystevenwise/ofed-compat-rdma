@@ -18,3 +18,7 @@ drivers/scsi/scsi_priv.h
 drivers/scsi/scsi_transport_srp.c
 drivers/scsi/cxgbi/
 include/scsi/scsi_transport_srp.h
+drivers/nvme/
+include/linux/nvme.h
+include/linux/nvme-rdma.h
+include/uapi/linux/nvme_ioctl.h
