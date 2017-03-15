@@ -1,4 +1,4 @@
-From 46df7fefcb0a8ad5521106d31197bff0043b6032 Mon Sep 17 00:00:00 2001
+From a99dc8aa1c4a24fa125fe2fd43adb71016ebd3b9 Mon Sep 17 00:00:00 2001
 From: Adit Ranadive <aditr@vmware.com>
 Date: Mon, 19 Dec 2016 16:23:19 -0800
 Subject: [PATCH 04/14] IB/vmw_pvrdma: Add functions for Verbs support
@@ -20,7 +20,7 @@ Signed-off-by: Adit Ranadive <aditr@vmware.com>
 
 diff --git a/drivers/infiniband/hw/vmw_pvrdma/pvrdma_verbs.c b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_verbs.c
 new file mode 100644
-index 0000000..1753075
+index 0000000..1605af7
 --- /dev/null
 +++ b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_verbs.c
 @@ -0,0 +1,577 @@
@@ -332,7 +332,7 @@ index 0000000..1753075
 +	union pvrdma_cmd_resp rsp;
 +	struct pvrdma_cmd_create_uc *cmd = &req.create_uc;
 +	struct pvrdma_cmd_create_uc_resp *resp = &rsp.create_uc_resp;
-+	struct pvrdma_alloc_ucontext_resp uresp;
++	struct pvrdma_alloc_ucontext_resp uresp = {0};
 +	int ret;
 +	void *ptr;
 +
