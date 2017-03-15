@@ -1,4 +1,4 @@
-From 4b497258985299d35a589b2e176cca5ae9b58d69 Mon Sep 17 00:00:00 2001
+From d41654b3ee6816e060a87f809c38a9e266d14d4a Mon Sep 17 00:00:00 2001
 From: Adit Ranadive <aditr@vmware.com>
 Date: Mon, 19 Dec 2016 16:31:48 -0800
 Subject: [PATCH 11/14] IB/vmw_pvrdma: Add Queue Pair support
@@ -18,7 +18,7 @@ Signed-off-by: Adit Ranadive <aditr@vmware.com>
 
 diff --git a/drivers/infiniband/hw/vmw_pvrdma/pvrdma_qp.c b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_qp.c
 new file mode 100644
-index 0000000..c8c01e5
+index 0000000..6b9ebc7
 --- /dev/null
 +++ b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_qp.c
 @@ -0,0 +1,972 @@
@@ -194,8 +194,9 @@ index 0000000..c8c01e5
 +					     sizeof(struct pvrdma_sge) *
 +					     qp->sq.max_sg);
 +	/* Note: one extra page for the header. */
-+	qp->npages_send = 1 + (qp->sq.wqe_cnt * qp->sq.wqe_size +
-+			       PAGE_SIZE - 1) / PAGE_SIZE;
++	qp->npages_send = PVRDMA_QP_NUM_HEADER_PAGES +
++			  (qp->sq.wqe_cnt * qp->sq.wqe_size + PAGE_SIZE - 1) /
++								PAGE_SIZE;
 +
 +	return 0;
 +}
@@ -214,6 +215,7 @@ index 0000000..c8c01e5
 +{
 +	struct pvrdma_qp *qp = NULL;
 +	struct pvrdma_dev *dev = to_vdev(pd->device);
++	struct pvrdma_cq *send_cq, *recv_cq;
 +	union pvrdma_cmd_req req;
 +	union pvrdma_cmd_resp rsp;
 +	struct pvrdma_cmd_create_qp *cmd = &req.create_qp;
@@ -299,6 +301,9 @@ index 0000000..c8c01e5
 +		} else {
 +			qp->is_kernel = true;
 +
++			send_cq = to_vcq(init_attr->send_cq);
++			recv_cq = to_vcq(init_attr->recv_cq);
++
 +			ret = pvrdma_set_sq_size(to_vdev(pd->device),
 +						 &init_attr->cap,
 +						 init_attr->qp_type, qp);
@@ -313,7 +318,7 @@ index 0000000..c8c01e5
 +			qp->npages = qp->npages_send + qp->npages_recv;
 +
 +			/* Skip header page. */
-+			qp->sq.offset = PAGE_SIZE;
++			qp->sq.offset = PVRDMA_QP_NUM_HEADER_PAGES * PAGE_SIZE;
 +
 +			/* Recv queue pages are after send pages. */
 +			qp->rq.offset = qp->npages_send * PAGE_SIZE;
@@ -366,7 +371,7 @@ index 0000000..c8c01e5
 +	cmd->qp_type = ib_qp_type_to_pvrdma(init_attr->qp_type);
 +	cmd->access_flags = IB_ACCESS_LOCAL_WRITE;
 +	cmd->total_chunks = qp->npages;
-+	cmd->send_chunks = qp->npages_send - 1;
++	cmd->send_chunks = qp->npages_send - PVRDMA_QP_NUM_HEADER_PAGES;
 +	cmd->pdir_dma = qp->pdir.dir_dma;
 +
 +	dev_dbg(&dev->pdev->dev, "create queuepair with %d, %d, %d, %d\n",
@@ -455,9 +460,11 @@ index 0000000..c8c01e5
 +	cmd->qp_handle = vqp->qp_handle;
 +
 +	ret = pvrdma_cmd_post(to_vdev(qp->device), &req, NULL, 0);
-+	if (ret < 0)
-+		dev_warn(&to_vdev(qp->device)->pdev->dev,
-+			 "destroy queuepair failed, error: %d\n", ret);
++	if (ret < 0) {
++		struct pvrdma_dev *dev = to_vdev(qp->device);
++
++		dev_warn(&dev->pdev->dev, "destroy queuepair failed\n");
++	}
 +
 +	pvrdma_free_qp(vqp);
 +
@@ -579,13 +586,13 @@ index 0000000..c8c01e5
 +	return ret;
 +}
 +
-+static inline void *get_sq_wqe(struct pvrdma_qp *qp, int n)
++static inline void *get_sq_wqe(struct pvrdma_qp *qp, unsigned int n)
 +{
 +	return pvrdma_page_dir_get_ptr(&qp->pdir,
 +				       qp->sq.offset + n * qp->sq.wqe_size);
 +}
 +
-+static inline void *get_rq_wqe(struct pvrdma_qp *qp, int n)
++static inline void *get_rq_wqe(struct pvrdma_qp *qp, unsigned int n)
 +{
 +	return pvrdma_page_dir_get_ptr(&qp->pdir,
 +				       qp->rq.offset + n * qp->rq.wqe_size);
@@ -623,9 +630,7 @@ index 0000000..c8c01e5
 +	unsigned long flags;
 +	struct pvrdma_sq_wqe_hdr *wqe_hdr;
 +	struct pvrdma_sge *sge;
-+	int i, index;
-+	int nreq;
-+	int ret;
++	int i, ret;
 +
 +	/*
 +	 * In states lower than RTS, we can fail immediately. In other states,
@@ -638,9 +643,8 @@ index 0000000..c8c01e5
 +
 +	spin_lock_irqsave(&qp->sq.lock, flags);
 +
-+	index = pvrdma_idx(&qp->sq.ring->prod_tail, qp->sq.wqe_cnt);
-+	for (nreq = 0; wr; nreq++, wr = wr->next) {
-+		unsigned int tail;
++	while (wr) {
++		unsigned int tail = 0;
 +
 +		if (unlikely(!pvrdma_idx_ring_has_space(
 +				qp->sq.ring, qp->sq.wqe_cnt, &tail))) {
@@ -705,7 +709,7 @@ index 0000000..c8c01e5
 +			}
 +		}
 +
-+		wqe_hdr = (struct pvrdma_sq_wqe_hdr *)get_sq_wqe(qp, index);
++		wqe_hdr = (struct pvrdma_sq_wqe_hdr *)get_sq_wqe(qp, tail);
 +		memset(wqe_hdr, 0, sizeof(*wqe_hdr));
 +		wqe_hdr->wr_id = wr->wr_id;
 +		wqe_hdr->num_sge = wr->num_sge;
@@ -796,12 +800,11 @@ index 0000000..c8c01e5
 +		/* Make sure wqe is written before index update */
 +		smp_wmb();
 +
-+		index++;
-+		if (unlikely(index >= qp->sq.wqe_cnt))
-+			index = 0;
 +		/* Update shared sq ring */
 +		pvrdma_idx_ring_inc(&qp->sq.ring->prod_tail,
 +				    qp->sq.wqe_cnt);
++
++		wr = wr->next;
 +	}
 +
 +	ret = 0;
@@ -831,7 +834,6 @@ index 0000000..c8c01e5
 +	struct pvrdma_qp *qp = to_vqp(ibqp);
 +	struct pvrdma_rq_wqe_hdr *wqe_hdr;
 +	struct pvrdma_sge *sge;
-+	int index, nreq;
 +	int ret = 0;
 +	int i;
 +
@@ -846,9 +848,8 @@ index 0000000..c8c01e5
 +
 +	spin_lock_irqsave(&qp->rq.lock, flags);
 +
-+	index = pvrdma_idx(&qp->rq.ring->prod_tail, qp->rq.wqe_cnt);
-+	for (nreq = 0; wr; nreq++, wr = wr->next) {
-+		unsigned int tail;
++	while (wr) {
++		unsigned int tail = 0;
 +
 +		if (unlikely(wr->num_sge > qp->rq.max_sg ||
 +			     wr->num_sge < 0)) {
@@ -868,7 +869,7 @@ index 0000000..c8c01e5
 +			goto out;
 +		}
 +
-+		wqe_hdr = (struct pvrdma_rq_wqe_hdr *)get_rq_wqe(qp, index);
++		wqe_hdr = (struct pvrdma_rq_wqe_hdr *)get_rq_wqe(qp, tail);
 +		wqe_hdr->wr_id = wr->wr_id;
 +		wqe_hdr->num_sge = wr->num_sge;
 +		wqe_hdr->total_len = 0;
@@ -884,12 +885,11 @@ index 0000000..c8c01e5
 +		/* Make sure wqe is written before index update */
 +		smp_wmb();
 +
-+		index++;
-+		if (unlikely(index >= qp->rq.wqe_cnt))
-+			index = 0;
 +		/* Update shared rq ring */
 +		pvrdma_idx_ring_inc(&qp->rq.ring->prod_tail,
 +				    qp->rq.wqe_cnt);
++
++		wr = wr->next;
 +	}
 +
 +	spin_unlock_irqrestore(&qp->rq.lock, flags);

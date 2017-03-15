@@ -1,4 +1,4 @@
-From 0d9e1f959e03cbb23cc6ee502bdefb535621e38f Mon Sep 17 00:00:00 2001
+From 2a670e3dc976a787f4ee58f6014210745ee9f414 Mon Sep 17 00:00:00 2001
 From: Adit Ranadive <aditr@vmware.com>
 Date: Mon, 19 Dec 2016 16:17:34 -0800
 Subject: [PATCH 01/14] IB/vmw_pvrdma: Add user-level shared functions
@@ -13,16 +13,16 @@ Reviewed-by: Aditya Sarwade <asarwade@vmware.com>
 Reviewed-by: Bryan Tan <bryantan@vmware.com>
 Signed-off-by: Adit Ranadive <aditr@vmware.com>
 ---
- drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h | 289 ++++++++++++++++++++++
- 1 file changed, 289 insertions(+)
+ drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h | 310 ++++++++++++++++++++++
+ 1 file changed, 310 insertions(+)
  create mode 100644 drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h
 
 diff --git a/drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h b/drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h
 new file mode 100644
-index 0000000..5016abc
+index 0000000..73f2f80
 --- /dev/null
 +++ b/drivers/infiniband/hw/vmw_pvrdma/vmw_pvrdma-abi.h
-@@ -0,0 +1,289 @@
+@@ -0,0 +1,310 @@
 +/*
 + * Copyright (c) 2012-2016 VMware, Inc.  All rights reserved.
 + *
@@ -73,12 +73,12 @@ index 0000000..5016abc
 +
 +#include <linux/types.h>
 +
-+#define PVRDMA_UVERBS_ABI_VERSION	3		/* ABI Version. */
++#define PVRDMA_UVERBS_ABI_VERSION	3
 +#define PVRDMA_UAR_HANDLE_MASK		0x00FFFFFF	/* Bottom 24 bits. */
-+#define PVRDMA_UAR_QP_OFFSET		0		/* QP doorbell. */
++#define PVRDMA_UAR_QP_OFFSET		0		/* QP doorbell offset. */
 +#define PVRDMA_UAR_QP_SEND		BIT(30)		/* Send bit. */
 +#define PVRDMA_UAR_QP_RECV		BIT(31)		/* Recv bit. */
-+#define PVRDMA_UAR_CQ_OFFSET		4		/* CQ doorbell. */
++#define PVRDMA_UAR_CQ_OFFSET		4		/* CQ doorbell offset. */
 +#define PVRDMA_UAR_CQ_ARM_SOL		BIT(29)		/* Arm solicited bit. */
 +#define PVRDMA_UAR_CQ_ARM		BIT(30)		/* Arm bit. */
 +#define PVRDMA_UAR_CQ_POLL		BIT(31)		/* Poll bit. */
@@ -310,6 +310,27 @@ index 0000000..5016abc
 +	__u8 smac[6];
 +	__u8 reserved2[7]; /* Pad to next power of 2 (64). */
 +};
++
++static inline enum pvrdma_wr_opcode ib_wr_opcode_to_pvrdma(enum ib_wr_opcode op)
++{
++	return (enum pvrdma_wr_opcode)op;
++}
++
++static inline enum ib_wc_status pvrdma_wc_status_to_ib(
++					enum pvrdma_wc_status status)
++{
++	return (enum ib_wc_status)status;
++}
++
++static inline int pvrdma_wc_opcode_to_ib(int opcode)
++{
++	return opcode;
++}
++
++static inline int pvrdma_wc_flags_to_ib(int flags)
++{
++	return flags;
++}
 +
 +#endif /* __VMW_PVRDMA_ABI_H__ */
 -- 

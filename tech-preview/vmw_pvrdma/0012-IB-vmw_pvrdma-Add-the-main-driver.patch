@@ -1,4 +1,4 @@
-From a74eaebe910011dc3674339ad5c50abcffb71486 Mon Sep 17 00:00:00 2001
+From 6f647cf23862deb12f81ff4f26c467b7e9eec085 Mon Sep 17 00:00:00 2001
 From: Adit Ranadive <aditr@vmware.com>
 Date: Mon, 19 Dec 2016 16:34:08 -0800
 Subject: [PATCH 12/14] IB/vmw_pvrdma: Add the main driver
@@ -13,16 +13,16 @@ Reviewed-by: Aditya Sarwade <asarwade@vmware.com>
 Reviewed-by: Bryan Tan <bryantan@vmware.com>
 Signed-off-by: Adit Ranadive <aditr@vmware.com>
 ---
- drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c | 1211 ++++++++++++++++++++++++
- 1 file changed, 1211 insertions(+)
+ drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c | 1242 ++++++++++++++++++++++++
+ 1 file changed, 1242 insertions(+)
  create mode 100644 drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c
 
 diff --git a/drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c
 new file mode 100644
-index 0000000..231a1ce
+index 0000000..459baaa
 --- /dev/null
 +++ b/drivers/infiniband/hw/vmw_pvrdma/pvrdma_main.c
-@@ -0,0 +1,1211 @@
+@@ -0,0 +1,1242 @@
 +/*
 + * Copyright (c) 2012-2016 VMware, Inc.  All rights reserved.
 + *
@@ -98,6 +98,8 @@ index 0000000..231a1ce
 +			  unsigned int index,
 +			  void **context);
 +
++
++static int pvrdma_enable_dev(struct pvrdma_dev *dev);
 +
 +static ssize_t show_hca(struct device *device, struct device_attribute *attr,
 +			char *buf)
@@ -711,8 +713,7 @@ index 0000000..231a1ce
 +
 +	ret = pvrdma_cmd_post(dev, &req, NULL, 0);
 +	if (ret < 0) {
-+		dev_warn(&dev->pdev->dev,
-+			 "could not create binding, error: %d\n", ret);
++		dev_warn(&dev->pdev->dev, "could not create binding\n");
 +		return -EFAULT;
 +	}
 +	memcpy(&dev->sgid_tbl[index], gid, sizeof(*gid));
@@ -751,7 +752,7 @@ index 0000000..231a1ce
 +	ret = pvrdma_cmd_post(dev, &req, NULL, 0);
 +	if (ret < 0) {
 +		dev_warn(&dev->pdev->dev,
-+			 "could not destroy binding, error: %d\n", ret);
++			 "could not destroy binding\n");
 +		return ret;
 +	}
 +	memset(&dev->sgid_tbl[index], 0, 16);
@@ -780,6 +781,10 @@ index 0000000..231a1ce
 +		pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ERR);
 +		break;
 +	case NETDEV_UP:
++		if (!dev->enabled && pvrdma_enable_dev(dev)) {
++			dev_err(&dev->pdev->dev, "failed to enable device\n");
++			break;
++		}
 +		pvrdma_dispatch_event(dev, 1, IB_EVENT_PORT_ACTIVE);
 +		break;
 +	default:
@@ -826,6 +831,48 @@ index 0000000..231a1ce
 +	return NOTIFY_DONE;
 +}
 +
++static void pvrdma_disable_dev(struct pvrdma_dev *dev)
++{
++	if (dev->enabled) {
++		ib_unregister_device(&dev->ib_dev);
++		dev->enabled = false;
++	}
++}
++
++static int pvrdma_enable_dev(struct pvrdma_dev *dev)
++{
++	int ret;
++	pvrdma_enable_intrs(dev);
++
++	/* Activate pvrdma device */
++	pvrdma_write_reg(dev, PVRDMA_REG_CTL, PVRDMA_DEVICE_CTL_ACTIVATE);
++
++	/* Make sure the write is complete before reading status. */
++	mb();
++
++	/* Check if device was successfully activated */
++	ret = pvrdma_read_reg(dev, PVRDMA_REG_ERR);
++	if (ret) {
++		dev_err(&dev->pdev->dev, "failed to activate device\n");
++		ret = -EFAULT;
++		goto err_disable_intrs;
++	}
++
++	/* Register IB device */
++	ret = pvrdma_register_device(dev);
++	if (ret) {
++		dev_err(&dev->pdev->dev, "failed to register IB device\n");
++		goto err_disable_intrs;
++	}
++
++	dev->enabled = true;
++	return 0;
++
++err_disable_intrs:
++	pvrdma_disable_intrs(dev);
++	return ret;
++}
++
 +static int pvrdma_pci_probe(struct pci_dev *pdev,
 +			    const struct pci_device_id *id)
 +{
@@ -863,6 +910,9 @@ index 0000000..231a1ce
 +		goto err_free_device;
 +	}
 +
++	/*
++	 * DEBUG: Checking PCI: 0x20200; _MEM; len=0x2000
++	 */
 +	dev_dbg(&pdev->dev, "PCI resource flags BAR0 %#lx\n",
 +		pci_resource_flags(pdev, 0));
 +	dev_dbg(&pdev->dev, "PCI resource len %#llx\n",
@@ -892,14 +942,14 @@ index 0000000..231a1ce
 +	/* Enable 64-Bit DMA */
 +	if (pci_set_dma_mask(pdev, DMA_BIT_MASK(64)) == 0) {
 +		ret = pci_set_consistent_dma_mask(pdev, DMA_BIT_MASK(64));
-+		if (ret != 0) {
++		if (ret) {
 +			dev_err(&pdev->dev,
 +				"pci_set_consistent_dma_mask failed\n");
 +			goto err_free_resource;
 +		}
 +	} else {
 +		ret = pci_set_dma_mask(pdev, DMA_BIT_MASK(32));
-+		if (ret != 0) {
++		if (ret) {
 +			dev_err(&pdev->dev,
 +				"pci_set_dma_mask failed\n");
 +			goto err_free_resource;
@@ -978,7 +1028,7 @@ index 0000000..231a1ce
 +	dev->dsr->resp_slot_dma = (u64)slot_dma;
 +
 +	/* Async event ring */
-+	dev->dsr->async_ring_pages.num_pages = 4;
++	dev->dsr->async_ring_pages.num_pages = PVRDMA_NUM_RING_PAGES;
 +	ret = pvrdma_page_dir_init(dev, &dev->async_pdir,
 +				   dev->dsr->async_ring_pages.num_pages, true);
 +	if (ret)
@@ -987,7 +1037,7 @@ index 0000000..231a1ce
 +	dev->dsr->async_ring_pages.pdir_dma = dev->async_pdir.dir_dma;
 +
 +	/* CQ notification ring */
-+	dev->dsr->cq_ring_pages.num_pages = 4;
++	dev->dsr->cq_ring_pages.num_pages = PVRDMA_NUM_RING_PAGES;
 +	ret = pvrdma_page_dir_init(dev, &dev->cq_pdir,
 +				   dev->dsr->cq_ring_pages.num_pages, true);
 +	if (ret)
@@ -1054,7 +1104,7 @@ index 0000000..231a1ce
 +	if (ret) {
 +		dev_err(&pdev->dev, "failed to allocate interrupts\n");
 +		ret = -ENOMEM;
-+		goto err_netdevice;
++		goto err_free_cq_ring;
 +	}
 +
 +	/* Allocate UAR table. */
@@ -1074,51 +1124,35 @@ index 0000000..231a1ce
 +	}
 +	dev_dbg(&pdev->dev, "gid table len %d\n", dev->dsr->caps.gid_tbl_len);
 +
-+	pvrdma_enable_intrs(dev);
-+
-+	/* Activate pvrdma device */
-+	pvrdma_write_reg(dev, PVRDMA_REG_CTL, PVRDMA_DEVICE_CTL_ACTIVATE);
-+
-+	/* Make sure the write is complete before reading status. */
-+	mb();
-+
-+	/* Check if device was successfully activated */
-+	ret = pvrdma_read_reg(dev, PVRDMA_REG_ERR);
-+	if (ret != 0) {
-+		dev_err(&pdev->dev, "failed to activate device\n");
-+		ret = -EFAULT;
-+		goto err_disable_intr;
-+	}
-+
-+	/* Register IB device */
-+	ret = pvrdma_register_device(dev);
-+	if (ret) {
-+		dev_err(&pdev->dev, "failed to register IB device\n");
-+		goto err_disable_intr;
++	if (netif_running(dev->netdev) && netif_carrier_ok(dev->netdev)) {
++		ret = pvrdma_enable_dev(dev);
++		if (ret) {
++			dev_err(&pdev->dev, "failed to enable device\n");
++			goto err_free_sgid_tbl;
++		}
++	} else {
++		dev_info(&pdev->dev, "pvrdma netdev link is down\n");
 +	}
 +
 +	dev->nb_netdev.notifier_call = pvrdma_netdevice_event;
 +	ret = register_netdevice_notifier(&dev->nb_netdev);
 +	if (ret) {
 +		dev_err(&pdev->dev, "failed to register netdevice events\n");
-+		goto err_unreg_ibdev;
++		goto err_disable_dev;
 +	}
 +
 +	dev_info(&pdev->dev, "attached to device\n");
 +	return 0;
 +
-+err_unreg_ibdev:
-+	ib_unregister_device(&dev->ib_dev);
-+err_disable_intr:
-+	pvrdma_disable_intrs(dev);
++err_disable_dev:
++	pvrdma_disable_dev(dev);
++err_free_sgid_tbl:
 +	kfree(dev->sgid_tbl);
 +err_free_uar_table:
 +	pvrdma_uar_table_cleanup(dev);
 +err_free_intrs:
 +	pvrdma_free_irq(dev);
 +	pvrdma_disable_msi_all(dev);
-+err_netdevice:
-+	unregister_netdevice_notifier(&dev->nb_netdev);
 +err_free_cq_ring:
 +	pvrdma_page_dir_cleanup(dev, &dev->cq_pdir);
 +err_free_async_ring:
@@ -1157,10 +1191,7 @@ index 0000000..231a1ce
 +	unregister_netdevice_notifier(&dev->nb_netdev);
 +	dev->nb_netdev.notifier_call = NULL;
 +
-+	flush_workqueue(event_wq);
-+
-+	/* Unregister ib device */
-+	ib_unregister_device(&dev->ib_dev);
++	pvrdma_disable_dev(dev);
 +
 +	mutex_lock(&pvrdma_device_list_lock);
 +	list_del(&dev->device_link);
@@ -1231,7 +1262,7 @@ index 0000000..231a1ce
 +module_exit(pvrdma_cleanup);
 +
 +MODULE_AUTHOR("VMware, Inc");
-+MODULE_DESCRIPTION("VMware Paravirtual RDMA driver");
++MODULE_DESCRIPTION("VMware Virtual RDMA/InfiniBand driver");
 +MODULE_VERSION(DRV_VERSION);
 +MODULE_LICENSE("Dual BSD/GPL");
 -- 

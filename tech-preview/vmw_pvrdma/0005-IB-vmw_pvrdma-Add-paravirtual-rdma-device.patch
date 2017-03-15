@@ -1,4 +1,4 @@
-From 6e016b78542f10b54148627bb818ce5b2f382566 Mon Sep 17 00:00:00 2001
+From f2eea44bcb98003a734c7dc162340163b954f9a5 Mon Sep 17 00:00:00 2001
 From: Adit Ranadive <aditr@vmware.com>
 Date: Mon, 19 Dec 2016 16:25:09 -0800
 Subject: [PATCH 05/14] IB/vmw_pvrdma: Add paravirtual rdma device
@@ -14,16 +14,16 @@ Reviewed-by: Aditya Sarwade <asarwade@vmware.com>
 Reviewed-by: Bryan Tan <bryantan@vmware.com>
 Signed-off-by: Adit Ranadive <aditr@vmware.com>
 ---
- drivers/infiniband/hw/vmw_pvrdma/pvrdma.h | 475 ++++++++++++++++++++++++++++++
- 1 file changed, 475 insertions(+)
+ drivers/infiniband/hw/vmw_pvrdma/pvrdma.h | 458 ++++++++++++++++++++++++++++++
+ 1 file changed, 458 insertions(+)
  create mode 100644 drivers/infiniband/hw/vmw_pvrdma/pvrdma.h
 
 diff --git a/drivers/infiniband/hw/vmw_pvrdma/pvrdma.h b/drivers/infiniband/hw/vmw_pvrdma/pvrdma.h
 new file mode 100644
-index 0000000..54384dd
+index 0000000..ea880fc
 --- /dev/null
 +++ b/drivers/infiniband/hw/vmw_pvrdma/pvrdma.h
-@@ -0,0 +1,475 @@
+@@ -0,0 +1,458 @@
 +/*
 + * Copyright (c) 2012-2016 VMware, Inc.  All rights reserved.
 + *
@@ -94,7 +94,10 @@ index 0000000..54384dd
 + * VMware PVRDMA PCI device id.
 + */
 +#define PCI_DEVICE_ID_VMWARE_PVRDMA	0x0820
-+#define	PCI_DEVICE_ID_VMWARE_VMXNET3	0x07B0
++#define PCI_DEVICE_ID_VMWARE_VMXNET3    0x07B0
++
++#define PVRDMA_NUM_RING_PAGES		4
++#define PVRDMA_QP_NUM_HEADER_PAGES	1
 +
 +struct pvrdma_dev;
 +
@@ -248,6 +251,7 @@ index 0000000..54384dd
 +	u32 port_cap_mask;
 +	struct mutex port_mutex; /* Port modification mutex. */
 +	bool ib_active;
++	bool enabled;
 +	atomic_t num_qps;
 +	atomic_t num_cqs;
 +	atomic_t num_pds;
@@ -432,27 +436,6 @@ index 0000000..54384dd
 +static inline enum ib_qp_state pvrdma_qp_state_to_ib(enum pvrdma_qp_state state)
 +{
 +	return (enum ib_qp_state)state;
-+}
-+
-+static inline enum pvrdma_wr_opcode ib_wr_opcode_to_pvrdma(enum ib_wr_opcode op)
-+{
-+	return (enum pvrdma_wr_opcode)op;
-+}
-+
-+static inline enum ib_wc_status pvrdma_wc_status_to_ib(
-+					enum pvrdma_wc_status status)
-+{
-+	return (enum ib_wc_status)status;
-+}
-+
-+static inline int pvrdma_wc_opcode_to_ib(int opcode)
-+{
-+	return opcode;
-+}
-+
-+static inline int pvrdma_wc_flags_to_ib(int flags)
-+{
-+	return flags;
 +}
 +
 +static inline int ib_send_flags_to_pvrdma(int flags)
