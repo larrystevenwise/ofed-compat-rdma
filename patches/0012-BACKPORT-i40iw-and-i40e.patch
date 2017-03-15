@@ -1,0 +1,38 @@
+From 958a60807baa8d37dd22fb5ede243cf14b5a2335 Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Date: Fri, 3 Feb 2017 12:23:27 -0600
+Subject: [PATCH] compat-rdma: Adopt i40iw Makefile and Kbuild
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/i40iw/Kconfig  |  4 ++--
+ drivers/infiniband/hw/i40iw/Makefile |  2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/Kconfig b/drivers/infiniband/hw/i40iw/Kconfig
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/i40iw/Kconfig
++++ b/drivers/infiniband/hw/i40iw/Kconfig
+@@ -1,7 +1,7 @@
+ config INFINIBAND_I40IW
+ 	tristate "Intel(R) Ethernet X722 iWARP Driver"
+-	depends on INET && I40E
++	depends on PCI && INFINIBAND && INET && I40E
+ 	select GENERIC_ALLOCATOR
+ 	---help---
+ 	Intel(R) Ethernet X722 iWARP Driver
+-	INET && I40IW && INFINIBAND && I40E
++	I40IW && PCI && INFINIBAND && INET && I40E
+diff --git a/drivers/infiniband/hw/i40iw/Makefile b/drivers/infiniband/hw/i40iw/Makefile
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/hw/i40iw/Makefile
++++ b/drivers/infiniband/hw/i40iw/Makefile
+@@ -1,4 +1,4 @@
+-ccflags-y :=  -Idrivers/net/ethernet/intel/i40e
++ccflags-y :=  -I$(CWD)/drivers/net/ethernet/intel/i40e
+ 
+ obj-$(CONFIG_INFINIBAND_I40IW) += i40iw.o
+ 
+-- 
+1.8.5.2
+
