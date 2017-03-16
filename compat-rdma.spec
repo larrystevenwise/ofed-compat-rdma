@@ -85,7 +85,7 @@
 Name: %{_name}
 Version: %{_version}
 Release: %{_release}
-License: GPLv2 or BSD
+License: GPLv2
 Url: http://openfabrics.org/
 Group: System Environment/Base
 Source: %{_name}-%{_version}.tgz
