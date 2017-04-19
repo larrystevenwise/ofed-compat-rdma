@@ -1,0 +1,33 @@
+From 6b0805c25657f9b702607ed4617c2821343158c0 Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Tue, 6 Dec 2016 15:49:34 -0600
+Subject: [PATCH 47/52] i40iw: Assign MSS only when it is a new MTU
+
+Currently we are changing the MSS regardless of whether
+there is a change or not in MTU. Fix to make the
+assignment of MSS dependent on an MTU change.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_main.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index 85d8fa6..cf9d288 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -1724,6 +1724,8 @@ static void i40iw_l2param_change(struct i40e_info *ldev, struct i40e_client *cli
+ 	for (i = 0; i < I40E_CLIENT_MAX_USER_PRIORITY; i++)
+ 		l2params->qs_handle_list[i] = params->qos.prio_qos[i].qs_handle;
+ 
++	l2params->mss = (params->mtu) ? params->mtu - I40IW_MTU_TO_MSS : iwdev->mss;
++
+ 	INIT_WORK(&work->work, i40iw_l2params_worker);
+ 	queue_work(iwdev->param_wq, &work->work);
+ }
+-- 
+1.8.3.1
+

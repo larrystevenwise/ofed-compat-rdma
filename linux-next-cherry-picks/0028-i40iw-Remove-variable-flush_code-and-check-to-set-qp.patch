@@ -1,0 +1,43 @@
+From 78e945aace5b9aaf19404799cd29b4d155806053 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 22:20:31 -0600
+Subject: [PATCH 28/52] i40iw: Remove variable flush_code and check to set
+ qp->sq_flush
+
+The flush_code variable in i40iw_bld_terminate_hdr() is obsolete and
+the check to set qp->sq_flush is unreachable. Currently flush code is
+populated in setup_term_hdr() and both SQ and RQ are flushed always
+as part of the tear down flow.
+
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_ctrl.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+index 5dde358..a135037 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+@@ -4185,7 +4185,6 @@ static int i40iw_bld_terminate_hdr(struct i40iw_sc_qp *qp,
+ 	u16 ddp_seg_len;
+ 	int copy_len = 0;
+ 	u8 is_tagged = 0;
+-	enum i40iw_flush_opcode flush_code = FLUSH_INVALID;
+ 	u32 opcode;
+ 	struct i40iw_terminate_hdr *termhdr;
+ 
+@@ -4358,9 +4357,6 @@ static int i40iw_bld_terminate_hdr(struct i40iw_sc_qp *qp,
+ 	if (copy_len)
+ 		memcpy(termhdr + 1, pkt, copy_len);
+ 
+-	if (flush_code && !info->in_rdrsp_wr)
+-		qp->sq_flush = (info->sq) ? true : false;
+-
+ 	return sizeof(struct i40iw_terminate_hdr) + copy_len;
+ }
+ 
+-- 
+1.8.3.1
+

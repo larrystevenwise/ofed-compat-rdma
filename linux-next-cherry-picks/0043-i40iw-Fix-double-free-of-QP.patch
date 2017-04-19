@@ -1,0 +1,94 @@
+From f4a87ca12a1c203913a5cc889ec49b817a1f45fc Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Tue, 6 Dec 2016 15:49:30 -0600
+Subject: [PATCH 43/52] i40iw: Fix double free of QP
+
+A QP can be double freed if i40iw_cm_disconn() is
+called while it is currently being freed by
+i40iw_rem_ref(). The fix in i40iw_cm_disconn() will
+first check if the QP is already freed before
+making another request for the QP to be freed.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw.h    |  2 +-
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 20 ++++++++++++++++----
+ drivers/infiniband/hw/i40iw/i40iw_hw.c |  4 +++-
+ 3 files changed, 20 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw.h b/drivers/infiniband/hw/i40iw/i40iw.h
+index ef188e6..51b8280 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw.h
++++ b/drivers/infiniband/hw/i40iw/i40iw.h
+@@ -512,7 +512,7 @@ static inline struct i40iw_handler *to_iwhdl(struct i40iw_device *iw_dev)
+ 
+ int i40iw_register_rdma_device(struct i40iw_device *iwdev);
+ void i40iw_port_ibevent(struct i40iw_device *iwdev);
+-int i40iw_cm_disconn(struct i40iw_qp *);
++void i40iw_cm_disconn(struct i40iw_qp *iwqp);
+ void i40iw_cm_disconn_worker(void *);
+ int mini_cm_recv_pkt(struct i40iw_cm_core *, struct i40iw_device *,
+ 		     struct sk_buff *);
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 25af89a..ff95fea 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -3359,21 +3359,33 @@ static void i40iw_cm_init_tsa_conn(struct i40iw_qp *iwqp,
+  * i40iw_cm_disconn - when a connection is being closed
+  * @iwqp: associate qp for the connection
+  */
+-int i40iw_cm_disconn(struct i40iw_qp *iwqp)
++void i40iw_cm_disconn(struct i40iw_qp *iwqp)
+ {
+ 	struct disconn_work *work;
+ 	struct i40iw_device *iwdev = iwqp->iwdev;
+ 	struct i40iw_cm_core *cm_core = &iwdev->cm_core;
++	unsigned long flags;
+ 
+ 	work = kzalloc(sizeof(*work), GFP_ATOMIC);
+ 	if (!work)
+-		return -ENOMEM;	/* Timer will clean up */
+-
++		return;	/* Timer will clean up */
++
++	spin_lock_irqsave(&iwdev->qptable_lock, flags);
++	if (!iwdev->qp_table[iwqp->ibqp.qp_num]) {
++		spin_unlock_irqrestore(&iwdev->qptable_lock, flags);
++		i40iw_debug(&iwdev->sc_dev, I40IW_DEBUG_CM,
++			    "%s qp_id %d is already freed\n",
++			     __func__, iwqp->ibqp.qp_num);
++		kfree(work);
++		return;
++	}
+ 	i40iw_add_ref(&iwqp->ibqp);
++	spin_unlock_irqrestore(&iwdev->qptable_lock, flags);
++
+ 	work->iwqp = iwqp;
+ 	INIT_WORK(&work->work, i40iw_disconnect_worker);
+ 	queue_work(cm_core->disconn_wq, &work->work);
+-	return 0;
++	return;
+ }
+ 
+ /**
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_hw.c b/drivers/infiniband/hw/i40iw/i40iw_hw.c
+index 5e2c16c..b2854b1 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_hw.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_hw.c
+@@ -308,7 +308,9 @@ void i40iw_process_aeq(struct i40iw_device *iwdev)
+ 			iwqp = iwdev->qp_table[info->qp_cq_id];
+ 			if (!iwqp) {
+ 				spin_unlock_irqrestore(&iwdev->qptable_lock, flags);
+-				i40iw_pr_err("qp_id %d is already freed\n", info->qp_cq_id);
++				i40iw_debug(dev, I40IW_DEBUG_AEQ,
++					    "%s qp_id %d is already freed\n",
++					    __func__, info->qp_cq_id);
+ 				continue;
+ 			}
+ 			i40iw_add_ref(&iwqp->ibqp);
+-- 
+1.8.3.1
+

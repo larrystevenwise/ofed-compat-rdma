@@ -1,0 +1,43 @@
+From d4165e3abdf16707602c10f0d678d4d564a87e35 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Tue, 22 Nov 2016 09:44:20 -0600
+Subject: [PATCH 29/52] i40iw: Fix incorrect assignment of SQ head
+
+The SQ head is incorrectly incremented when the number
+of WQEs required is greater than the number available.
+The fix is to use the I40IW_RING_MOV_HEAD_BY_COUNT
+macro. This checks for the SQ full condition first and
+only if SQ has room for the request, then we move the
+head appropriately.
+
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_uk.c | 10 ++++------
+ 1 file changed, 4 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+index 5d9c3bf..4376cd6 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_uk.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+@@ -175,12 +175,10 @@ u64 *i40iw_qp_get_next_send_wqe(struct i40iw_qp_uk *qp,
+ 		if (!*wqe_idx)
+ 			qp->swqe_polarity = !qp->swqe_polarity;
+ 	}
+-
+-	for (i = 0; i < wqe_size / I40IW_QP_WQE_MIN_SIZE; i++) {
+-		I40IW_RING_MOVE_HEAD(qp->sq_ring, ret_code);
+-		if (ret_code)
+-			return NULL;
+-	}
++	I40IW_RING_MOVE_HEAD_BY_COUNT(qp->sq_ring,
++				      wqe_size / I40IW_QP_WQE_MIN_SIZE, ret_code);
++	if (ret_code)
++		return NULL;
+ 
+ 	wqe = qp->sq_base[*wqe_idx].elem;
+ 
+-- 
+1.8.3.1
+

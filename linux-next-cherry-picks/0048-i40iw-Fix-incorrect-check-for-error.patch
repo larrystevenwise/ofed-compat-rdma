@@ -1,0 +1,30 @@
+From 0cc0d851ccf1746466822c1b7ce02c980406d57f Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Tue, 6 Dec 2016 15:49:35 -0600
+Subject: [PATCH 48/52] i40iw: Fix incorrect check for error
+
+In i40iw_ieq_handle_partial() the check for !status is incorrect.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_puda.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_puda.c b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+index 7541b0d..c3d28ba 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_puda.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+@@ -1132,7 +1132,7 @@ static enum i40iw_status_code i40iw_ieq_handle_partial(struct i40iw_puda_rsrc *i
+ 	list_add(&buf->list, &pbufl);
+ 
+ 	status = i40iw_ieq_create_pbufl(pfpdu, rxlist, &pbufl, buf, fpdu_len);
+-	if (!status)
++	if (status)
+ 		goto error;
+ 
+ 	txbuf = i40iw_puda_get_bufpool(ieq);
+-- 
+1.8.3.1
+

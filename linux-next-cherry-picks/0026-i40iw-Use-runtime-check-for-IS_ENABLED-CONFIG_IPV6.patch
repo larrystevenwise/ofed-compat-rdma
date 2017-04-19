@@ -1,0 +1,42 @@
+From 5ebcb0ff54e594668e506583fa7344d101e3d05e Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 21:34:02 -0600
+Subject: [PATCH 26/52] i40iw: Use runtime check for IS_ENABLED(CONFIG_IPV6)
+
+To be consistent, use the runtime check instead of
+conditional compile.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index cbd77eb..b60e346 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -1583,9 +1583,10 @@ static enum i40iw_status_code i40iw_del_multiple_qhash(
+ static struct net_device *i40iw_netdev_vlan_ipv6(u32 *addr, u16 *vlan_id, u8 *mac)
+ {
+ 	struct net_device *ip_dev = NULL;
+-#if IS_ENABLED(CONFIG_IPV6)
+ 	struct in6_addr laddr6;
+ 
++	if (!IS_ENABLED(CONFIG_IPV6))
++		return NULL;
+ 	i40iw_copy_ip_htonl(laddr6.in6_u.u6_addr32, addr);
+ 	if (vlan_id)
+ 		*vlan_id = I40IW_NO_VLAN;
+@@ -1602,7 +1603,6 @@ static struct net_device *i40iw_netdev_vlan_ipv6(u32 *addr, u16 *vlan_id, u8 *ma
+ 		}
+ 	}
+ 	rcu_read_unlock();
+-#endif
+ 	return ip_dev;
+ }
+ 
+-- 
+1.8.3.1
+

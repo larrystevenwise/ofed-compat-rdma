@@ -1,0 +1,47 @@
+From 01d0b36798732d826fbf84de8961a09b3a2fbf3f Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 21:26:39 -0600
+Subject: [PATCH 19/52] i40iw: Correct values for max_recv_sge, max_send_sge
+
+When creating QPs, ensure init_attr->cap.max_recv_sge
+is clipped to MAX_FRAG_COUNT.
+
+Expose MAX_FRAG_COUNT for max_recv_sge and max_send_sge in
+i40iw_query_qp().
+
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Reviewed-By: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index aacaa0f..6b516d6 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -608,6 +608,9 @@ static struct ib_qp *i40iw_create_qp(struct ib_pd *ibpd,
+ 	if (init_attr->cap.max_send_sge > I40IW_MAX_WQ_FRAGMENT_COUNT)
+ 		init_attr->cap.max_send_sge = I40IW_MAX_WQ_FRAGMENT_COUNT;
+ 
++	if (init_attr->cap.max_recv_sge > I40IW_MAX_WQ_FRAGMENT_COUNT)
++		init_attr->cap.max_recv_sge = I40IW_MAX_WQ_FRAGMENT_COUNT;
++
+ 	memset(&init_info, 0, sizeof(init_info));
+ 
+ 	sq_size = init_attr->cap.max_send_wr;
+@@ -813,8 +816,9 @@ static int i40iw_query_qp(struct ib_qp *ibqp,
+ 	attr->qp_access_flags = 0;
+ 	attr->cap.max_send_wr = qp->qp_uk.sq_size;
+ 	attr->cap.max_recv_wr = qp->qp_uk.rq_size;
+-	attr->cap.max_recv_sge = 1;
+ 	attr->cap.max_inline_data = I40IW_MAX_INLINE_DATA_SIZE;
++	attr->cap.max_send_sge = I40IW_MAX_WQ_FRAGMENT_COUNT;
++	attr->cap.max_recv_sge = I40IW_MAX_WQ_FRAGMENT_COUNT;
+ 	init_attr->event_handler = iwqp->ibqp.event_handler;
+ 	init_attr->qp_context = iwqp->ibqp.qp_context;
+ 	init_attr->send_cq = iwqp->ibqp.send_cq;
+-- 
+1.8.3.1
+

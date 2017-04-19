@@ -1,0 +1,805 @@
+From 0fc2dc58896f182daeeb4a7b5fc8d763afec3117 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Mon, 10 Oct 2016 21:12:10 -0500
+Subject: [PATCH 13/52] i40iw: Add Quality of Service support
+
+Add support for QoS on QPs. Upon device initialization,
+a map is created from user priority to queue set
+handles. On QP creation, use ToS to look up the queue
+set handle for use with the QP.
+
+Signed-off-by: Faisal Latif <faisal.latif@intel.com>
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw.h       |   9 ++
+ drivers/infiniband/hw/i40iw/i40iw_cm.c    |  30 +++++-
+ drivers/infiniband/hw/i40iw/i40iw_cm.h    |   2 +-
+ drivers/infiniband/hw/i40iw/i40iw_ctrl.c  | 151 +++++++++++++++++++++++++++++-
+ drivers/infiniband/hw/i40iw/i40iw_d.h     |   2 +
+ drivers/infiniband/hw/i40iw/i40iw_hw.c    |  25 ++---
+ drivers/infiniband/hw/i40iw/i40iw_main.c  |  66 +++++++++++--
+ drivers/infiniband/hw/i40iw/i40iw_osdep.h |   2 +
+ drivers/infiniband/hw/i40iw/i40iw_p.h     |   2 +
+ drivers/infiniband/hw/i40iw/i40iw_puda.c  |   3 +-
+ drivers/infiniband/hw/i40iw/i40iw_type.h  |  18 +++-
+ drivers/infiniband/hw/i40iw/i40iw_utils.c |  45 +++++++++
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c |   6 +-
+ 13 files changed, 325 insertions(+), 36 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw.h b/drivers/infiniband/hw/i40iw/i40iw.h
+index 8ec09e4..4a0c12b 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw.h
++++ b/drivers/infiniband/hw/i40iw/i40iw.h
+@@ -210,6 +210,12 @@ struct i40iw_msix_vector {
+ 	u32 ceq_id;
+ };
+ 
++struct l2params_work {
++	struct work_struct work;
++	struct i40iw_device *iwdev;
++	struct i40iw_l2params l2params;
++};
++
+ #define I40IW_MSIX_TABLE_SIZE   65
+ 
+ struct virtchnl_work {
+@@ -514,6 +520,9 @@ enum i40iw_status_code i40iw_add_mac_addr(struct i40iw_device *iwdev,
+ void i40iw_hw_modify_qp(struct i40iw_device *iwdev, struct i40iw_qp *iwqp,
+ 			struct i40iw_modify_qp_info *info, bool wait);
+ 
++void i40iw_qp_suspend_resume(struct i40iw_sc_dev *dev,
++			     struct i40iw_sc_qp *qp,
++			     bool suspend);
+ enum i40iw_status_code i40iw_manage_qhash(struct i40iw_device *iwdev,
+ 					  struct i40iw_cm_info *cminfo,
+ 					  enum i40iw_quad_entry_type etype,
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 8563769..24b22e9 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -221,6 +221,7 @@ static void i40iw_get_addr_info(struct i40iw_cm_node *cm_node,
+ 	memcpy(cm_info->rem_addr, cm_node->rem_addr, sizeof(cm_info->rem_addr));
+ 	cm_info->loc_port = cm_node->loc_port;
+ 	cm_info->rem_port = cm_node->rem_port;
++	cm_info->user_pri = cm_node->user_pri;
+ }
+ 
+ /**
+@@ -396,6 +397,7 @@ static struct i40iw_puda_buf *i40iw_form_cm_frame(struct i40iw_cm_node *cm_node,
+ 	u32 opts_len = 0;
+ 	u32 pd_len = 0;
+ 	u32 hdr_len = 0;
++	u16 vtag;
+ 
+ 	sqbuf = i40iw_puda_get_bufpool(dev->ilq);
+ 	if (!sqbuf)
+@@ -445,7 +447,8 @@ static struct i40iw_puda_buf *i40iw_form_cm_frame(struct i40iw_cm_node *cm_node,
+ 		ether_addr_copy(ethh->h_source, cm_node->loc_mac);
+ 		if (cm_node->vlan_id < VLAN_TAG_PRESENT) {
+ 			((struct vlan_ethhdr *)ethh)->h_vlan_proto = htons(ETH_P_8021Q);
+-			((struct vlan_ethhdr *)ethh)->h_vlan_TCI = htons(cm_node->vlan_id);
++			vtag = (cm_node->user_pri << VLAN_PRIO_SHIFT) | cm_node->vlan_id;
++			((struct vlan_ethhdr *)ethh)->h_vlan_TCI = htons(vtag);
+ 
+ 			((struct vlan_ethhdr *)ethh)->h_vlan_encapsulated_proto = htons(ETH_P_IP);
+ 		} else {
+@@ -474,7 +477,8 @@ static struct i40iw_puda_buf *i40iw_form_cm_frame(struct i40iw_cm_node *cm_node,
+ 		ether_addr_copy(ethh->h_source, cm_node->loc_mac);
+ 		if (cm_node->vlan_id < VLAN_TAG_PRESENT) {
+ 			((struct vlan_ethhdr *)ethh)->h_vlan_proto = htons(ETH_P_8021Q);
+-			((struct vlan_ethhdr *)ethh)->h_vlan_TCI = htons(cm_node->vlan_id);
++			vtag = (cm_node->user_pri << VLAN_PRIO_SHIFT) | cm_node->vlan_id;
++			((struct vlan_ethhdr *)ethh)->h_vlan_TCI = htons(vtag);
+ 			((struct vlan_ethhdr *)ethh)->h_vlan_encapsulated_proto = htons(ETH_P_IPV6);
+ 		} else {
+ 			ethh->h_proto = htons(ETH_P_IPV6);
+@@ -1880,6 +1884,7 @@ static int i40iw_dec_refcnt_listen(struct i40iw_cm_core *cm_core,
+ 			nfo.loc_port = listener->loc_port;
+ 			nfo.ipv4 = listener->ipv4;
+ 			nfo.vlan_id = listener->vlan_id;
++			nfo.user_pri = listener->user_pri;
+ 
+ 			if (!list_empty(&listener->child_listen_list)) {
+ 				i40iw_del_multiple_qhash(listener->iwdev, &nfo, listener);
+@@ -2138,6 +2143,11 @@ static struct i40iw_cm_node *i40iw_make_cm_node(
+ 	/* set our node specific transport info */
+ 	cm_node->ipv4 = cm_info->ipv4;
+ 	cm_node->vlan_id = cm_info->vlan_id;
++	if ((cm_node->vlan_id == I40IW_NO_VLAN) && iwdev->dcb)
++		cm_node->vlan_id = 0;
++	cm_node->user_pri = cm_info->user_pri;
++	if (listener)
++		cm_node->user_pri = listener->user_pri;
+ 	memcpy(cm_node->loc_addr, cm_info->loc_addr, sizeof(cm_node->loc_addr));
+ 	memcpy(cm_node->rem_addr, cm_info->rem_addr, sizeof(cm_node->rem_addr));
+ 	cm_node->loc_port = cm_info->loc_port;
+@@ -3055,6 +3065,7 @@ void i40iw_receive_ilq(struct i40iw_sc_dev *dev, struct i40iw_puda_buf *rbuf)
+ 	struct i40iw_device *iwdev = (struct i40iw_device *)dev->back_dev;
+ 	struct i40iw_cm_core *cm_core = &iwdev->cm_core;
+ 	struct vlan_ethhdr *ethh;
++	u16 vtag;
+ 
+ 	/* if vlan, then maclen = 18 else 14 */
+ 	iph = (struct iphdr *)rbuf->iph;
+@@ -3068,7 +3079,9 @@ void i40iw_receive_ilq(struct i40iw_sc_dev *dev, struct i40iw_puda_buf *rbuf)
+ 	ethh = (struct vlan_ethhdr *)rbuf->mem.va;
+ 
+ 	if (ethh->h_vlan_proto == htons(ETH_P_8021Q)) {
+-		cm_info.vlan_id = ntohs(ethh->h_vlan_TCI) & VLAN_VID_MASK;
++		vtag = ntohs(ethh->h_vlan_TCI);
++		cm_info.user_pri = (vtag & VLAN_PRIO_MASK) >> VLAN_PRIO_SHIFT;
++		cm_info.vlan_id = vtag & VLAN_VID_MASK;
+ 		i40iw_debug(cm_core->dev,
+ 			    I40IW_DEBUG_CM,
+ 			    "%s vlan_id=%d\n",
+@@ -3309,6 +3322,8 @@ static void i40iw_cm_init_tsa_conn(struct i40iw_qp *iwqp,
+ 
+ 	ctx_info->tcp_info_valid = true;
+ 	ctx_info->iwarp_info_valid = true;
++	ctx_info->add_to_qoslist = true;
++	ctx_info->user_pri = cm_node->user_pri;
+ 
+ 	i40iw_init_tcp_ctx(cm_node, &tcp_info, iwqp);
+ 	if (cm_node->snd_mark_en) {
+@@ -3326,6 +3341,7 @@ static void i40iw_cm_init_tsa_conn(struct i40iw_qp *iwqp,
+ 	/* once tcp_info is set, no need to do it again */
+ 	ctx_info->tcp_info_valid = false;
+ 	ctx_info->iwarp_info_valid = false;
++	ctx_info->add_to_qoslist = false;
+ }
+ 
+ /**
+@@ -3759,6 +3775,9 @@ int i40iw_connect(struct iw_cm_id *cm_id, struct iw_cm_conn_param *conn_param)
+ 		i40iw_netdev_vlan_ipv6(cm_info.loc_addr, &cm_info.vlan_id, NULL);
+ 	}
+ 	cm_info.cm_id = cm_id;
++	cm_info.user_pri = rt_tos2priority(cm_id->tos);
++	i40iw_debug(&iwdev->sc_dev, I40IW_DEBUG_DCB, "%s TOS:[%d] UP:[%d]\n",
++		    __func__, cm_id->tos, cm_info.user_pri);
+ 	if ((cm_info.ipv4 && (laddr->sin_addr.s_addr != raddr->sin_addr.s_addr)) ||
+ 	    (!cm_info.ipv4 && memcmp(laddr6->sin6_addr.in6_u.u6_addr32,
+ 				     raddr6->sin6_addr.in6_u.u6_addr32,
+@@ -3904,6 +3923,11 @@ int i40iw_create_listen(struct iw_cm_id *cm_id, int backlog)
+ 
+ 	cm_id->provider_data = cm_listen_node;
+ 
++	cm_listen_node->user_pri = rt_tos2priority(cm_id->tos);
++	cm_info.user_pri = cm_listen_node->user_pri;
++	i40iw_debug(&iwdev->sc_dev, I40IW_DEBUG_DCB, "%s TOS:[%d] UP:[%d]\n",
++		    __func__, cm_id->tos, cm_listen_node->user_pri);
++
+ 	if (!cm_listen_node->reused_node) {
+ 		if (wildcard) {
+ 			if (cm_info.ipv4)
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.h b/drivers/infiniband/hw/i40iw/i40iw_cm.h
+index e9046d9..945ed26 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.h
+@@ -368,7 +368,7 @@ struct i40iw_cm_info {
+ 	u32 rem_addr[4];
+ 	u16 vlan_id;
+ 	int backlog;
+-	u16 user_pri;
++	u8 user_pri;
+ 	bool ipv4;
+ };
+ 
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+index 2c4b4d0..31c4a0c 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+@@ -223,6 +223,133 @@ static enum i40iw_status_code i40iw_sc_parse_fpm_query_buf(
+ }
+ 
+ /**
++ * i40iw_fill_qos_list - Change all unknown qs handles to available ones
++ * @qs_list: list of qs_handles to be fixed with valid qs_handles
++ */
++static void i40iw_fill_qos_list(u16 *qs_list)
++{
++	u16 qshandle = qs_list[0];
++	int i;
++
++	for (i = 0; i < I40IW_MAX_USER_PRIORITY; i++) {
++		if (qs_list[i] == QS_HANDLE_UNKNOWN)
++			qs_list[i] = qshandle;
++		else
++			qshandle = qs_list[i];
++	}
++}
++
++/**
++ * i40iw_qp_from_entry - Given entry, get to the qp structure
++ * @entry: Points to list of qp structure
++ */
++static struct i40iw_sc_qp *i40iw_qp_from_entry(struct list_head *entry)
++{
++	if (!entry)
++		return NULL;
++
++	return (struct i40iw_sc_qp *)((char *)entry - offsetof(struct i40iw_sc_qp, list));
++}
++
++/**
++ * i40iw_get_qp - get the next qp from the list given current qp
++ * @head: Listhead of qp's
++ * @qp: current qp
++ */
++static struct i40iw_sc_qp *i40iw_get_qp(struct list_head *head, struct i40iw_sc_qp *qp)
++{
++	struct list_head *entry = NULL;
++	struct list_head *lastentry;
++
++	if (list_empty(head))
++		return NULL;
++
++	if (!qp) {
++		entry = head->next;
++	} else {
++		lastentry = &qp->list;
++		entry = (lastentry != head) ? lastentry->next : NULL;
++	}
++
++	return i40iw_qp_from_entry(entry);
++}
++
++/**
++ * i40iw_change_l2params - given the new l2 parameters, change all qp
++ * @dev: IWARP device pointer
++ * @l2params: New paramaters from l2
++ */
++void i40iw_change_l2params(struct i40iw_sc_dev *dev, struct i40iw_l2params *l2params)
++{
++	struct i40iw_sc_qp *qp = NULL;
++	bool qs_handle_change = false;
++	bool mss_change = false;
++	unsigned long flags;
++	u16 qs_handle;
++	int i;
++
++	if (dev->mss != l2params->mss) {
++		mss_change = true;
++		dev->mss = l2params->mss;
++	}
++
++	i40iw_fill_qos_list(l2params->qs_handle_list);
++	for (i = 0; i < I40IW_MAX_USER_PRIORITY; i++) {
++		qs_handle = l2params->qs_handle_list[i];
++		if (dev->qos[i].qs_handle != qs_handle)
++			qs_handle_change = true;
++		else if (!mss_change)
++			continue;       /* no MSS nor qs handle change */
++		spin_lock_irqsave(&dev->qos[i].lock, flags);
++		qp = i40iw_get_qp(&dev->qos[i].qplist, qp);
++		while (qp) {
++			if (mss_change)
++				i40iw_qp_mss_modify(dev, qp);
++			if (qs_handle_change) {
++				qp->qs_handle = qs_handle;
++				/* issue cqp suspend command */
++				i40iw_qp_suspend_resume(dev, qp, true);
++			}
++			qp = i40iw_get_qp(&dev->qos[i].qplist, qp);
++		}
++		spin_unlock_irqrestore(&dev->qos[i].lock, flags);
++		dev->qos[i].qs_handle = qs_handle;
++	}
++}
++
++/**
++ * i40iw_qp_rem_qos - remove qp from qos lists during destroy qp
++ * @dev: IWARP device pointer
++ * @qp: qp to be removed from qos
++ */
++static void i40iw_qp_rem_qos(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp)
++{
++	unsigned long flags;
++
++	if (!qp->on_qoslist)
++		return;
++	spin_lock_irqsave(&dev->qos[qp->user_pri].lock, flags);
++	list_del(&qp->list);
++	spin_unlock_irqrestore(&dev->qos[qp->user_pri].lock, flags);
++}
++
++/**
++ * i40iw_qp_add_qos - called during setctx fot qp to be added to qos
++ * @dev: IWARP device pointer
++ * @qp: qp to be added to qos
++ */
++void i40iw_qp_add_qos(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp)
++{
++	unsigned long flags;
++
++	spin_lock_irqsave(&dev->qos[qp->user_pri].lock, flags);
++	qp->qs_handle = dev->qos[qp->user_pri].qs_handle;
++	list_add(&qp->list, &dev->qos[qp->user_pri].qplist);
++	qp->on_qoslist = true;
++	spin_unlock_irqrestore(&dev->qos[qp->user_pri].lock, flags);
++}
++
++/**
+  * i40iw_sc_pd_init - initialize sc pd struct
+  * @dev: sc device struct
+  * @pd: sc pd ptr
+@@ -1082,7 +1209,7 @@ static enum i40iw_status_code i40iw_sc_manage_qhash_table_entry(
+ 			      LS_64(info->dest_ip[2], I40IW_CQPSQ_QHASH_ADDR2) |
+ 			      LS_64(info->dest_ip[3], I40IW_CQPSQ_QHASH_ADDR3));
+ 	}
+-	qw2 = LS_64(cqp->dev->qs_handle, I40IW_CQPSQ_QHASH_QS_HANDLE);
++	qw2 = LS_64(cqp->dev->qos[info->user_pri].qs_handle, I40IW_CQPSQ_QHASH_QS_HANDLE);
+ 	if (info->vlan_valid)
+ 		qw2 |= LS_64(info->vlan_id, I40IW_CQPSQ_QHASH_VLANID);
+ 	set_64bit_val(wqe, 16, qw2);
+@@ -2151,7 +2278,7 @@ static enum i40iw_status_code i40iw_sc_qp_init(struct i40iw_sc_qp *qp,
+ 	qp->rq_tph_en = info->rq_tph_en;
+ 	qp->rcv_tph_en = info->rcv_tph_en;
+ 	qp->xmit_tph_en = info->xmit_tph_en;
+-	qp->qs_handle = qp->pd->dev->qs_handle;
++	qp->qs_handle = qp->pd->dev->qos[qp->user_pri].qs_handle;
+ 	qp->exception_lan_queue = qp->pd->dev->exception_lan_queue;
+ 
+ 	return 0;
+@@ -2296,6 +2423,7 @@ static enum i40iw_status_code i40iw_sc_qp_destroy(
+ 	struct i40iw_sc_cqp *cqp;
+ 	u64 header;
+ 
++	i40iw_qp_rem_qos(qp->pd->dev, qp);
+ 	cqp = qp->pd->dev->cqp;
+ 	wqe = i40iw_sc_cqp_get_next_send_wqe(cqp, scratch);
+ 	if (!wqe)
+@@ -2447,6 +2575,12 @@ static enum i40iw_status_code i40iw_sc_qp_setctx(
+ 
+ 	iw = info->iwarp_info;
+ 	tcp = info->tcp_info;
++	if (info->add_to_qoslist) {
++		qp->user_pri = info->user_pri;
++		i40iw_qp_add_qos(qp->pd->dev, qp);
++		i40iw_debug(qp->dev, I40IW_DEBUG_DCB, "%s qp[%d] UP[%d] qset[%d]\n",
++			    __func__, qp->qp_uk.qp_id, qp->user_pri, qp->qs_handle);
++	}
+ 	qw0 = LS_64(qp->qp_uk.rq_wqe_size, I40IWQPC_RQWQESIZE) |
+ 	      LS_64(info->err_rq_idx_valid, I40IWQPC_ERR_RQ_IDX_VALID) |
+ 	      LS_64(qp->rcv_tph_en, I40IWQPC_RCVTPHEN) |
+@@ -3959,7 +4093,7 @@ enum i40iw_status_code i40iw_process_cqp_cmd(struct i40iw_sc_dev *dev,
+ 					     struct cqp_commands_info *pcmdinfo)
+ {
+ 	enum i40iw_status_code status = 0;
+-	unsigned long	flags;
++	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&dev->cqp_lock, flags);
+ 	if (list_empty(&dev->cqp_cmd_head) && !i40iw_ring_full(dev->cqp))
+@@ -3978,7 +4112,7 @@ enum i40iw_status_code i40iw_process_bh(struct i40iw_sc_dev *dev)
+ {
+ 	enum i40iw_status_code status = 0;
+ 	struct cqp_commands_info *pcmdinfo;
+-	unsigned long	flags;
++	unsigned long flags;
+ 
+ 	spin_lock_irqsave(&dev->cqp_lock, flags);
+ 	while (!list_empty(&dev->cqp_cmd_head) && !i40iw_ring_full(dev->cqp)) {
+@@ -4742,6 +4876,7 @@ enum i40iw_status_code i40iw_device_init(struct i40iw_sc_dev *dev,
+ 	u16 hmc_fcn = 0;
+ 	enum i40iw_status_code ret_code = 0;
+ 	u8 db_size;
++	int i;
+ 
+ 	spin_lock_init(&dev->cqp_lock);
+ 	INIT_LIST_HEAD(&dev->cqp_cmd_head);             /* for the cqp commands backlog. */
+@@ -4757,7 +4892,13 @@ enum i40iw_status_code i40iw_device_init(struct i40iw_sc_dev *dev,
+ 		return ret_code;
+ 	}
+ 	dev->hmc_fn_id = info->hmc_fn_id;
+-	dev->qs_handle = info->qs_handle;
++	i40iw_fill_qos_list(info->l2params.qs_handle_list);
++	for (i = 0; i < I40IW_MAX_USER_PRIORITY; i++) {
++		dev->qos[i].qs_handle = info->l2params.qs_handle_list[i];
++		i40iw_debug(dev, I40IW_DEBUG_DCB, "qset[%d]: %d\n", i, dev->qos[i].qs_handle);
++		spin_lock_init(&dev->qos[i].lock);
++		INIT_LIST_HEAD(&dev->qos[i].qplist);
++	}
+ 	dev->exception_lan_queue = info->exception_lan_queue;
+ 	dev->is_pf = info->is_pf;
+ 
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_d.h b/drivers/infiniband/hw/i40iw/i40iw_d.h
+index 2fac1db..e184c0e 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_d.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_d.h
+@@ -74,6 +74,8 @@
+ #define RS_32_1(val, bits)      (u32)(val >> bits)
+ #define I40E_HI_DWORD(x)        ((u32)((((x) >> 16) >> 16) & 0xFFFFFFFF))
+ 
++#define QS_HANDLE_UNKNOWN       0xffff
++
+ #define LS_64(val, field) (((u64)val << field ## _SHIFT) & (field ## _MASK))
+ 
+ #define RS_64(val, field) ((u64)(val & field ## _MASK) >> field ## _SHIFT)
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_hw.c b/drivers/infiniband/hw/i40iw/i40iw_hw.c
+index 0c92a40..b94727f 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_hw.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_hw.c
+@@ -359,6 +359,9 @@ void i40iw_process_aeq(struct i40iw_device *iwdev)
+ 				continue;
+ 			i40iw_cm_disconn(iwqp);
+ 			break;
++		case I40IW_AE_QP_SUSPEND_COMPLETE:
++			i40iw_qp_suspend_resume(dev, &iwqp->sc_qp, false);
++			break;
+ 		case I40IW_AE_TERMINATE_SENT:
+ 			i40iw_terminate_send_fin(qp);
+ 			break;
+@@ -404,19 +407,18 @@ void i40iw_process_aeq(struct i40iw_device *iwdev)
+ 		case I40IW_AE_LCE_CQ_CATASTROPHIC:
+ 		case I40IW_AE_UDA_XMIT_DGRAM_TOO_LONG:
+ 		case I40IW_AE_UDA_XMIT_IPADDR_MISMATCH:
+-		case I40IW_AE_QP_SUSPEND_COMPLETE:
+ 			ctx_info->err_rq_idx_valid = false;
+ 		default:
+-				if (!info->sq && ctx_info->err_rq_idx_valid) {
+-					ctx_info->err_rq_idx = info->wqe_idx;
+-					ctx_info->tcp_info_valid = false;
+-					ctx_info->iwarp_info_valid = false;
+-					ret = dev->iw_priv_qp_ops->qp_setctx(&iwqp->sc_qp,
+-									     iwqp->host_ctx.va,
+-									     ctx_info);
+-				}
+-				i40iw_terminate_connection(qp, info);
+-				break;
++			if (!info->sq && ctx_info->err_rq_idx_valid) {
++				ctx_info->err_rq_idx = info->wqe_idx;
++				ctx_info->tcp_info_valid = false;
++				ctx_info->iwarp_info_valid = false;
++				ret = dev->iw_priv_qp_ops->qp_setctx(&iwqp->sc_qp,
++								     iwqp->host_ctx.va,
++								     ctx_info);
++			}
++			i40iw_terminate_connection(qp, info);
++			break;
+ 		}
+ 		if (info->qp)
+ 			i40iw_rem_ref(&iwqp->ibqp);
+@@ -560,6 +562,7 @@ enum i40iw_status_code i40iw_manage_qhash(struct i40iw_device *iwdev,
+ 	}
+ 
+ 	info->ipv4_valid = cminfo->ipv4;
++	info->user_pri = cminfo->user_pri;
+ 	ether_addr_copy(info->mac_addr, iwdev->netdev->dev_addr);
+ 	info->qp_num = cpu_to_le32(dev->ilq->qp_id);
+ 	info->dest_port = cpu_to_le16(cminfo->loc_port);
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index ac2f3cd..40aac87 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -939,7 +939,7 @@ static enum i40iw_status_code i40iw_initialize_ilq(struct i40iw_device *iwdev)
+ 	info.rq_size = 8192;
+ 	info.buf_size = 1024;
+ 	info.tx_buf_cnt = 16384;
+-	info.mss = iwdev->mss;
++	info.mss = iwdev->sc_dev.mss;
+ 	info.receive = i40iw_receive_ilq;
+ 	info.xmit_complete = i40iw_free_sqbuf;
+ 	status = i40iw_puda_create_rsrc(&iwdev->sc_dev, &info);
+@@ -967,7 +967,7 @@ static enum i40iw_status_code i40iw_initialize_ieq(struct i40iw_device *iwdev)
+ 	info.sq_size = 8192;
+ 	info.rq_size = 8192;
+ 	info.buf_size = 2048;
+-	info.mss = iwdev->mss;
++	info.mss = iwdev->sc_dev.mss;
+ 	info.tx_buf_cnt = 16384;
+ 	status = i40iw_puda_create_rsrc(&iwdev->sc_dev, &info);
+ 	if (status)
+@@ -1296,6 +1296,9 @@ static enum i40iw_status_code i40iw_initialize_dev(struct i40iw_device *iwdev,
+ 	struct i40iw_device_init_info info;
+ 	struct i40iw_dma_mem mem;
+ 	u32 size;
++	u16 last_qset = I40IW_NO_QSET;
++	u16 qset;
++	u32 i;
+ 
+ 	memset(&info, 0, sizeof(info));
+ 	size = sizeof(struct i40iw_hmc_pble_rsrc) + sizeof(struct i40iw_hmc_info) +
+@@ -1325,7 +1328,16 @@ static enum i40iw_status_code i40iw_initialize_dev(struct i40iw_device *iwdev,
+ 	info.bar0 = ldev->hw_addr;
+ 	info.hw = &iwdev->hw;
+ 	info.debug_mask = debug;
+-	info.qs_handle = ldev->params.qos.prio_qos[0].qs_handle;
++	info.l2params.mss =
++		(ldev->params.mtu) ? ldev->params.mtu - I40IW_MTU_TO_MSS : I40IW_DEFAULT_MSS;
++	for (i = 0; i < I40E_CLIENT_MAX_USER_PRIORITY; i++) {
++		qset = ldev->params.qos.prio_qos[i].qs_handle;
++		info.l2params.qs_handle_list[i] = qset;
++		if (last_qset == I40IW_NO_QSET)
++			last_qset = qset;
++		else if ((qset != last_qset) && (qset != I40IW_NO_QSET))
++			iwdev->dcb = true;
++	}
+ 	info.exception_lan_queue = 1;
+ 	info.vchnl_send = i40iw_virtchnl_send;
+ 	status = i40iw_device_init(&iwdev->sc_dev, &info);
+@@ -1416,6 +1428,8 @@ static void i40iw_deinit_device(struct i40iw_device *iwdev, bool reset, bool del
+ 	struct i40iw_sc_dev *dev = &iwdev->sc_dev;
+ 
+ 	i40iw_pr_info("state = %d\n", iwdev->init_state);
++	if (iwdev->param_wq)
++		destroy_workqueue(iwdev->param_wq);
+ 
+ 	switch (iwdev->init_state) {
+ 	case RDMA_DEV_REGISTERED:
+@@ -1630,6 +1644,9 @@ static int i40iw_open(struct i40e_info *ldev, struct i40e_client *client)
+ 		iwdev->init_state = RDMA_DEV_REGISTERED;
+ 		iwdev->iw_status = 1;
+ 		i40iw_port_ibevent(iwdev);
++		iwdev->param_wq = alloc_ordered_workqueue("l2params", WQ_MEM_RECLAIM);
++		if(iwdev->param_wq == NULL)
++			break;
+ 		i40iw_pr_info("i40iw_open completed\n");
+ 		return 0;
+ 	} while (0);
+@@ -1640,25 +1657,58 @@ static int i40iw_open(struct i40e_info *ldev, struct i40e_client *client)
+ }
+ 
+ /**
+- * i40iw_l2param_change : handle qs handles for qos and mss change
++ * i40iw_l2params_worker - worker for l2 params change
++ * @work: work pointer for l2 params
++ */
++static void i40iw_l2params_worker(struct work_struct *work)
++{
++	struct l2params_work *dwork =
++	    container_of(work, struct l2params_work, work);
++	struct i40iw_device *iwdev = dwork->iwdev;
++
++	i40iw_change_l2params(&iwdev->sc_dev, &dwork->l2params);
++	atomic_dec(&iwdev->params_busy);
++	kfree(work);
++}
++
++/**
++ * i40iw_l2param_change - handle qs handles for qos and mss change
+  * @ldev: lan device information
+  * @client: client for paramater change
+  * @params: new parameters from L2
+  */
+-static void i40iw_l2param_change(struct i40e_info *ldev,
+-				 struct i40e_client *client,
++static void i40iw_l2param_change(struct i40e_info *ldev, struct i40e_client *client,
+ 				 struct i40e_params *params)
+ {
+ 	struct i40iw_handler *hdl;
++	struct i40iw_l2params *l2params;
++	struct l2params_work *work;
+ 	struct i40iw_device *iwdev;
++	int i;
+ 
+ 	hdl = i40iw_find_i40e_handler(ldev);
+ 	if (!hdl)
+ 		return;
+ 
+ 	iwdev = &hdl->device;
+-	if (params->mtu)
+-		iwdev->mss = params->mtu - I40IW_MTU_TO_MSS;
++
++	if (atomic_read(&iwdev->params_busy))
++		return;
++
++
++	work = kzalloc(sizeof(*work), GFP_ATOMIC);
++	if (!work)
++		return;
++
++	atomic_inc(&iwdev->params_busy);
++
++	work->iwdev = iwdev;
++	l2params = &work->l2params;
++	for (i = 0; i < I40E_CLIENT_MAX_USER_PRIORITY; i++)
++		l2params->qs_handle_list[i] = params->qos.prio_qos[i].qs_handle;
++
++	INIT_WORK(&work->work, i40iw_l2params_worker);
++	queue_work(iwdev->param_wq, &work->work);
+ }
+ 
+ /**
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_osdep.h b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
+index 80f422b..a6b18cd 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_osdep.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_osdep.h
+@@ -198,6 +198,8 @@ enum i40iw_status_code i40iw_cqp_manage_vf_pble_bp(struct i40iw_sc_dev *dev,
+ void i40iw_cqp_spawn_worker(struct i40iw_sc_dev *dev,
+ 			    struct i40iw_virtchnl_work_info *work_info, u32 iw_vf_idx);
+ void *i40iw_remove_head(struct list_head *list);
++void i40iw_qp_suspend_resume(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp, bool suspend);
++void i40iw_qp_mss_modify(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp);
+ 
+ void i40iw_term_modify_qp(struct i40iw_sc_qp *qp, u8 next_state, u8 term, u8 term_len);
+ void i40iw_terminate_done(struct i40iw_sc_qp *qp, int timeout_occurred);
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_p.h b/drivers/infiniband/hw/i40iw/i40iw_p.h
+index a0b8ca1..c9e8cb8 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_p.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_p.h
+@@ -65,6 +65,8 @@ enum i40iw_status_code i40iw_pf_init_vfhmc(struct i40iw_sc_dev *dev, u8 vf_hmc_f
+ 					   u32 *vf_cnt_array);
+ 
+ /* cqp misc functions */
++void i40iw_change_l2params(struct i40iw_sc_dev *dev, struct i40iw_l2params *l2params);
++void i40iw_qp_add_qos(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp);
+ 
+ void i40iw_terminate_send_fin(struct i40iw_sc_qp *qp);
+ 
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_puda.c b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+index c62d354..7541b0d 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_puda.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+@@ -608,7 +608,8 @@ static enum i40iw_status_code i40iw_puda_qp_create(struct i40iw_puda_rsrc *rsrc)
+ 		ukqp->wqe_alloc_reg = (u32 __iomem *)(i40iw_get_hw_addr(qp->pd->dev) +
+ 						    I40E_VFPE_WQEALLOC1);
+ 
+-	qp->qs_handle = qp->dev->qs_handle;
++	qp->user_pri = 0;
++	i40iw_qp_add_qos(rsrc->dev, qp);
+ 	i40iw_puda_qp_setctx(rsrc);
+ 	ret = i40iw_puda_qp_wqe(rsrc);
+ 	if (ret)
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_type.h b/drivers/infiniband/hw/i40iw/i40iw_type.h
+index 2b1a04e..b6f448a 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_type.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_type.h
+@@ -397,6 +397,9 @@ struct i40iw_sc_qp {
+ 	bool virtual_map;
+ 	bool flush_sq;
+ 	bool flush_rq;
++	u8 user_pri;
++	struct list_head list;
++	bool on_qoslist;
+ 	bool sq_flush;
+ 	enum i40iw_flush_opcode flush_code;
+ 	enum i40iw_term_eventtypes eventtype;
+@@ -424,6 +427,12 @@ struct i40iw_vchnl_vf_msg_buffer {
+ 	char parm_buffer[I40IW_VCHNL_MAX_VF_MSG_SIZE - 1];
+ };
+ 
++struct i40iw_qos {
++	struct list_head qplist;
++	spinlock_t lock;	/* qos list */
++	u16 qs_handle;
++};
++
+ struct i40iw_vfdev {
+ 	struct i40iw_sc_dev *pf_dev;
+ 	u8 *hmc_info_mem;
+@@ -482,7 +491,8 @@ struct i40iw_sc_dev {
+ 	const struct i40iw_vf_cqp_ops *iw_vf_cqp_ops;
+ 
+ 	struct i40iw_hmc_fpm_misc hmc_fpm_misc;
+-	u16 qs_handle;
++	struct i40iw_qos qos[I40IW_MAX_USER_PRIORITY];
++	u16 mss;
+ 	u32 debug_mask;
+ 	u16 exception_lan_queue;
+ 	u8 hmc_fn_id;
+@@ -564,7 +574,7 @@ struct i40iw_device_init_info {
+ 	struct i40iw_hw *hw;
+ 	void __iomem *bar0;
+ 	enum i40iw_status_code (*vchnl_send)(struct i40iw_sc_dev *, u32, u8 *, u16);
+-	u16 qs_handle;
++	struct i40iw_l2params l2params;
+ 	u16 exception_lan_queue;
+ 	u8 hmc_fn_id;
+ 	bool is_pf;
+@@ -722,6 +732,8 @@ struct i40iw_qp_host_ctx_info {
+ 	bool iwarp_info_valid;
+ 	bool err_rq_idx_valid;
+ 	u16 err_rq_idx;
++	bool add_to_qoslist;
++	u8 user_pri;
+ };
+ 
+ struct i40iw_aeqe_info {
+@@ -886,7 +898,7 @@ struct i40iw_qhash_table_info {
+ 	bool ipv4_valid;
+ 	u8 mac_addr[6];
+ 	u16 vlan_id;
+-	u16 qs_handle;
++	u8 user_pri;
+ 	u32 qp_num;
+ 	u32 dest_ip[4];
+ 	u32 src_ip[4];
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+index 6fd043b..cd98902 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+@@ -712,6 +712,51 @@ enum i40iw_status_code i40iw_cqp_sds_cmd(struct i40iw_sc_dev *dev,
+ }
+ 
+ /**
++ * i40iw_qp_suspend_resume - cqp command for suspend/resume
++ * @dev: hardware control device structure
++ * @qp: hardware control qp
++ * @suspend: flag if suspend or resume
++ */
++void i40iw_qp_suspend_resume(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp, bool suspend)
++{
++	struct i40iw_device *iwdev = (struct i40iw_device *)dev->back_dev;
++	struct i40iw_cqp_request *cqp_request;
++	struct i40iw_sc_cqp *cqp = dev->cqp;
++	struct cqp_commands_info *cqp_info;
++	enum i40iw_status_code status;
++
++	cqp_request = i40iw_get_cqp_request(&iwdev->cqp, false);
++	if (!cqp_request)
++		return;
++
++	cqp_info = &cqp_request->info;
++	cqp_info->cqp_cmd = (suspend) ? OP_SUSPEND : OP_RESUME;
++	cqp_info->in.u.suspend_resume.cqp = cqp;
++	cqp_info->in.u.suspend_resume.qp = qp;
++	cqp_info->in.u.suspend_resume.scratch = (uintptr_t)cqp_request;
++	status = i40iw_handle_cqp_op(iwdev, cqp_request);
++	if (status)
++		i40iw_pr_err("CQP-OP QP Suspend/Resume fail");
++}
++
++/**
++ * i40iw_qp_mss_modify - modify mss for qp
++ * @dev: hardware control device structure
++ * @qp: hardware control qp
++ */
++void i40iw_qp_mss_modify(struct i40iw_sc_dev *dev, struct i40iw_sc_qp *qp)
++{
++	struct i40iw_device *iwdev = (struct i40iw_device *)dev->back_dev;
++	struct i40iw_qp *iwqp = (struct i40iw_qp *)qp->back_qp;
++	struct i40iw_modify_qp_info info;
++
++	memset(&info, 0, sizeof(info));
++	info.mss_change = true;
++	info.new_mss = dev->mss;
++	i40iw_hw_modify_qp(iwdev, iwqp, &info, false);
++}
++
++/**
+  * i40iw_term_modify_qp - modify qp for term message
+  * @qp: hardware control qp
+  * @next_state: qp's next state
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index 6329c97..56e1c2c 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -254,7 +254,6 @@ static void i40iw_alloc_push_page(struct i40iw_device *iwdev, struct i40iw_sc_qp
+ {
+ 	struct i40iw_cqp_request *cqp_request;
+ 	struct cqp_commands_info *cqp_info;
+-	struct i40iw_sc_dev *dev = &iwdev->sc_dev;
+ 	enum i40iw_status_code status;
+ 
+ 	if (qp->push_idx != I40IW_INVALID_PUSH_PAGE_INDEX)
+@@ -270,7 +269,7 @@ static void i40iw_alloc_push_page(struct i40iw_device *iwdev, struct i40iw_sc_qp
+ 	cqp_info->cqp_cmd = OP_MANAGE_PUSH_PAGE;
+ 	cqp_info->post_sq = 1;
+ 
+-	cqp_info->in.u.manage_push_page.info.qs_handle = dev->qs_handle;
++	cqp_info->in.u.manage_push_page.info.qs_handle = qp->qs_handle;
+ 	cqp_info->in.u.manage_push_page.info.free_page = 0;
+ 	cqp_info->in.u.manage_push_page.cqp = &iwdev->cqp.sc_cqp;
+ 	cqp_info->in.u.manage_push_page.scratch = (uintptr_t)cqp_request;
+@@ -292,7 +291,6 @@ static void i40iw_dealloc_push_page(struct i40iw_device *iwdev, struct i40iw_sc_
+ {
+ 	struct i40iw_cqp_request *cqp_request;
+ 	struct cqp_commands_info *cqp_info;
+-	struct i40iw_sc_dev *dev = &iwdev->sc_dev;
+ 	enum i40iw_status_code status;
+ 
+ 	if (qp->push_idx == I40IW_INVALID_PUSH_PAGE_INDEX)
+@@ -307,7 +305,7 @@ static void i40iw_dealloc_push_page(struct i40iw_device *iwdev, struct i40iw_sc_
+ 	cqp_info->post_sq = 1;
+ 
+ 	cqp_info->in.u.manage_push_page.info.push_idx = qp->push_idx;
+-	cqp_info->in.u.manage_push_page.info.qs_handle = dev->qs_handle;
++	cqp_info->in.u.manage_push_page.info.qs_handle = qp->qs_handle;
+ 	cqp_info->in.u.manage_push_page.info.free_page = 1;
+ 	cqp_info->in.u.manage_push_page.cqp = &iwdev->cqp.sc_cqp;
+ 	cqp_info->in.u.manage_push_page.scratch = (uintptr_t)cqp_request;
+-- 
+1.8.3.1
+

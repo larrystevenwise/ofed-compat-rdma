@@ -1,0 +1,65 @@
+From a05e15135b67d71f30f70ab45dede4706f988439 Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Wed, 30 Nov 2016 15:08:34 -0600
+Subject: [PATCH 34/52] i40iw: Replace list_for_each_entry macro with safe
+ version
+
+Use list_for_each_entry_safe macro for the IPv6 addr list
+as IPv6 addresses can be deleted while going through the
+list.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c   | 4 ++--
+ drivers/infiniband/hw/i40iw/i40iw_main.c | 4 ++--
+ 2 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 93ae764..9a14880 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -1644,7 +1644,7 @@ static enum i40iw_status_code i40iw_add_mqh_6(struct i40iw_device *iwdev,
+ {
+ 	struct net_device *ip_dev;
+ 	struct inet6_dev *idev;
+-	struct inet6_ifaddr *ifp;
++	struct inet6_ifaddr *ifp, *tmp;
+ 	enum i40iw_status_code ret = 0;
+ 	struct i40iw_cm_listener *child_listen_node;
+ 	unsigned long flags;
+@@ -1659,7 +1659,7 @@ static enum i40iw_status_code i40iw_add_mqh_6(struct i40iw_device *iwdev,
+ 				i40iw_pr_err("idev == NULL\n");
+ 				break;
+ 			}
+-			list_for_each_entry(ifp, &idev->addr_list, if_list) {
++			list_for_each_entry_safe(ifp, tmp, &idev->addr_list, if_list) {
+ 				i40iw_debug(&iwdev->sc_dev,
+ 					    I40IW_DEBUG_CM,
+ 					    "IP=%pI6, vlan_id=%d, MAC=%pM\n",
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index d86bb6e..4ce05b8 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -1164,7 +1164,7 @@ static void i40iw_add_ipv6_addr(struct i40iw_device *iwdev)
+ {
+ 	struct net_device *ip_dev;
+ 	struct inet6_dev *idev;
+-	struct inet6_ifaddr *ifp;
++	struct inet6_ifaddr *ifp, *tmp;
+ 	u32 local_ipaddr6[4];
+ 
+ 	rcu_read_lock();
+@@ -1177,7 +1177,7 @@ static void i40iw_add_ipv6_addr(struct i40iw_device *iwdev)
+ 				i40iw_pr_err("ipv6 inet device not found\n");
+ 				break;
+ 			}
+-			list_for_each_entry(ifp, &idev->addr_list, if_list) {
++			list_for_each_entry_safe(ifp, tmp, &idev->addr_list, if_list) {
+ 				i40iw_pr_info("IP=%pI6, vlan_id=%d, MAC=%pM\n", &ifp->addr,
+ 					      rdma_vlan_dev_vlan_id(ip_dev), ip_dev->dev_addr);
+ 				i40iw_copy_ip_ntohl(local_ipaddr6,
+-- 
+1.8.3.1
+

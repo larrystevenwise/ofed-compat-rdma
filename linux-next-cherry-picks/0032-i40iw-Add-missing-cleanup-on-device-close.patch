@@ -1,0 +1,290 @@
+From d59659340c61e777208524f77c268fe6edc6fe37 Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Wed, 30 Nov 2016 14:59:26 -0600
+Subject: [PATCH 32/52] i40iw: Add missing cleanup on device close
+
+On i40iw device close, disconnect all connected QPs by moving
+them to error state; and block further QPs, PDs and CQs from
+being created. Additionally, make sure all resources have been
+freed before deallocating the ibdev as part of the device close.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw.h       |  5 +++++
+ drivers/infiniband/hw/i40iw/i40iw_cm.c    | 31 +++++++++++++++++++++++++++++++
+ drivers/infiniband/hw/i40iw/i40iw_cm.h    |  2 ++
+ drivers/infiniband/hw/i40iw/i40iw_d.h     |  2 ++
+ drivers/infiniband/hw/i40iw/i40iw_main.c  |  4 ++++
+ drivers/infiniband/hw/i40iw/i40iw_utils.c | 21 +++++++++++++++++++++
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c | 25 +++++++++++++++++++++++++
+ 7 files changed, 90 insertions(+)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw.h b/drivers/infiniband/hw/i40iw/i40iw.h
+index dac9a6b..c795c61 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw.h
++++ b/drivers/infiniband/hw/i40iw/i40iw.h
+@@ -303,10 +303,13 @@ struct i40iw_device {
+ 	u32 mr_stagmask;
+ 	u32 mpa_version;
+ 	bool dcb;
++	bool closing;
+ 	u32 used_pds;
+ 	u32 used_cqs;
+ 	u32 used_mrs;
+ 	u32 used_qps;
++	wait_queue_head_t close_wq;
++	atomic64_t use_count;
+ };
+ 
+ struct i40iw_ib_device {
+@@ -521,6 +524,8 @@ enum i40iw_status_code i40iw_add_mac_addr(struct i40iw_device *iwdev,
+ 
+ void i40iw_rem_pdusecount(struct i40iw_pd *iwpd, struct i40iw_device *iwdev);
+ void i40iw_add_pdusecount(struct i40iw_pd *iwpd);
++void i40iw_rem_devusecount(struct i40iw_device *iwdev);
++void i40iw_add_devusecount(struct i40iw_device *iwdev);
+ void i40iw_hw_modify_qp(struct i40iw_device *iwdev, struct i40iw_qp *iwqp,
+ 			struct i40iw_modify_qp_info *info, bool wait);
+ 
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index b60e346..11ef0b0 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -4128,3 +4128,34 @@ static void i40iw_cm_post_event(struct i40iw_cm_event *event)
+ 
+ 	queue_work(event->cm_node->cm_core->event_wq, &event->event_work);
+ }
++
++/**
++ * i40iw_cm_disconnect_all - disconnect all connected qp's
++ * @iwdev: device pointer
++ */
++void i40iw_cm_disconnect_all(struct i40iw_device *iwdev)
++{
++	struct i40iw_cm_core *cm_core = &iwdev->cm_core;
++	struct list_head *list_core_temp;
++	struct list_head *list_node;
++	struct i40iw_cm_node *cm_node;
++	unsigned long flags;
++	struct list_head connected_list;
++	struct ib_qp_attr attr;
++
++	INIT_LIST_HEAD(&connected_list);
++	spin_lock_irqsave(&cm_core->ht_lock, flags);
++	list_for_each_safe(list_node, list_core_temp, &cm_core->connected_nodes) {
++		cm_node = container_of(list_node, struct i40iw_cm_node, list);
++		atomic_inc(&cm_node->ref_count);
++		list_add(&cm_node->connected_entry, &connected_list);
++	}
++	spin_unlock_irqrestore(&cm_core->ht_lock, flags);
++
++	list_for_each_safe(list_node, list_core_temp, &connected_list) {
++		cm_node = container_of(list_node, struct i40iw_cm_node, connected_entry);
++		attr.qp_state = IB_QPS_ERR;
++		i40iw_modify_qp(&cm_node->iwqp->ibqp, &attr, IB_QP_STATE, NULL);
++		i40iw_rem_ref_cm_node(cm_node);
++	}
++}
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.h b/drivers/infiniband/hw/i40iw/i40iw_cm.h
+index 24615c2..0381b7f 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.h
+@@ -339,6 +339,7 @@ struct i40iw_cm_node {
+ 	int accept_pend;
+ 	struct list_head timer_entry;
+ 	struct list_head reset_entry;
++	struct list_head connected_entry;
+ 	atomic_t passive_state;
+ 	bool qhash_set;
+ 	u8 user_pri;
+@@ -443,4 +444,5 @@ int i40iw_arp_table(struct i40iw_device *iwdev,
+ 		    u8 *mac_addr,
+ 		    u32 action);
+ 
++void i40iw_cm_disconnect_all(struct i40iw_device *iwdev);
+ #endif /* I40IW_CM_H */
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_d.h b/drivers/infiniband/hw/i40iw/i40iw_d.h
+index e184c0e..1bd4bad 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_d.h
++++ b/drivers/infiniband/hw/i40iw/i40iw_d.h
+@@ -35,6 +35,8 @@
+ #ifndef I40IW_D_H
+ #define I40IW_D_H
+ 
++#define I40IW_FIRST_USER_QP_ID  2
++
+ #define I40IW_DB_ADDR_OFFSET    (4 * 1024 * 1024 - 64 * 1024)
+ #define I40IW_VF_DB_ADDR_OFFSET (64 * 1024)
+ 
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index 9d3b9ee..d86bb6e 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -1546,6 +1546,7 @@ static enum i40iw_status_code i40iw_setup_init_state(struct i40iw_handler *hdl,
+ 
+ 	init_waitqueue_head(&iwdev->vchnl_waitq);
+ 	init_waitqueue_head(&dev->vf_reqs);
++	init_waitqueue_head(&iwdev->close_wq);
+ 
+ 	status = i40iw_initialize_dev(iwdev, ldev);
+ exit:
+@@ -1748,6 +1749,9 @@ static void i40iw_close(struct i40e_info *ldev, struct i40e_client *client, bool
+ 		return;
+ 
+ 	iwdev = &hdl->device;
++	iwdev->closing = true;
++
++	i40iw_cm_disconnect_all(iwdev);
+ 	destroy_workqueue(iwdev->virtchnl_wq);
+ 	i40iw_deinit_device(iwdev, reset);
+ }
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+index 4e880e8..5815128 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+@@ -392,6 +392,7 @@ static void i40iw_free_qp(struct i40iw_cqp_request *cqp_request, u32 num)
+ 
+ 	i40iw_rem_pdusecount(iwqp->iwpd, iwdev);
+ 	i40iw_free_qp_resources(iwdev, iwqp, qp_num);
++	i40iw_rem_devusecount(iwdev);
+ }
+ 
+ /**
+@@ -459,6 +460,26 @@ enum i40iw_status_code i40iw_handle_cqp_op(struct i40iw_device *iwdev,
+ }
+ 
+ /**
++ * i40iw_add_devusecount - add dev refcount
++ * @iwdev: dev for refcount
++ */
++void i40iw_add_devusecount(struct i40iw_device *iwdev)
++{
++	atomic64_inc(&iwdev->use_count);
++}
++
++/**
++ * i40iw_rem_devusecount - decrement refcount for dev
++ * @iwdev: device
++ */
++void i40iw_rem_devusecount(struct i40iw_device *iwdev)
++{
++	if (!atomic64_dec_and_test(&iwdev->use_count))
++		return;
++	wake_up(&iwdev->close_wq);
++}
++
++/**
+  * i40iw_add_pdusecount - add pd refcount
+  * @iwpd: pd for refcount
+  */
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index 1c2f0a1..bc24086 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -336,6 +336,9 @@ static struct ib_pd *i40iw_alloc_pd(struct ib_device *ibdev,
+ 	u32 pd_id = 0;
+ 	int err;
+ 
++	if (iwdev->closing)
++		return ERR_PTR(-ENODEV);
++
+ 	err = i40iw_alloc_resource(iwdev, iwdev->allocated_pds,
+ 				   iwdev->max_pd, &pd_id, &iwdev->next_pd);
+ 	if (err) {
+@@ -601,6 +604,9 @@ static struct ib_qp *i40iw_create_qp(struct ib_pd *ibpd,
+ 	struct i40iwarp_offload_info *iwarp_info;
+ 	unsigned long flags;
+ 
++	if (iwdev->closing)
++		return ERR_PTR(-ENODEV);
++
+ 	if (init_attr->create_flags)
+ 		return ERR_PTR(-EINVAL);
+ 	if (init_attr->cap.max_inline_data > I40IW_MAX_INLINE_DATA_SIZE)
+@@ -776,6 +782,7 @@ static struct ib_qp *i40iw_create_qp(struct ib_pd *ibpd,
+ 	iwqp->sig_all = (init_attr->sq_sig_type == IB_SIGNAL_ALL_WR) ? 1 : 0;
+ 	iwdev->qp_table[qp_num] = iwqp;
+ 	i40iw_add_pdusecount(iwqp->iwpd);
++	i40iw_add_devusecount(iwdev);
+ 	if (ibpd->uobject && udata) {
+ 		memset(&uresp, 0, sizeof(uresp));
+ 		uresp.actual_sq_size = sq_size;
+@@ -887,6 +894,11 @@ int i40iw_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
+ 	spin_lock_irqsave(&iwqp->lock, flags);
+ 
+ 	if (attr_mask & IB_QP_STATE) {
++		if (iwdev->closing && attr->qp_state != IB_QPS_ERR) {
++			err = -EINVAL;
++			goto exit;
++		}
++
+ 		switch (attr->qp_state) {
+ 		case IB_QPS_INIT:
+ 		case IB_QPS_RTR:
+@@ -1086,6 +1098,7 @@ static int i40iw_destroy_cq(struct ib_cq *ib_cq)
+ 	cq_wq_destroy(iwdev, cq);
+ 	cq_free_resources(iwdev, iwcq);
+ 	kfree(iwcq);
++	i40iw_rem_devusecount(iwdev);
+ 	return 0;
+ }
+ 
+@@ -1116,6 +1129,9 @@ static struct ib_cq *i40iw_create_cq(struct ib_device *ibdev,
+ 	int err_code;
+ 	int entries = attr->cqe;
+ 
++	if (iwdev->closing)
++		return ERR_PTR(-ENODEV);
++
+ 	if (entries > iwdev->max_cqe)
+ 		return ERR_PTR(-EINVAL);
+ 
+@@ -1233,6 +1249,7 @@ static struct ib_cq *i40iw_create_cq(struct ib_device *ibdev,
+ 		}
+ 	}
+ 
++	i40iw_add_devusecount(iwdev);
+ 	return (struct ib_cq *)iwcq;
+ 
+ cq_destroy:
+@@ -1270,6 +1287,7 @@ static void i40iw_free_stag(struct i40iw_device *iwdev, u32 stag)
+ 
+ 	stag_idx = (stag & iwdev->mr_stagmask) >> I40IW_CQPSQ_STAG_IDX_SHIFT;
+ 	i40iw_free_resource(iwdev, iwdev->allocated_mrs, stag_idx);
++	i40iw_rem_devusecount(iwdev);
+ }
+ 
+ /**
+@@ -1300,6 +1318,7 @@ static u32 i40iw_create_stag(struct i40iw_device *iwdev)
+ 		stag = stag_index << I40IW_CQPSQ_STAG_IDX_SHIFT;
+ 		stag |= driver_key;
+ 		stag += (u32)consumer_key;
++		i40iw_add_devusecount(iwdev);
+ 	}
+ 	return stag;
+ }
+@@ -1809,6 +1828,9 @@ static struct ib_mr *i40iw_reg_user_mr(struct ib_pd *pd,
+ 	int ret;
+ 	int pg_shift;
+ 
++	if (iwdev->closing)
++		return ERR_PTR(-ENODEV);
++
+ 	if (length > I40IW_MAX_MR_SIZE)
+ 		return ERR_PTR(-EINVAL);
+ 	region = ib_umem_get(pd->uobject->context, start, length, acc, 0);
+@@ -2842,6 +2864,9 @@ void i40iw_destroy_rdma_device(struct i40iw_ib_device *iwibdev)
+ 	i40iw_unregister_rdma_device(iwibdev);
+ 	kfree(iwibdev->ibdev.iwcm);
+ 	iwibdev->ibdev.iwcm = NULL;
++	wait_event_timeout(iwibdev->iwdev->close_wq,
++			   !atomic64_read(&iwibdev->iwdev->use_count),
++			   I40IW_EVENT_TIMEOUT);
+ 	ib_dealloc_device(&iwibdev->ibdev);
+ }
+ 
+-- 
+1.8.3.1
+

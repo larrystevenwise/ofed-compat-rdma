@@ -1,0 +1,33 @@
+From 1ef936b229c54e73a3cce9f4eb8dd5a146add073 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 30 Nov 2016 15:13:47 -0600
+Subject: [PATCH 39/52] i40iw: Code cleanup, remove check of PBLE pages
+
+Remove check for zero 'pages' of unallocated pbles calculated in
+add_pble_pool(); as it can never be true.
+
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_pble.c | 4 ----
+ 1 file changed, 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_pble.c b/drivers/infiniband/hw/i40iw/i40iw_pble.c
+index 85993dc..c87ba16 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_pble.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_pble.c
+@@ -353,10 +353,6 @@ static enum i40iw_status_code add_pble_pool(struct i40iw_sc_dev *dev,
+ 	pages = (idx->rel_pd_idx) ? (I40IW_HMC_PD_CNT_IN_SD -
+ 			idx->rel_pd_idx) : I40IW_HMC_PD_CNT_IN_SD;
+ 	pages = min(pages, pble_rsrc->unallocated_pble >> PBLE_512_SHIFT);
+-	if (!pages) {
+-		ret_code = I40IW_ERR_NO_PBLCHUNKS_AVAILABLE;
+-		goto error;
+-	}
+ 	info.chunk = chunk;
+ 	info.hmc_info = hmc_info;
+ 	info.pages = pages;
+-- 
+1.8.3.1
+

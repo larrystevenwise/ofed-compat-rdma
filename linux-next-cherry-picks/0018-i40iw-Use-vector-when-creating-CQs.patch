@@ -1,0 +1,88 @@
+From e69c5093617afdbd2ab02c289d0adaac044dff66 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 21:24:48 -0600
+Subject: [PATCH 18/52] i40iw: Use vector when creating CQs
+
+Assign each CEQ vector to a different CPU when possible, then
+when creating a CQ, use the vector for the CEQ id. This
+allows completion work to be distributed over multiple cores.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_main.c  | 8 +++++++-
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c | 5 +++--
+ 2 files changed, 10 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index e6abdaf..ed24831 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -270,6 +270,7 @@ static void i40iw_disable_irq(struct i40iw_sc_dev *dev,
+ 		i40iw_wr32(dev->hw, I40E_PFINT_DYN_CTLN(msix_vec->idx - 1), 0);
+ 	else
+ 		i40iw_wr32(dev->hw, I40E_VFINT_DYN_CTLN1(msix_vec->idx - 1), 0);
++	irq_set_affinity_hint(msix_vec->irq, NULL);
+ 	free_irq(msix_vec->irq, dev_id);
+ }
+ 
+@@ -688,6 +689,7 @@ static enum i40iw_status_code i40iw_configure_ceq_vector(struct i40iw_device *iw
+ 							 struct i40iw_msix_vector *msix_vec)
+ {
+ 	enum i40iw_status_code status;
++	cpumask_t mask;
+ 
+ 	if (iwdev->msix_shared && !ceq_id) {
+ 		tasklet_init(&iwdev->dpc_tasklet, i40iw_dpc, (unsigned long)iwdev);
+@@ -697,12 +699,15 @@ static enum i40iw_status_code i40iw_configure_ceq_vector(struct i40iw_device *iw
+ 		status = request_irq(msix_vec->irq, i40iw_ceq_handler, 0, "CEQ", iwceq);
+ 	}
+ 
++	cpumask_clear(&mask);
++	cpumask_set_cpu(msix_vec->cpu_affinity, &mask);
++	irq_set_affinity_hint(msix_vec->irq, &mask);
++
+ 	if (status) {
+ 		i40iw_pr_err("ceq irq config fail\n");
+ 		return I40IW_ERR_CONFIG;
+ 	}
+ 	msix_vec->ceq_id = ceq_id;
+-	msix_vec->cpu_affinity = 0;
+ 
+ 	return 0;
+ }
+@@ -1396,6 +1401,7 @@ static enum i40iw_status_code i40iw_save_msix_info(struct i40iw_device *iwdev,
+ 	for (i = 0, ceq_idx = 0; i < iwdev->msix_count; i++, iw_qvinfo++) {
+ 		iwdev->iw_msixtbl[i].idx = ldev->msix_entries[i].entry;
+ 		iwdev->iw_msixtbl[i].irq = ldev->msix_entries[i].vector;
++		iwdev->iw_msixtbl[i].cpu_affinity = ceq_idx;
+ 		if (i == 0) {
+ 			iw_qvinfo->aeq_idx = 0;
+ 			if (iwdev->msix_shared)
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index 56e1c2c..aacaa0f 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -1135,7 +1135,8 @@ static struct ib_cq *i40iw_create_cq(struct ib_device *ibdev,
+ 	ukinfo->cq_id = cq_num;
+ 	iwcq->ibcq.cqe = info.cq_uk_init_info.cq_size;
+ 	info.ceqe_mask = 0;
+-	info.ceq_id = 0;
++	if (attr->comp_vector < iwdev->ceqs_count)
++		info.ceq_id = attr->comp_vector;
+ 	info.ceq_id_valid = true;
+ 	info.ceqe_mask = 1;
+ 	info.type = I40IW_CQ_TYPE_IWARP;
+@@ -2619,7 +2620,7 @@ static struct i40iw_ib_device *i40iw_init_rdma_device(struct i40iw_device *iwdev
+ 	    (1ull << IB_USER_VERBS_CMD_POST_RECV) |
+ 	    (1ull << IB_USER_VERBS_CMD_POST_SEND);
+ 	iwibdev->ibdev.phys_port_cnt = 1;
+-	iwibdev->ibdev.num_comp_vectors = 1;
++	iwibdev->ibdev.num_comp_vectors = iwdev->ceqs_count;
+ 	iwibdev->ibdev.dma_device = &pcidev->dev;
+ 	iwibdev->ibdev.dev.parent = &pcidev->dev;
+ 	iwibdev->ibdev.query_port = i40iw_query_port;
+-- 
+1.8.3.1
+

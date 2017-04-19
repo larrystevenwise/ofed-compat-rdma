@@ -1,0 +1,32 @@
+From 1ad19f739f494eda2f8e9611ab6c3056244b70fc Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 21:32:25 -0600
+Subject: [PATCH 24/52] i40iw: Remove NULL check for cm_node->iwdev
+
+It is not necessary to check cm_node->iwdev in
+i40iw_rem_ref_cm_node() as it can never be NULL after
+a successful call out of i40iw_make_cm_node().
+
+Signed-off-by: Chien Tin Tung <chien.tin.tung@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 9e447b5..cbd77eb 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -2234,7 +2234,7 @@ static void i40iw_rem_ref_cm_node(struct i40iw_cm_node *cm_node)
+ 		i40iw_dec_refcnt_listen(cm_core, cm_node->listener, 0, true);
+ 	} else {
+ 		if (!i40iw_listen_port_in_use(cm_core, cm_node->loc_port) &&
+-		    cm_node->apbvt_set && cm_node->iwdev) {
++		    cm_node->apbvt_set) {
+ 			i40iw_manage_apbvt(cm_node->iwdev,
+ 					   cm_node->loc_port,
+ 					   I40IW_MANAGE_APBVT_DEL);
+-- 
+1.8.3.1
+

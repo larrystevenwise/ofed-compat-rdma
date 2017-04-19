@@ -1,0 +1,48 @@
+From 5e9ff9b0bf0a20e87c75506604a1233f6c37f335 Mon Sep 17 00:00:00 2001
+From: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+Date: Mon, 15 Aug 2016 23:40:53 +0530
+Subject: [PATCH 11/52] i40iw_cm: Remove deprecated
+ create_singlethread_workqueue
+
+alloc_ordered_workqueue() with WQ_MEM_RECLAIM set, replaces
+deprecated create_singlethread_workqueue(). This is the identity
+conversion.
+
+The workqueue "event_wq" is involved in event handling and queues
+i40iw_cm_event_handler.
+
+The workqueue "disconn_wq" is involved in closing connection and queues
+i40iw_disconnect_worker.
+
+Both workqueues have been identity converted.
+
+WQ_MEM_RECLAIM has been set to ensure forward progress under memory
+pressure.
+
+Signed-off-by: Bhaktipriya Shridhar <bhaktipriya96@gmail.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 7 +++++--
+ 1 file changed, 5 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 5026dc7..c490f8d 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -3166,8 +3166,11 @@ void i40iw_setup_cm_core(struct i40iw_device *iwdev)
+ 	spin_lock_init(&cm_core->ht_lock);
+ 	spin_lock_init(&cm_core->listen_list_lock);
+ 
+-	cm_core->event_wq = create_singlethread_workqueue("iwewq");
+-	cm_core->disconn_wq = create_singlethread_workqueue("iwdwq");
++	cm_core->event_wq = alloc_ordered_workqueue("iwewq",
++						    WQ_MEM_RECLAIM);
++
++	cm_core->disconn_wq = alloc_ordered_workqueue("iwdwq",
++						      WQ_MEM_RECLAIM);
+ }
+ 
+ /**
+-- 
+1.8.3.1
+

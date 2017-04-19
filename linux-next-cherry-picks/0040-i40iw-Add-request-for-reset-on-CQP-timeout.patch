@@ -1,0 +1,58 @@
+From 78300cf8152f87adb20fbe71a600e0d8d72aabe8 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 30 Nov 2016 15:14:15 -0600
+Subject: [PATCH 40/52] i40iw: Add request for reset on CQP timeout
+
+When CQP times out, send a request to LAN driver for reset.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw.h       |  1 +
+ drivers/infiniband/hw/i40iw/i40iw_utils.c | 10 +++++++++-
+ 2 files changed, 10 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw.h b/drivers/infiniband/hw/i40iw/i40iw.h
+index c795c61..ef188e6 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw.h
++++ b/drivers/infiniband/hw/i40iw/i40iw.h
+@@ -304,6 +304,7 @@ struct i40iw_device {
+ 	u32 mpa_version;
+ 	bool dcb;
+ 	bool closing;
++	bool reset;
+ 	u32 used_pds;
+ 	u32 used_cqs;
+ 	u32 used_mrs;
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+index 641f00f..4a08ffb 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+@@ -396,7 +396,10 @@ static int i40iw_wait_event(struct i40iw_device *iwdev,
+ 		i40iw_pr_err("error cqp command 0x%x timed out ret = %d\n",
+ 			     info->cqp_cmd, timeout_ret);
+ 		err_code = -ETIME;
+-		i40iw_request_reset(iwdev);
++		if (!iwdev->reset) {
++			iwdev->reset = true;
++			i40iw_request_reset(iwdev);
++		}
+ 		goto done;
+ 	}
+ 	cqp_error = cqp_request->compl_info.error;
+@@ -426,6 +429,11 @@ enum i40iw_status_code i40iw_handle_cqp_op(struct i40iw_device *iwdev,
+ 	struct cqp_commands_info *info = &cqp_request->info;
+ 	int err_code = 0;
+ 
++	if (iwdev->reset) {
++		i40iw_free_cqp_request(&iwdev->cqp, cqp_request);
++		return I40IW_ERR_CQP_COMPL_ERROR;
++	}
++
+ 	status = i40iw_process_cqp_cmd(dev, info);
+ 	if (status) {
+ 		i40iw_pr_err("error cqp command 0x%x failed\n", info->cqp_cmd);
+-- 
+1.8.3.1
+

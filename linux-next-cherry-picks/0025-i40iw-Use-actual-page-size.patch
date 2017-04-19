@@ -1,0 +1,49 @@
+From e67791858e7b8d1389833386cb2dd0ca30d06862 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Wed, 9 Nov 2016 21:33:32 -0600
+Subject: [PATCH 25/52] i40iw: Use actual page size
+
+In i40iw_post_send, use the actual page size instead of
+encoded page size. This is to be consistent with the
+rest of the file.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c | 5 +----
+ 1 file changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index d20ee11..dcf08b8 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -2145,7 +2145,6 @@ static int i40iw_post_send(struct ib_qp *ibqp,
+ 		case IB_WR_REG_MR:
+ 		{
+ 			struct i40iw_mr *iwmr = to_iwmr(reg_wr(ib_wr)->mr);
+-			int page_shift = ilog2(reg_wr(ib_wr)->mr->page_size);
+ 			int flags = reg_wr(ib_wr)->access;
+ 			struct i40iw_pble_alloc *palloc = &iwmr->iwpbl.pble_alloc;
+ 			struct i40iw_sc_dev *dev = &iwqp->iwdev->sc_dev;
+@@ -2156,6 +2155,7 @@ static int i40iw_post_send(struct ib_qp *ibqp,
+ 			info.access_rights |= i40iw_get_user_access(flags);
+ 			info.stag_key = reg_wr(ib_wr)->key & 0xff;
+ 			info.stag_idx = reg_wr(ib_wr)->key >> 8;
++			info.page_size = reg_wr(ib_wr)->mr->page_size;
+ 			info.wr_id = ib_wr->wr_id;
+ 
+ 			info.addr_type = I40IW_ADDR_TYPE_VA_BASED;
+@@ -2169,9 +2169,6 @@ static int i40iw_post_send(struct ib_qp *ibqp,
+ 			if (iwmr->npages > I40IW_MIN_PAGES_PER_FMR)
+ 				info.chunk_size = 1;
+ 
+-			if (page_shift == 21)
+-				info.page_size = 1; /* 2M page */
+-
+ 			ret = dev->iw_priv_qp_ops->iw_mr_fast_register(&iwqp->sc_qp, &info, true);
+ 			if (ret)
+ 				err = -ENOMEM;
+-- 
+1.8.3.1
+
