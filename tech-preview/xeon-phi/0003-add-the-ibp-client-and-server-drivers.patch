@@ -1,4 +1,4 @@
-From 3da8ce605b1942b5a7705f10cbadd2afe3b5b810 Mon Sep 17 00:00:00 2001
+From bd9c0ebb6c193ae15edb8a1030e60c7d657350a5 Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Fri, 20 May 2016 16:17:43 -0700
 Subject: [PATCH 3/7] add the ibp client and server drivers
@@ -55,7 +55,7 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/drv/ibp.h            |  260 +++
  drivers/infiniband/ibp/drv/server.c         |  503 +++++
  drivers/infiniband/ibp/drv/server.h         |  182 ++
- drivers/infiniband/ibp/drv/server_msg.c     | 2813 +++++++++++++++++++++++++++
+ drivers/infiniband/ibp/drv/server_msg.c     | 2815 +++++++++++++++++++++++++++
  drivers/infiniband/ibp/sa/Makefile          |   13 +
  drivers/infiniband/ibp/sa/client.c          |  134 ++
  drivers/infiniband/ibp/sa/client.h          |   90 +
@@ -72,7 +72,7 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/sa/server.c          |  218 +++
  drivers/infiniband/ibp/sa/server.h          |  173 ++
  drivers/infiniband/ibp/sa/server_msg.c      |  185 ++
- 62 files changed, 22335 insertions(+)
+ 62 files changed, 22337 insertions(+)
  create mode 100644 drivers/infiniband/ibp/Kconfig
  create mode 100644 drivers/infiniband/ibp/Makefile
  create mode 100644 drivers/infiniband/ibp/cm/Makefile
@@ -11551,7 +11551,7 @@ index 0000000..7f49cde
 +}
 diff --git a/drivers/infiniband/ibp/drv/hw/mlx5/dbrec.c b/drivers/infiniband/ibp/drv/hw/mlx5/dbrec.c
 new file mode 100644
-index 0000000..23aaeac
+index 0000000..f06e4d9
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/hw/mlx5/dbrec.c
 @@ -0,0 +1,126 @@
@@ -11614,12 +11614,12 @@ index 0000000..23aaeac
 +static int ibp_mlx5_alloc_db_from_pgdir(struct ibp_mlx5_db_pgdir *pgdir,
 +					struct ibp_mlx5_dbrec *db)
 +{
-+	int i;
++	unsigned long i;
 +	int offset;
 +
 +	i = find_first_bit(pgdir->bitmap, MLX5_DB_PER_PAGE);
 +	if (i >= MLX5_DB_PER_PAGE) {
-+		print_err("find_first_bit returned %d > %d\n",
++		print_err("find_first_bit returned %lu > %lu\n",
 +			  i, MLX5_DB_PER_PAGE);
 +		return -ENOMEM;
 +	}
@@ -16011,10 +16011,10 @@ index 0000000..faf8dae
 +#endif /* SERVER_H */
 diff --git a/drivers/infiniband/ibp/drv/server_msg.c b/drivers/infiniband/ibp/drv/server_msg.c
 new file mode 100644
-index 0000000..ed5a697
+index 0000000..b0cb8cf
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/server_msg.c
-@@ -0,0 +1,2813 @@
+@@ -0,0 +1,2815 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -16233,9 +16233,11 @@ index 0000000..ed5a697
 +		umem->hugetlb = 0;
 +
 +	for_each_sg(umem->sg_head.sgl, sg, npages, i) {
-+		page = vmalloc_to_page(va[i]);
++		phys_addr_t phys;
++		phys = slow_virt_to_phys(va[i]);
++		page = pfn_to_page(phys >> PAGE_SHIFT);
 +		if (!page) {
-+			print_err("vmalloc_to_page failed\n");
++			print_err("pfn_to_page failed\n");
 +			ret = -EINVAL;
 +			goto err2;
 +		}
