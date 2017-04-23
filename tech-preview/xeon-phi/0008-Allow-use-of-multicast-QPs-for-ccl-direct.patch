@@ -1,0 +1,93 @@
+From f2dbf0422ef72a07b06363e4daa3c4b91202e0a8 Mon Sep 17 00:00:00 2001
+From: pmmccorm <patrick.m.mccormick@intel.com>
+Date: Thu, 20 Apr 2017 06:41:52 -0700
+Subject: [PATCH 8/8] Allow use of multicast QPs for ccl-direct.
+
+Signed-off-by: pmmccorm <patrick.m.mccormick@intel.com>
+---
+ drivers/infiniband/hw/mlx4/qp.c | 17 ++++++++++++++---
+ drivers/infiniband/hw/mlx5/qp.c |  3 +++
+ 2 files changed, 17 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/mlx4/qp.c b/drivers/infiniband/hw/mlx4/qp.c
+index 03b4634..c16235b 100644
+--- a/drivers/infiniband/hw/mlx4/qp.c
++++ b/drivers/infiniband/hw/mlx4/qp.c
+@@ -713,15 +713,19 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
+ 
+ 	qp->mlx4_ib_qp_type = qp_type;
+ 
++	if (init_attr->create_flags & IB_QP_CREATE_BLOCK_MULTICAST_LOOPBACK)
++		qp->flags |= MLX4_IB_QP_BLOCK_MULTICAST_LOOPBACK;
++
++	if (init_attr->create_flags & IB_QP_CREATE_IPOIB_UD_LSO)
++		qp->flags |= MLX4_IB_QP_LSO;
++
+ 	mutex_init(&qp->mutex);
+ 	spin_lock_init(&qp->sq.lock);
+ 	spin_lock_init(&qp->rq.lock);
+ 	INIT_LIST_HEAD(&qp->gid_list);
+ 	INIT_LIST_HEAD(&qp->steering_rules);
+ 
+-	if (init_attr->create_flags & IB_QP_CREATE_IPOIB_UD_LSO)
+-		qp->flags |= MLX4_IB_QP_LSO;
+-
++	/*
+ 	if (init_attr->create_flags & IB_QP_CREATE_NETIF_QP) {
+ 		if (dev->steering_support == MLX4_STEERING_MODE_DEVICE_MANAGED)
+ 			qp->flags |= MLX4_IB_QP_NETIF;
+@@ -730,6 +734,7 @@ static int create_qp_common(struct mlx4_ib_dev *dev, struct ib_pd *pd,
+ 			goto err;
+ 		}
+ 	}
++	*/
+ 
+ 	qp->state	 = IB_QPS_RESET;
+ 	if (init_attr->sq_sig_type == IB_SIGNAL_ALL_WR)
+@@ -1133,6 +1138,8 @@ static struct ib_qp *_mlx4_ib_create_qp(struct ib_pd *pd,
+ 
+ 	gfp = (init_attr->create_flags & MLX4_IB_QP_CREATE_USE_GFP_NOIO) ?
+ 		GFP_NOIO : GFP_KERNEL;
++
++#if 0 /* Removed to allow Xeon Phi's use of ib_ipoib via CCL-Direct (ibp) */
+ 	/*
+ 	 * We only support LSO, vendor flag1, and multicast loopback blocking,
+ 	 * and only for kernel UD QPs.
+@@ -1163,6 +1170,7 @@ static struct ib_qp *_mlx4_ib_create_qp(struct ib_pd *pd,
+ 		     init_attr->qp_type != IB_QPT_GSI))
+ 			return ERR_PTR(-EINVAL);
+ 	}
++#endif /* if 0 */
+ 
+ 	switch (init_attr->qp_type) {
+ 	case IB_QPT_XRC_TGT:
+@@ -1203,9 +1211,12 @@ static struct ib_qp *_mlx4_ib_create_qp(struct ib_pd *pd,
+ 	{
+ 		int sqpn;
+ 
++#if 0 /* Removed to allow Xeon Phi's use of ib_ipoib via CCL-Direct (ibp) */
+ 		/* Userspace is not allowed to create special QPs: */
+ 		if (udata)
+ 			return ERR_PTR(-EINVAL);
++#endif /* if 0 */
++
+ 		if (init_attr->create_flags & MLX4_IB_QP_CREATE_ROCE_V2_GSI) {
+ 			int res = mlx4_qp_reserve_range(to_mdev(pd->device)->dev, 1, 1, &sqpn, 0);
+ 
+diff --git a/drivers/infiniband/hw/mlx5/qp.c b/drivers/infiniband/hw/mlx5/qp.c
+index affc3f6..a0bb69ae 100644
+--- a/drivers/infiniband/hw/mlx5/qp.c
++++ b/drivers/infiniband/hw/mlx5/qp.c
+@@ -1568,6 +1568,9 @@ static int create_qp_common(struct mlx5_ib_dev *dev, struct ib_pd *pd,
+ 	}
+ 
+ 	if (pd) {
++		if (init_attr->create_flags & IB_QP_CREATE_BLOCK_MULTICAST_LOOPBACK)
++			qp->flags |= MLX5_IB_QP_BLOCK_MULTICAST_LOOPBACK;
++
+ 		if (pd->uobject) {
+ 			__u32 max_wqes =
+ 				1 << MLX5_CAP_GEN(mdev, log_max_qp_sz);
+-- 
+1.8.3.1
+

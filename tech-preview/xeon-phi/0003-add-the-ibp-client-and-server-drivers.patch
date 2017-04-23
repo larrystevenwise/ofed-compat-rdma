@@ -1,7 +1,7 @@
-From bd9c0ebb6c193ae15edb8a1030e60c7d657350a5 Mon Sep 17 00:00:00 2001
+From d6e76907bc776a15cf6cb48ea57f5031f37ff14e Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Fri, 20 May 2016 16:17:43 -0700
-Subject: [PATCH 3/7] add the ibp client and server drivers
+Subject: [PATCH 3/8] add the ibp client and server drivers
 
 This adds the CCL-Direct (ibp) client and server drivers to
 infiniband.  It includes the base ib proxy driver, the mlx4
@@ -51,11 +51,11 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/drv/hw/mlx5/main.h   |  327 ++++
  drivers/infiniband/ibp/drv/hw/mlx5/qp.c     |  714 +++++++
  drivers/infiniband/ibp/drv/hw/mlx5/srq.c    |  185 ++
- drivers/infiniband/ibp/drv/ibp-abi.h        |  649 ++++++
+ drivers/infiniband/ibp/drv/ibp-abi.h        |  651 +++++++
  drivers/infiniband/ibp/drv/ibp.h            |  260 +++
  drivers/infiniband/ibp/drv/server.c         |  503 +++++
  drivers/infiniband/ibp/drv/server.h         |  182 ++
- drivers/infiniband/ibp/drv/server_msg.c     | 2815 +++++++++++++++++++++++++++
+ drivers/infiniband/ibp/drv/server_msg.c     | 2818 +++++++++++++++++++++++++++
  drivers/infiniband/ibp/sa/Makefile          |   13 +
  drivers/infiniband/ibp/sa/client.c          |  134 ++
  drivers/infiniband/ibp/sa/client.h          |   90 +
@@ -72,7 +72,7 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/sa/server.c          |  218 +++
  drivers/infiniband/ibp/sa/server.h          |  173 ++
  drivers/infiniband/ibp/sa/server_msg.c      |  185 ++
- 62 files changed, 22337 insertions(+)
+ 62 files changed, 22342 insertions(+)
  create mode 100644 drivers/infiniband/ibp/Kconfig
  create mode 100644 drivers/infiniband/ibp/Makefile
  create mode 100644 drivers/infiniband/ibp/cm/Makefile
@@ -2771,7 +2771,7 @@ index 0000000..f08608e
 +EXPORT_SYMBOL(ib_cm_init_qp_attr);
 diff --git a/drivers/infiniband/ibp/cm/cm_server_msg.c b/drivers/infiniband/ibp/cm/cm_server_msg.c
 new file mode 100644
-index 0000000..02b3fb3
+index 0000000..5fd6f72
 --- /dev/null
 +++ b/drivers/infiniband/ibp/cm/cm_server_msg.c
 @@ -0,0 +1,1065 @@
@@ -3349,8 +3349,8 @@ index 0000000..02b3fb3
 +	struct ibp_send_cm_req_cmd	*cmd;
 +	struct ib_cm_id			*cm_id;
 +	struct ib_cm_req_param		param = {0};
-+	struct ib_sa_path_rec		primary_path;
-+	struct ib_sa_path_rec		alternate_path;
++	struct ib_sa_path_rec		primary_path = { 0 };
++	struct ib_sa_path_rec		alternate_path = { 0 };
 +	size_t				len;
 +	int				ret;
 +
@@ -14393,10 +14393,10 @@ index 0000000..c9a5524
 +}
 diff --git a/drivers/infiniband/ibp/drv/ibp-abi.h b/drivers/infiniband/ibp/drv/ibp-abi.h
 new file mode 100644
-index 0000000..fa8a1a9
+index 0000000..cad1e30
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/ibp-abi.h
-@@ -0,0 +1,649 @@
+@@ -0,0 +1,651 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -14753,6 +14753,7 @@ index 0000000..fa8a1a9
 +
 +struct ibp_alloc_pd_resp {
 +	u64			pd;
++	u32			local_dma_lkey;
 +	u64			data[0];
 +};
 +
@@ -14975,6 +14976,7 @@ index 0000000..fa8a1a9
 +	u64			cq_context;
 +	u32			cqe;
 +	u32			vector;
++	u32			flags;
 +	u64			data[0];
 +};
 +
@@ -16011,10 +16013,10 @@ index 0000000..faf8dae
 +#endif /* SERVER_H */
 diff --git a/drivers/infiniband/ibp/drv/server_msg.c b/drivers/infiniband/ibp/drv/server_msg.c
 new file mode 100644
-index 0000000..b0cb8cf
+index 0000000..c6a15df
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/server_msg.c
-@@ -0,0 +1,2815 @@
+@@ -0,0 +1,2818 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -17328,6 +17330,7 @@ index 0000000..b0cb8cf
 +	len += outlen - udata.outlen;	/* add driver private data */
 +
 +	resp->pd = (uintptr_t)pd;
++	resp->local_dma_lkey = pd->local_dma_lkey;
 +
 +send_resp:
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, ret);
@@ -17576,10 +17579,11 @@ index 0000000..b0cb8cf
 +	pd	= (struct ib_pd *) cmd->pd;
 +	msg	= (struct ibp_verb_response_msg *) tx_buf;
 +	resp	= (struct ibp_create_srq_resp *) msg->data;
-+	len = hdr->length - sizeof(*cmd);
++	len 	= hdr->length - sizeof(*cmd);
 +	outlen = MAX_MSG_SIZE - sizeof(*msg) - sizeof(*resp);
 +
-+	INIT_UDATA(&udata, cmd->data, resp->data, len, outlen);
++	// TODO: get proper len from uOS:
++	INIT_UDATA(&udata, cmd->data, resp->data, len-8, outlen);
 +
 +	len = sizeof(*msg);
 +
@@ -18268,6 +18272,7 @@ index 0000000..b0cb8cf
 +	memset(&attr, 0, sizeof(attr));
 +	attr.cqe = cmd->cqe;
 +	attr.comp_vector = cmd->vector;
++	attr.flags = cmd->flags;
 +
 +	cq = device->ib_dev->create_cq(device->ib_dev, &attr,
 +				       ucontext->ibucontext, &udata);
