@@ -1,0 +1,32 @@
+From bdc8cbd34d5d9d82c3db4df6a182b0530040062d Mon Sep 17 00:00:00 2001
+From: Sudarsana Reddy Kalluru <sudarsana.kalluru@cavium.com>
+Date: Fri, 21 Oct 2016 04:43:39 -0400
+Subject: [PATCH 58/58] qede: get_channels() need to populate max tx/rx
+ coalesce values
+
+Recent changes in kernel ethtool implementation requires the driver
+callback for get_channels() has to populate the values for max tx/rx
+coalesce fields.
+
+Signed-off-by: Sudarsana Reddy Kalluru <Sudarsana.Kalluru@cavium.com>
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qede/qede_ethtool.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+index 25a9b29..16a1a47 100644
+--- a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
++++ b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+@@ -756,6 +756,8 @@ static void qede_get_channels(struct net_device *dev,
+	struct qede_dev *edev = netdev_priv(dev);
+
+	channels->max_combined = QEDE_MAX_RSS_CNT(edev);
++	channels->max_rx = QEDE_MAX_RSS_CNT(edev);
++	channels->max_tx = QEDE_MAX_RSS_CNT(edev);
+	channels->combined_count = QEDE_QUEUE_CNT(edev) - edev->fp_num_tx -
+					edev->fp_num_rx;
+	channels->tx_count = edev->fp_num_tx;
+--
+1.8.3.1

@@ -1,0 +1,137 @@
+From fd3c615ae13a853ab26211e14f70b416cc8f8134 Mon Sep 17 00:00:00 2001
+From: "Mintz, Yuval" <Yuval.Mintz@cavium.com>
+Date: Mon, 27 Feb 2017 11:06:32 +0200
+Subject: [PATCH 157/157] qed: Fix race with multiple VFs
+
+A PF syncronizes all IOV activity relating to its VFs
+by using a single workqueue handling the work.
+The workqueue would reach a bitmask of pending VF events
+and act upon each in turn.
+
+Problem is that the indication of a VF message [which sets
+the 'vf event' bit for that VF] arrives and is set in
+the slowpath attention context, which isn't syncronized with
+the processing of the events.
+When multiple VFs are present, it's possible that PF would
+lose the indication of one of the VF's pending evens, leading
+that VF to later timeout.
+
+Instead of adding locks/barriers, simply move from a bitmask
+into a per-VF indication inside that VF entry in the PF database.
+
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_sriov.c | 39 +++++++++++++++++------------
+ drivers/net/ethernet/qlogic/qed/qed_sriov.h |  4 ++-
+ 2 files changed, 26 insertions(+), 17 deletions(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_sriov.c b/drivers/net/ethernet/qlogic/qed/qed_sriov.c
+index 29ed785..253c2bb 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_sriov.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_sriov.c
+@@ -3014,8 +3014,7 @@ cleanup:
+		ack_vfs[vfid / 32] |= BIT((vfid % 32));
+		p_hwfn->pf_iov_info->pending_flr[rel_vf_id / 64] &=
+		    ~(1ULL << (rel_vf_id % 64));
+-		p_hwfn->pf_iov_info->pending_events[rel_vf_id / 64] &=
+-		    ~(1ULL << (rel_vf_id % 64));
++		p_vf->vf_mbx.b_pending_msg = false;
+	}
+
+	return rc;
+@@ -3128,11 +3127,20 @@ static void qed_iov_process_mbx_req(struct qed_hwfn *p_hwfn,
+	mbx = &p_vf->vf_mbx;
+
+	/* qed_iov_process_mbx_request */
+-	DP_VERBOSE(p_hwfn, QED_MSG_IOV,
+-		   "VF[%02x]: Processing mailbox message\n", p_vf->abs_vf_id);
++	if (!mbx->b_pending_msg) {
++		DP_NOTICE(p_hwfn,
++			  "VF[%02x]: Trying to process mailbox message when none is pending\n",
++			  p_vf->abs_vf_id);
++		return;
++	}
++	mbx->b_pending_msg = false;
+
+	mbx->first_tlv = mbx->req_virt->first_tlv;
+
++	DP_VERBOSE(p_hwfn, QED_MSG_IOV,
++		   "VF[%02x]: Processing mailbox message [type %04x]\n",
++		   p_vf->abs_vf_id, mbx->first_tlv.tl.type);
++
+	/* check if tlv type is known */
+	if (qed_iov_tlv_supported(mbx->first_tlv.tl.type) &&
+	    !p_vf->b_malicious) {
+@@ -3219,20 +3227,19 @@ static void qed_iov_process_mbx_req(struct qed_hwfn *p_hwfn,
+	}
+ }
+
+-static void qed_iov_pf_add_pending_events(struct qed_hwfn *p_hwfn, u8 vfid)
++void qed_iov_pf_get_pending_events(struct qed_hwfn *p_hwfn, u64 *events)
+ {
+-	u64 add_bit = 1ULL << (vfid % 64);
++	int i;
+
+-	p_hwfn->pf_iov_info->pending_events[vfid / 64] |= add_bit;
+-}
++	memset(events, 0, sizeof(u64) * QED_VF_ARRAY_LENGTH);
+
+-static void qed_iov_pf_get_and_clear_pending_events(struct qed_hwfn *p_hwfn,
+-						    u64 *events)
+-{
+-	u64 *p_pending_events = p_hwfn->pf_iov_info->pending_events;
++	qed_for_each_vf(p_hwfn, i) {
++		struct qed_vf_info *p_vf;
+
+-	memcpy(events, p_pending_events, sizeof(u64) * QED_VF_ARRAY_LENGTH);
+-	memset(p_pending_events, 0, sizeof(u64) * QED_VF_ARRAY_LENGTH);
++		p_vf = &p_hwfn->pf_iov_info->vfs_array[i];
++		if (p_vf->vf_mbx.b_pending_msg)
++			events[i / 64] |= 1ULL << (i % 64);
++	}
+ }
+
+ static struct qed_vf_info *qed_sriov_get_vf_from_absid(struct qed_hwfn *p_hwfn,
+@@ -3266,7 +3273,7 @@ static int qed_sriov_vfpf_msg(struct qed_hwfn *p_hwfn,
+	p_vf->vf_mbx.pending_req = (((u64)vf_msg->hi) << 32) | vf_msg->lo;
+
+	/* Mark the event and schedule the workqueue */
+-	qed_iov_pf_add_pending_events(p_hwfn, p_vf->relative_vf_id);
++	p_vf->vf_mbx.b_pending_msg = true;
+	qed_schedule_iov(p_hwfn, QED_IOV_WQ_MSG_FLAG);
+
+	return 0;
+@@ -4030,7 +4037,7 @@ static void qed_handle_vf_msg(struct qed_hwfn *hwfn)
+		return;
+	}
+
+-	qed_iov_pf_get_and_clear_pending_events(hwfn, events);
++	qed_iov_pf_get_pending_events(hwfn, events);
+
+	DP_VERBOSE(hwfn, QED_MSG_IOV,
+		   "Event mask of VF events: 0x%llx 0x%llx 0x%llx\n",
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_sriov.h b/drivers/net/ethernet/qlogic/qed/qed_sriov.h
+index fc08cc2..a896058 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_sriov.h
++++ b/drivers/net/ethernet/qlogic/qed/qed_sriov.h
+@@ -140,6 +140,9 @@ struct qed_iov_vf_mbx {
+	/* Address in VF where a pending message is located */
+	dma_addr_t pending_req;
+
++	/* Message from VF awaits handling */
++	bool b_pending_msg;
++
+	u8 *offset;
+
+	/* saved VF request header */
+@@ -232,7 +235,6 @@ struct qed_vf_info {
+  */
+ struct qed_pf_iov {
+	struct qed_vf_info vfs_array[MAX_NUM_VFS];
+-	u64 pending_events[QED_VF_ARRAY_LENGTH];
+	u64 pending_flr[QED_VF_ARRAY_LENGTH];
+
+	/* Allocate message address continuosuly and split to each VF */
+--
+1.8.3.1

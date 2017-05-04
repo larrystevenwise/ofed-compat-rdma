@@ -1,0 +1,31 @@
+From 59e8970b3798e4cbe575ed9cf4d53098760a2a86 Mon Sep 17 00:00:00 2001
+From: Ram Amrani <Ram.Amrani@Cavium.com>
+Date: Tue, 24 Jan 2017 13:50:35 +0200
+Subject: [PATCH 131/131] RDMA/qedr: Return max inline data in QP query result
+
+Return the maximum supported amount of inline data, not the qp's current
+configured inline data size, when filling out the results of a query
+qp call.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Signed-off-by: Michal Kalderon <Michal.Kalderon@cavium.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/verbs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+index 27d90a8..bb907b1 100644
+--- a/drivers/infiniband/hw/qedr/verbs.c
++++ b/drivers/infiniband/hw/qedr/verbs.c
+@@ -2028,7 +2028,7 @@ int qedr_query_qp(struct ib_qp *ibqp,
+	qp_attr->cap.max_recv_wr = qp->rq.max_wr;
+	qp_attr->cap.max_send_sge = qp->sq.max_sges;
+	qp_attr->cap.max_recv_sge = qp->rq.max_sges;
+-	qp_attr->cap.max_inline_data = qp->max_inline_data;
++	qp_attr->cap.max_inline_data = ROCE_REQ_MAX_INLINE_DATA_SIZE;
+	qp_init_attr->cap = qp_attr->cap;
+
+	memcpy(&qp_attr->ah_attr.grh.dgid.raw[0], &params.dgid.bytes[0],
+--
+1.8.3.1

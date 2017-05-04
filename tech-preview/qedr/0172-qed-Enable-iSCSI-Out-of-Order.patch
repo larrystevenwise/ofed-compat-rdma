@@ -1,0 +1,31 @@
+From 6b116b1d6a521a1907b3c18cb7a8592a655f660c Mon Sep 17 00:00:00 2001
+From: "Mintz, Yuval" <Yuval.Mintz@cavium.com>
+Date: Tue, 14 Mar 2017 15:26:04 +0200
+Subject: [PATCH 172/172] qed: Enable iSCSI Out-of-Order
+
+Missing in the initial submission, qed fails to propagate qedi's
+request to enable OOO to firmware.
+
+Fixes: fc831825f99e ("qed: Add support for hardware offloaded iSCSI")
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_iscsi.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_iscsi.c b/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
+index 7e73b05..098766f 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
+@@ -190,6 +190,9 @@ qed_sp_iscsi_func_start(struct qed_hwfn *p_hwfn,
+	p_init->num_sq_pages_in_ring = p_params->num_sq_pages_in_ring;
+	p_init->num_r2tq_pages_in_ring = p_params->num_r2tq_pages_in_ring;
+	p_init->num_uhq_pages_in_ring = p_params->num_uhq_pages_in_ring;
++	p_init->ooo_enable = p_params->ooo_enable;
++	p_init->ll2_rx_queue_id = p_hwfn->hw_info.resc_start[QED_LL2_QUEUE] +
++				  p_params->ll2_ooo_queue_id;
+	p_init->func_params.log_page_size = p_params->log_page_size;
+	val = p_params->num_tasks;
+	p_init->func_params.num_tasks = cpu_to_le16(val);
+--
+1.8.3.1

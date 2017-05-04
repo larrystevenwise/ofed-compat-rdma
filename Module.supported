@@ -44,3 +44,6 @@ be2net.ko external
 i40iw.ko external
 i40e.ko external
 compat.ko external
+qed.ko external
+qede.ko external
+qedr.ko external

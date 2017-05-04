@@ -1,0 +1,28 @@
+From 4251e7475d4b2ac0d9ad039439ad0650921b1d27 Mon Sep 17 00:00:00 2001
+From: Wei Yongjun <weiyongjun1@huawei.com>
+Date: Tue, 18 Oct 2016 15:54:50 +0000
+Subject: [PATCH 56/56] qed: Remove useless set memory to zero use memset()
+
+The memory return by kzalloc() has already be set to zero, so
+remove useless memset(0).
+
+Signed-off-by: Wei Yongjun <weiyongjun1@huawei.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_roce.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_roce.c b/drivers/net/ethernet/qlogic/qed/qed_roce.c
+index 76831a3..b11beb5 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_roce.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_roce.c
+@@ -2747,7 +2747,6 @@ static int qed_roce_ll2_start(struct qed_dev *cdev,
+		DP_ERR(cdev, "qed roce ll2 start: failed memory allocation\n");
+		return -ENOMEM;
+	}
+-	memset(roce_ll2, 0, sizeof(*roce_ll2));
+	roce_ll2->handle = QED_LL2_UNUSED_HANDLE;
+	roce_ll2->cbs = params->cbs;
+	roce_ll2->cb_cookie = params->cb_cookie;
+--
+1.8.3.1

@@ -1,0 +1,33 @@
+From 7ca547bdb00e3b162e8ed2889161b93eba9def0b Mon Sep 17 00:00:00 2001
+From: Manish Chopra <Manish.Chopra@cavium.com>
+Date: Sun, 1 Jan 2017 13:57:05 +0200
+Subject: [PATCH 116/116] qede - mark SKB as encapsulated
+
+When driver receives a recognized encapsulated packet it needs
+to set the skb->encapsulation field as well.
+
+Signed-off-by: Manish Chopra <Manish.Chopra@cavium.com>
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qede/qede_fp.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qede/qede_fp.c b/drivers/net/ethernet/qlogic/qede/qede_fp.c
+index a06acab..dddae1e 100644
+--- a/drivers/net/ethernet/qlogic/qede/qede_fp.c
++++ b/drivers/net/ethernet/qlogic/qede/qede_fp.c
+@@ -607,8 +607,10 @@ static void qede_set_skb_csum(struct sk_buff *skb, u8 csum_flag)
+	if (csum_flag & QEDE_CSUM_UNNECESSARY)
+		skb->ip_summed = CHECKSUM_UNNECESSARY;
+
+-	if (csum_flag & QEDE_TUNN_CSUM_UNNECESSARY)
++	if (csum_flag & QEDE_TUNN_CSUM_UNNECESSARY) {
+		skb->csum_level = 1;
++		skb->encapsulation = 1;
++	}
+ }
+
+ static inline void qede_skb_receive(struct qede_dev *edev,
+--
+1.8.3.1

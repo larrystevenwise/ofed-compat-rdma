@@ -1,0 +1,32 @@
+From 1fe582ecade714e90e71c67c32edb7b5b809d651 Mon Sep 17 00:00:00 2001
+From: Ram Amrani <Ram.Amrani@Cavium.com>
+Date: Sun, 1 Jan 2017 13:57:10 +0200
+Subject: [PATCH 121/121] qed: Conserve RDMA resources when !QEDR
+
+If qedr isn't part of the kernel then don't allocate RDMA resources
+for it in qed.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_mcp.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_mcp.c b/drivers/net/ethernet/qlogic/qed/qed_mcp.c
+index 2566741..c8a8775 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_mcp.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_mcp.c
+@@ -1122,7 +1122,9 @@ qed_mcp_get_shmem_proto(struct qed_hwfn *p_hwfn,
+
+	switch (p_info->config & FUNC_MF_CFG_PROTOCOL_MASK) {
+	case FUNC_MF_CFG_PROTOCOL_ETHERNET:
+-		if (qed_mcp_get_shmem_proto_mfw(p_hwfn, p_ptt, p_proto))
++		if (!IS_ENABLED(CONFIG_QED_RDMA))
++			*p_proto = QED_PCI_ETH;
++		else if (qed_mcp_get_shmem_proto_mfw(p_hwfn, p_ptt, p_proto))
+			qed_mcp_get_shmem_proto_legacy(p_hwfn, p_proto);
+		break;
+	case FUNC_MF_CFG_PROTOCOL_ISCSI:
+--
+1.8.3.1

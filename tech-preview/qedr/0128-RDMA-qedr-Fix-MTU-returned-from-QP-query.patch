@@ -1,0 +1,28 @@
+From 097b615965fb1af714fbc2311f68839b1086ebcb Mon Sep 17 00:00:00 2001
+From: "Amrani, Ram" <Ram.Amrani@cavium.com>
+Date: Mon, 26 Dec 2016 08:40:58 +0200
+Subject: [PATCH 128/128] RDMA/qedr: Fix MTU returned from QP query
+
+MTU value returned from QP query should include overhead.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/verbs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+index 57c8de2..84dcd73 100644
+--- a/drivers/infiniband/hw/qedr/verbs.c
++++ b/drivers/infiniband/hw/qedr/verbs.c
+@@ -2016,7 +2016,7 @@ int qedr_query_qp(struct ib_qp *ibqp,
+
+	qp_attr->qp_state = qedr_get_ibqp_state(params.state);
+	qp_attr->cur_qp_state = qedr_get_ibqp_state(params.state);
+-	qp_attr->path_mtu = iboe_get_mtu(params.mtu);
++	qp_attr->path_mtu = ib_mtu_int_to_enum(params.mtu);
+	qp_attr->path_mig_state = IB_MIG_MIGRATED;
+	qp_attr->rq_psn = params.rq_psn;
+	qp_attr->sq_psn = params.sq_psn;
+--
+1.8.3.1

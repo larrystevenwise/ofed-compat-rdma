@@ -1,0 +1,30 @@
+From 69117101f95c17cb2ff173332a240ab697e5dda2 Mon Sep 17 00:00:00 2001
+From: Bart Van Assche <bart.vanassche@sandisk.com>
+Date: Fri, 20 Jan 2017 13:04:25 -0800
+Subject: [PATCH 127/127] IB/qedr: Switch from dma_device to dev.parent
+
+Prepare for removal of ib_device.dma_device.
+
+Signed-off-by: Bart Van Assche <bart.vanassche@sandisk.com>
+Cc: Ram Amrani <Ram.Amrani@cavium.com>
+Cc: Michal Kalderon <Michal.Kalderon@cavium.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/main.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/qedr/main.c b/drivers/infiniband/hw/qedr/main.c
+index 7b74d09..908c0b0 100644
+--- a/drivers/infiniband/hw/qedr/main.c
++++ b/drivers/infiniband/hw/qedr/main.c
+@@ -170,7 +170,7 @@ static int qedr_register_device(struct qedr_dev *dev)
+	dev->ibdev.get_port_immutable = qedr_port_immutable;
+	dev->ibdev.get_netdev = qedr_get_netdev;
+
+-	dev->ibdev.dma_device = &dev->pdev->dev;
++	dev->ibdev.dev.parent = &dev->pdev->dev;
+
+	dev->ibdev.get_link_layer = qedr_link_layer;
+	dev->ibdev.get_dev_fw_str = qedr_get_dev_fw_str;
+--
+1.8.3.1

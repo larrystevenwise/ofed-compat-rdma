@@ -1,0 +1,34 @@
+From ea7ef2accdeaf825165cccd60b848765677bf1f2 Mon Sep 17 00:00:00 2001
+From: Colin Ian King <colin.king@canonical.com>
+Date: Tue, 18 Oct 2016 19:39:28 +0100
+Subject: [PATCH 94/94] qedr: return -EINVAL if pd is null and avoid null ptr
+ dereference
+
+Currently, if pd is null then we hit a null pointer derference
+on accessing pd->pd_id.  Instead of just printing an error message
+we should also return -EINVAL immediately.
+
+Signed-off-by: Colin Ian King <colin.king@canonical.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/verbs.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+index a615142..b2a0eb8 100644
+--- a/drivers/infiniband/hw/qedr/verbs.c
++++ b/drivers/infiniband/hw/qedr/verbs.c
+@@ -511,8 +511,10 @@ int qedr_dealloc_pd(struct ib_pd *ibpd)
+	struct qedr_dev *dev = get_qedr_dev(ibpd->device);
+	struct qedr_pd *pd = get_qedr_pd(ibpd);
+
+-	if (!pd)
++	if (!pd) {
+		pr_err("Invalid PD received in dealloc_pd\n");
++		return -EINVAL;
++	}
+
+	DP_DEBUG(dev, QEDR_MSG_INIT, "Deallocating PD %d\n", pd->pd_id);
+	dev->ops->rdma_dealloc_pd(dev->rdma_ctx, pd->pd_id);
+--
+1.8.3.1

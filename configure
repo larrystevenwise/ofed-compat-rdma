@@ -184,6 +184,9 @@ Usage:  `basename $0` [options]
     --with-vmw_pvrdma-mod    make CONFIG_INFINIBAND_VMWARE_PVRDMA=m [no]
     --without-vmw_pvrdma-mod    [yes]
 
+    --with-qedr-mod    make CONFIG_INFINIBAND_QEDR [no]
+    --without-qedr-mod    [yes]
+
     --with-nvme-mod    make CONFIG_NVME_CORE=m [no]
     --without-nvme-mod    [yes]
 
@@ -725,6 +728,20 @@ main()
                         --without-vmw_pvrdma-mod)
                             CONFIG_INFINIBAND_VMWARE_PVRDMA=
                         ;;
+                       --with-qedr-mod)
+                            CONFIG_QED="m"
+                            CONFIG_QED_LL2="m"
+                            CONFIG_QED_RDMA="m"
+                            CONFIG_QEDE="m"
+                            CONFIG_INFINIBAND_QEDR="m"
+                        ;;
+                        --without-qedr-mod)
+                            CONFIG_QED=
+                            CONFIG_QED_LL2=
+                            CONFIG_QED_RDMA=
+                            CONFIG_QEDE=
+                            CONFIG_INFINIBAND_QEDR=
+                        ;;
 			--with-nvme-mod)
 			    CONFIG_NVME_CORE="m"
 			    CONFIG_BLK_DEV_NVME="m"
@@ -891,6 +908,13 @@ CONFIG_NVME_TARGET=${CONFIG_NVME_TARGET:-''}
 CONFIG_NVME_TARGET_RDMA=${CONFIG_NVME_TARGET_RDMA:-''}
 
 CONFIG_MLX4_EN_DCB=''
+
+CONFIG_QED=${CONFIG_QED:-''}
+CONFIG_QED_LL2=${CONFIG_QED_LL2:-''}
+CONFIG_QED_RDMA=${CONFIG_QED_RDMA:-''}
+CONFIG_QEDE=${CONFIG_QEDE:-''}
+CONFIG_INFINIBAND_QEDR=${CONFIG_INFINIBAND_QEDR:-''}
+
 if [ "X${CONFIG_MLX4_EN}" == "Xm" ]; then
     check_autofconf CONFIG_DCB
     if [ X${CONFIG_DCB} == "X1" ]; then
@@ -927,6 +951,12 @@ fi
 		echo ".vmw_pvrdma_applied does not exist. running ofed-patch.sh for vmw_pvrdma"
 		ex ${CWD}/ofed_scripts/ofed_patch.sh --without-git --without-quilt --with-patchdir=tech-preview/vmw_pvrdma
 		touch .vmw_pvrdma_applied
+	fi
+
+	if [[ ! -e .qedr_applied && "X$CONFIG_INFINIBAND_QEDR" == "Xm" ]]; then
+		echo ".qedr_applied does not exist. running ofed-patch.sh for qedr"
+		ex ${CWD}/ofed_scripts/ofed_patch.sh --without-git --without-quilt --with-patchdir=tech-preview/qedr
+		touch .qedr_applied
 	fi
 
         # Create configure.mk
@@ -1029,6 +1059,12 @@ CONFIG_NVME_TARGET=${CONFIG_NVME_TARGET}
 CONFIG_NVME_TARGET_RDMA=${CONFIG_NVME_TARGET_RDMA}
 
 CONFIG_MLX4_EN_DCB=${CONFIG_MLX4_EN_DCB}
+
+CONFIG_QED=${CONFIG_QED}
+CONFIG_QED_LL2=${CONFIG_QED_LL2}
+CONFIG_QED_RDMA=${CONFIG_QED_RDMA}
+CONFIG_QEDE=${CONFIG_QEDE}
+CONFIG_INFINIBAND_QEDR=${CONFIG_INFINIBAND_QEDR}
 
 EOFCONFIG
         echo "Created ${CONFIG}:"
@@ -1367,6 +1403,31 @@ if [ "X${CONFIG_NVME_TARGET_RDMA}" == "Xm" ]; then
 	DEFINE_NVME_TARGET="#undef CONFIG_NVME_TARGET\n#define CONFIG_NVME_TARGET 1"
 	DEFINE_NVME_TARGET_RDMA="#undef CONFIG_NVME_TARGET_RDMA\n#define CONFIG_NVME_TARGET_RDMA 1"
 fi
+if [ "X${CONFIG_INFINIBAND_QEDR}" == "Xm" ]; then
+	DEFINE_QED="#undef CONFIG_QED\n#define CONFIG_QED 1"
+else
+	DEFINE_QED="#undef CONFIG_QED"
+fi
+if [ "X${CONFIG_INFINIBAND_QEDR}" == "Xm" ]; then
+	DEFINE_QED_LL2="#undef CONFIG_QED_LL2\n#define CONFIG_QED_LL2 1"
+else
+        DEFINE_QED_LL2="#undef CONFIG_QED_LL2"
+fi
+if [ "X${CONFIG_INFINIBAND_QEDR}" == "Xm" ]; then
+	DEFINE_QED_RDMA="#undef CONFIG_QED_RDMA\n#define CONFIG_QED_RDMA 1"
+else
+        DEFINE_QED_RDMA="#undef CONFIG_QED_RDMA"
+fi
+if [ "X${CONFIG_INFINIBAND_QEDR}" == "Xm" ]; then
+	DEFINE_QEDE="#undef CONFIG_QEDE\n#define CONFIG_QEDE 1"
+else
+        DEFINE_QEDE="#undef CONFIG_QEDE"
+fi
+if [ "X${CONFIG_INFINIBAND_QEDR}" == "Xm" ]; then
+	DEFINE_INFINIBAND_QEDR="#undef CONFIG_INFINIBAND_QEDR\n#define CONFIG_INFINIBAND_QEDR 1"
+else
+	DEFINE_INFINIBAND_QEDR="#undef CONFIG_INFINIBAND_QEDR"
+fi
 
 cat > ${AUTOCONF_H} << EOFAUTOCONF
 #ifndef __OFED_BUILD__
@@ -1443,7 +1504,14 @@ $(echo -e "${DEFINE_BLK_DEV_NVME}" | grep -v undef)
 $(echo -e "${DEFINE_NVME_TARGET}" | grep -v undef)
 $(echo -e "${DEFINE_NVME_TARGET_RDMA}" | grep -v undef)
 $(echo -e "${DEFINE_NVME_FABRICS}" | grep -v undef)
-#else
+
+$(echo -e "${DEFINE_QED}" | grep -v undef)
+$(echo -e "${DEFINE_QED_LL2}" | grep -v undef)
+$(echo -e "${DEFINE_QED_RDMA}" | grep -v undef)
+$(echo -e "${DEFINE_QEDE}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_QEDR}" | grep -v undef)
+
+else
 #undef CONFIG_MEMTRACK
 #undef CONFIG_DEBUG_INFO
 #undef CONFIG_INFINIBAND
@@ -1524,6 +1592,12 @@ $(echo -e "${DEFINE_NVME_FABRICS}" | grep -v undef)
 #undef CONFIG_NVME_TARGET
 #undef CONFIG_NVME_TARGET_RDMA
 
+#undef CONFIG_QED
+#undef CONFIG_QED_LL2
+#undef CONFIG_QED_RDMA
+#undef CONFIG_QEDE
+#undef CONFIG_INFINIBAND_QEDR
+
 $(echo -e "${DEFINE_INFINIBAND}")
 $(echo -e "${DEFINE_INFINIBAND_IPOIB}")
 $(echo -e "${DEFINE_INFINIBAND_IPOIB_CM}")
@@ -1596,6 +1670,13 @@ $(echo -e "${DEFINE_BLK_DEV_NVME}")
 $(echo -e "${DEFINE_NVME_TARGET}")
 $(echo -e "${DEFINE_NVME_TARGET_RDMA}")
 $(echo -e "${DEFINE_NVME_TARGET_FABRICS}")
+
+$(echo -e "${DEFINE_QED}")
+$(echo -e "${DEFINE_QED_LL2}")
+$(echo -e "${DEFINE_QED_RDMA}")
+$(echo -e "${DEFINE_QEDE}")
+$(echo -e "${DEFINE_INFINIBAND_QEDR}")
+
 #endif
 
 EOFAUTOCONF

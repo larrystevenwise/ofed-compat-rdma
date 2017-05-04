@@ -1,0 +1,36 @@
+From 933e6dcaa0f65eb2f624ad760274020874a1f35e Mon Sep 17 00:00:00 2001
+From: Ram Amrani <Ram.Amrani@Cavium.com>
+Date: Tue, 24 Jan 2017 13:50:38 +0200
+Subject: [PATCH 134/134] RDMA/qedr: Don't reset QP when queues aren't flushed
+
+Fail QP state transition from error to reset if SQ/RQ are not empty
+and still in the process of flushing out the queued work entries.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Signed-off-by: Michal Kalderon <Michal.Kalderon@cavium.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/verbs.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
+
+diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+index 0688dce..3dae964 100644
+--- a/drivers/infiniband/hw/qedr/verbs.c
++++ b/drivers/infiniband/hw/qedr/verbs.c
+@@ -1733,6 +1733,14 @@ static int qedr_update_qp_state(struct qedr_dev *dev,
+		/* ERR->XXX */
+		switch (new_state) {
+		case QED_ROCE_QP_STATE_RESET:
++			if ((qp->rq.prod != qp->rq.cons) ||
++			    (qp->sq.prod != qp->sq.cons)) {
++				DP_NOTICE(dev,
++					  "Error->Reset with rq/sq not empty rq.prod=%x rq.cons=%x sq.prod=%x sq.cons=%x\n",
++					  qp->rq.prod, qp->rq.cons, qp->sq.prod,
++					  qp->sq.cons);
++				status = -EINVAL;
++			}
+			break;
+		default:
+			status = -EINVAL;
+--
+1.8.3.1

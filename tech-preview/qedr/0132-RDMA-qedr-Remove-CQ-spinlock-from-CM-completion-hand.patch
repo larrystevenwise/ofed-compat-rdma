@@ -1,0 +1,66 @@
+From 91bff997db2ec04f9ba761a55c21642f9803b06c Mon Sep 17 00:00:00 2001
+From: Ram Amrani <Ram.Amrani@Cavium.com>
+Date: Tue, 24 Jan 2017 13:50:36 +0200
+Subject: [PATCH 132/132] RDMA/qedr: Remove CQ spinlock from CM completion
+ handlers
+
+There is only a single event queue that triggers the completion
+events for the RDMA CM and it is being processed serially. This means
+that inherently there can no parallelism of CQ completion handler
+callbacks, hence the lock is redundant.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Signed-off-by: Michal Kalderon <Michal.Kalderon@cavium.com>
+Reviewed-by: Leon Romanovsky <leonro@mellanox.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/qedr.h    |  3 ---
+ drivers/infiniband/hw/qedr/qedr_cm.c | 10 ++--------
+ 2 files changed, 2 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/infiniband/hw/qedr/qedr.h b/drivers/infiniband/hw/qedr/qedr.h
+index 620badd..94319ab 100644
+--- a/drivers/infiniband/hw/qedr/qedr.h
++++ b/drivers/infiniband/hw/qedr/qedr.h
+@@ -251,9 +251,6 @@ struct qedr_cq {
+
+	u16 icid;
+
+-	/* Lock to protect completion handler */
+-	spinlock_t comp_handler_lock;
+-
+	/* Lock to protect multiplem CQ's */
+	spinlock_t cq_lock;
+	u8 arm_flags;
+diff --git a/drivers/infiniband/hw/qedr/qedr_cm.c b/drivers/infiniband/hw/qedr/qedr_cm.c
+index 63890eb..00361f3 100644
+--- a/drivers/infiniband/hw/qedr/qedr_cm.c
++++ b/drivers/infiniband/hw/qedr/qedr_cm.c
+@@ -87,11 +87,8 @@ void qedr_ll2_tx_cb(void *_qdev, struct qed_roce_ll2_packet *pkt)
+	qedr_inc_sw_gsi_cons(&qp->sq);
+	spin_unlock_irqrestore(&qp->q_lock, flags);
+
+-	if (cq->ibcq.comp_handler) {
+-		spin_lock_irqsave(&cq->comp_handler_lock, flags);
++	if (cq->ibcq.comp_handler)
+		(*cq->ibcq.comp_handler) (&cq->ibcq, cq->ibcq.cq_context);
+-		spin_unlock_irqrestore(&cq->comp_handler_lock, flags);
+-	}
+ }
+
+ void qedr_ll2_rx_cb(void *_dev, struct qed_roce_ll2_packet *pkt,
+@@ -113,11 +110,8 @@ void qedr_ll2_rx_cb(void *_dev, struct qed_roce_ll2_packet *pkt,
+
+	spin_unlock_irqrestore(&qp->q_lock, flags);
+
+-	if (cq->ibcq.comp_handler) {
+-		spin_lock_irqsave(&cq->comp_handler_lock, flags);
++	if (cq->ibcq.comp_handler)
+		(*cq->ibcq.comp_handler) (&cq->ibcq, cq->ibcq.cq_context);
+-		spin_unlock_irqrestore(&cq->comp_handler_lock, flags);
+-	}
+ }
+
+ static void qedr_destroy_gsi_cq(struct qedr_dev *dev,
+--
+1.8.3.1

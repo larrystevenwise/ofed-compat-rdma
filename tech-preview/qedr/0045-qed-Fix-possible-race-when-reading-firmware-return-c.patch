@@ -1,0 +1,68 @@
+From d5df7688b6a36dbb5611a58229a5e294cd978999 Mon Sep 17 00:00:00 2001
+From: Manish Chopra <manish.chopra@caviumnetworks.com>
+Date: Fri, 14 Oct 2016 05:19:23 -0400
+Subject: [PATCH 45/45] qed: Fix possible race when reading firmware return
+ code.
+
+While handling SPQ ramrod completion, there is a possible race
+where driver might not read updated fw return code based on
+ramrod completion done. This patch ensures that fw return code
+is written first and then completion done flag is updated
+using appropriate memory barriers.
+
+Signed-off-by: Manish Chopra <manish.chopra@caviumnetworks.com>
+Signed-off-by: Yuval Mintz <Yuval.Mintz@caviumnetworks.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_sp.h  |  4 ++--
+ drivers/net/ethernet/qlogic/qed/qed_spq.c | 12 ++++++------
+ 2 files changed, 8 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_sp.h b/drivers/net/ethernet/qlogic/qed/qed_sp.h
+index 652c908..27c450f 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_sp.h
++++ b/drivers/net/ethernet/qlogic/qed/qed_sp.h
+@@ -111,8 +111,8 @@ union qed_spq_req_comp {
+ };
+
+ struct qed_spq_comp_done {
+-	u64	done;
+-	u8	fw_return_code;
++	unsigned int	done;
++	u8		fw_return_code;
+ };
+
+ struct qed_spq_entry {
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/qlogic/qed/qed_spq.c
+index 259a615..6c05402 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_spq.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c
+@@ -54,11 +54,10 @@ static void qed_spq_blocking_cb(struct qed_hwfn *p_hwfn,
+
+	comp_done = (struct qed_spq_comp_done *)cookie;
+
+-	comp_done->done			= 0x1;
+-	comp_done->fw_return_code	= fw_return_code;
++	comp_done->fw_return_code = fw_return_code;
+
+-	/* make update visible to waiting thread */
+-	smp_wmb();
++	/* Make sure completion done is visible on waiting thread */
++	smp_store_release(&comp_done->done, 0x1);
+ }
+
+ static int __qed_spq_block(struct qed_hwfn *p_hwfn,
+@@ -74,8 +73,9 @@ static int __qed_spq_block(struct qed_hwfn *p_hwfn,
+
+	while (iter_cnt--) {
+		/* Validate we receive completion update */
+-		smp_rmb();
+-		if (comp_done->done == 1) {
++		if (READ_ONCE(comp_done->done) == 1) {
++			/* Read updated FW return value */
++			smp_read_barrier_depends();
+			if (p_fw_ret)
+				*p_fw_ret = comp_done->fw_return_code;
+			return 0;
+--
+1.8.3.1

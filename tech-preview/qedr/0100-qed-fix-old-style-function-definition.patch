@@ -1,0 +1,35 @@
+From 7729bad4fd95e48bcafcb2222c63a8a5cdc42f61 Mon Sep 17 00:00:00 2001
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Fri, 16 Dec 2016 09:47:41 +0100
+Subject: [PATCH 100/100] qed: fix old-style function definition
+
+The newly added file causes a harmless warning, with "make W=1":
+
+drivers/net/ethernet/qlogic/qed/qed_iscsi.c: In function 'qed_get_iscsi_ops':
+drivers/net/ethernet/qlogic/qed/qed_iscsi.c:1268:29: warning: old-style function definition [-Wold-style-definition]
+
+This makes it a proper prototype.
+
+Fixes: fc831825f99e ("qed: Add support for hardware offloaded iSCSI.")
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Reviewed-by: Johannes Thumshirn <jthumshirn@suse.de>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_iscsi.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_iscsi.c b/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
+index 00efb1c..17a7012 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_iscsi.c
+@@ -1265,7 +1265,7 @@ static const struct qed_iscsi_ops qed_iscsi_ops_pass = {
+	.get_stats = &qed_iscsi_stats,
+ };
+
+-const struct qed_iscsi_ops *qed_get_iscsi_ops()
++const struct qed_iscsi_ops *qed_get_iscsi_ops(void)
+ {
+	return &qed_iscsi_ops_pass;
+ }
+--
+1.8.3.1

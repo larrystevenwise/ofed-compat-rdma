@@ -1,0 +1,50 @@
+From d194fd265e78ca1b2a4607918778446de44818b2 Mon Sep 17 00:00:00 2001
+From: Yuval Mintz <Yuval.Mintz@qlogic.com>
+Date: Fri, 19 Aug 2016 08:34:57 +0300
+Subject: [PATCH 10/10] qed*: Fix pause setting
+
+When moving into using ethtool's link_ksetting, qed started
+supplying its own bitmask of speed/capabilities, but qede
+is still checking for the SUPPORTED value to determine whether
+it supports pause.
+
+Fixes: 054c67d1c82a ("qed*: Add support for ethtool link_ksettings callbacks")
+Signed-off-by: Yuval Mintz <Yuval.Mintz@qlogic.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qede/qede_ethtool.c | 2 +-
+ include/linux/qed/qed_if.h                      | 8 +++++---
+ 2 files changed, 6 insertions(+), 4 deletions(-)
+
+Index: compat-rdma-work/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+===================================================================
+--- compat-rdma-work.orig/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
++++ compat-rdma-work/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+@@ -672,7 +672,7 @@ static int qede_set_pauseparam(struct ne
+	memset(&params, 0, sizeof(params));
+	params.override_flags |= QED_LINK_OVERRIDE_PAUSE_CONFIG;
+	if (epause->autoneg) {
+-		if (!(current_link.supported_caps & SUPPORTED_Autoneg)) {
++		if (!(current_link.supported_caps & QED_LM_Autoneg_BIT)) {
+			DP_INFO(edev, "autoneg not supported\n");
+			return -EINVAL;
+		}
+Index: compat-rdma-work/include/linux/qed/qed_if.h
+===================================================================
+--- compat-rdma-work.orig/include/linux/qed/qed_if.h
++++ compat-rdma-work/include/linux/qed/qed_if.h
+@@ -318,9 +318,11 @@ struct qed_link_params {
+ struct qed_link_output {
+	bool	link_up;
+
+-	u32	supported_caps;         /* In SUPPORTED defs */
+-	u32	advertised_caps;        /* In ADVERTISED defs */
+-	u32	lp_caps;                /* In ADVERTISED defs */
++	/* In QED_LM_* defs */
++	u32	supported_caps;
++	u32	advertised_caps;
++	u32	lp_caps;
++
+	u32	speed;                  /* In Mb/s */
+	u8	duplex;                 /* In DUPLEX defs */
+	u8	port;                   /* In PORT defs */

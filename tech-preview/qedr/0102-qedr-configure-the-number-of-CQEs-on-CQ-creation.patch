@@ -1,0 +1,37 @@
+From c7eb3bced78fe83119b90d730ab58a572eb80e29 Mon Sep 17 00:00:00 2001
+From: "Amrani, Ram" <Ram.Amrani@cavium.com>
+Date: Thu, 22 Dec 2016 14:40:33 +0200
+Subject: [PATCH 102/102] qedr: configure the number of CQEs on CQ creation
+
+Configure ibcq->cqe when a CQ is created.
+
+Signed-off-by: Ram Amrani <Ram.Amrani@cavium.com>
+Reviewed-by: Michal Kalderon <Michal.Kalderon@cavium.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/qedr/verbs.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
+index 302fb05..73df639 100644
+--- a/drivers/infiniband/hw/qedr/verbs.c
++++ b/drivers/infiniband/hw/qedr/verbs.c
+@@ -890,6 +890,8 @@ struct ib_cq *qedr_create_cq(struct ib_device *ibdev,
+
+		pbl_ptr = cq->q.pbl_tbl->pa;
+		page_cnt = cq->q.pbl_info.num_pbes;
++
++		cq->ibcq.cqe = chain_entries;
+	} else {
+		cq->cq_type = QEDR_CQ_TYPE_KERNEL;
+
+@@ -905,6 +907,7 @@ struct ib_cq *qedr_create_cq(struct ib_device *ibdev,
+
+		page_cnt = qed_chain_get_page_cnt(&cq->pbl);
+		pbl_ptr = qed_chain_get_pbl_phys(&cq->pbl);
++		cq->ibcq.cqe = cq->pbl.capacity;
+	}
+
+	qedr_init_cq_params(cq, ctx, dev, vector, chain_entries, page_cnt,
+--
+1.8.3.1
