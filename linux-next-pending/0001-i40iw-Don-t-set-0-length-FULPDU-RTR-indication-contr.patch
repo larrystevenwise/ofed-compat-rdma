@@ -1,0 +1,29 @@
+From 769fee69761ae285cf8b59f55d4cbb1de5a89b9f Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Date: Sun, 14 May 2017 17:28:30 -0500
+Subject: [PATCH 1/4] i40iw: Don't set 0-length FULPDU RTR indication control
+ flag
+
+Don't set control flag for 0-length FULPDU (Send) RTR indication
+in the enhanced MPA Request/Reply frames, because it isn't supported.
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 95a0586..2155fd8 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -784,7 +784,6 @@ static void i40iw_build_mpa_v2(struct i40iw_cm_node *cm_node,
+ 	}
+ 
+ 	ctrl_ird |= IETF_PEER_TO_PEER;
+-	ctrl_ird |= IETF_FLPDU_ZERO_LEN;
+ 
+ 	switch (mpa_key) {
+ 	case MPA_KEY_REQUEST:
+-- 
+1.8.3.1
+

@@ -1,0 +1,30 @@
+From dedc71c76797eaf154735d160c0d3720af41428e Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Date: Sun, 14 May 2017 17:30:48 -0500
+Subject: [PATCH 2/4] i40iw: ACK MPA Reject frame
+
+Explicitly ACK the MPA Reject frame so the peer
+does not retransmit the frame.
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_cm.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_cm.c b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+index 2155fd8..29c335f 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_cm.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_cm.c
+@@ -2445,8 +2445,8 @@ static void i40iw_handle_rcv_mpa(struct i40iw_cm_node *cm_node,
+ 		} else {
+ 			type = I40IW_CM_EVENT_CONNECTED;
+ 			cm_node->state = I40IW_CM_STATE_OFFLOADED;
+-			i40iw_send_ack(cm_node);
+ 		}
++		i40iw_send_ack(cm_node);
+ 		break;
+ 	default:
+ 		pr_err("%s wrong cm_node state =%d\n", __func__, cm_node->state);
+-- 
+1.8.3.1
+

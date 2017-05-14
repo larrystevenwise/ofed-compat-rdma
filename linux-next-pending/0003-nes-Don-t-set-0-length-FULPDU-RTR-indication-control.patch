@@ -1,0 +1,29 @@
+From eea2e975cec4184e7fe237f2a1c6a32a4bcb26c6 Mon Sep 17 00:00:00 2001
+From: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+Date: Sun, 14 May 2017 17:42:04 -0500
+Subject: [PATCH 3/4] nes: Don't set 0-length FULPDU RTR indication control
+ flag
+
+Don't set control flag for 0-length FULPDU (Send) RTR indication
+in the enhanced MPA Request/Reply frames, because it isn't supported.
+
+Signed-off-by: Tatyana Nikolova <tatyana.e.nikolova@intel.com>
+---
+ drivers/infiniband/hw/nes/nes_cm.c | 1 -
+ 1 file changed, 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/nes/nes_cm.c b/drivers/infiniband/hw/nes/nes_cm.c
+index 7f0aa23..b5ea25a 100644
+--- a/drivers/infiniband/hw/nes/nes_cm.c
++++ b/drivers/infiniband/hw/nes/nes_cm.c
+@@ -610,7 +610,6 @@ static void build_mpa_v2(struct nes_cm_node *cm_node,
+ 		ctrl_ord = cm_node->ord_size & IETF_NO_IRD_ORD;
+ 	}
+ 	ctrl_ird |= IETF_PEER_TO_PEER;
+-	ctrl_ird |= IETF_FLPDU_ZERO_LEN;
+ 
+ 	switch (mpa_key) {
+ 	case MPA_KEY_REQUEST:
+-- 
+1.8.3.1
+
