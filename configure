@@ -681,6 +681,7 @@ main()
                         --without-i40iw-mod)
                             CONFIG_INFINIBAND_I40IW=
                             CONFIG_I40E=
+                            add_conf "# Load I40IW modules" "I40IW_LOAD=no"
                         ;;
                         --with-nes-mod)
                             CONFIG_INFINIBAND_NES="m"
