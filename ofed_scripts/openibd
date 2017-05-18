@@ -299,6 +299,18 @@ get_mlx4_en_interfaces()
     done
 }
 
+enable_iwpmd()
+{
+	if command -v "systemctl" > /dev/null 2>&1 ; then
+		if [ "systemctl is-enabled iwpmd" != "enabled" ]; then
+			systemctl enable iwpmd
+		fi
+		if [ "systemctl is-active iwpmd" != "active" ]; then
+			systemctl start iwpmd
+		fi
+	fi
+}
+
 # If module $1 is loaded return - 0 else - 1
 is_module()
 {
@@ -818,6 +830,7 @@ start()
         fi
     fi
 
+    local need_iwpmd=0
     # Load Mellanox HCA driver
     if [ "X${MTHCA_LOAD}" == "Xyes" ]; then
         load_module ib_mthca
@@ -927,6 +940,8 @@ start()
         my_rc=$?
         if [ $my_rc -ne 0 ]; then
                 echo_failure $"Loading cxgb4 driver: "
+	else
+		need_iwpmd=1
         fi
         RC=$[ $RC + $my_rc ]
     fi
@@ -938,6 +953,8 @@ start()
         my_rc=$?
         if [ $my_rc -ne 0 ]; then
                 echo_failure $"Loading nes driver: "
+	else
+		need_iwpmd=1
         fi
         RC=$[ $RC + $my_rc ]
     fi
@@ -949,6 +966,8 @@ start()
         my_rc=$?
         if [ $my_rc -ne 0 ]; then
                 echo_failure $"Loading i40iw driver: "
+	else
+		need_iwpmd=1
         fi
         RC=$[ $RC + $my_rc ]
     fi
@@ -985,6 +1004,10 @@ start()
     if [ $IPOIB -eq 1 ]; then
         load_module ib_ipoib
         RC=$[ $RC + $? ]
+    fi
+
+    if [ $need_iwpmd -eq 1 ]; then
+	enable_iwpmd
     fi
 
     if [ $RC -eq 0 ]; then
