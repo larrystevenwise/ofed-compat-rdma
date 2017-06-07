@@ -176,23 +176,16 @@ diff -durp a/drivers/infiniband/hw/qib/qib_init.c b/drivers/infiniband/hw/qib/qi
 diff -durp a/drivers/infiniband/hw/qib/qib_user_pages.c b/drivers/infiniband/hw/qib/qib_user_pages.c
 --- a/drivers/infiniband/hw/qib/qib_user_pages.c
 +++ b/drivers/infiniband/hw/qib/qib_user_pages.c
-@@ -66,9 +66,16 @@ static int __qib_get_user_pages(unsigned
+@@ -66,7 +66,8 @@ static int __qib_get_user_pages(unsigned
  	}
  
  	for (got = 0; got < num_pages; got += ret) {
-+#ifdef HAVE_GET_USER_PAGES_6_PARAMS
- 		ret = get_user_pages(start_page + got * PAGE_SIZE,
- 				     num_pages - got, 1, 1,
- 				     p + got, NULL);
-+#else
+-		ret = get_user_pages(start_page + got * PAGE_SIZE,
 +		ret = get_user_pages(current, current->mm,
 +				     start_page + got * PAGE_SIZE,
-+				     num_pages - got, 1, 1,
-+				     p + got, NULL);
-+#endif
+ 				     num_pages - got, 1, 1,
+ 				     p + got, NULL);
  		if (ret < 0)
- 			goto bail_release;
- 	}
 diff -durp a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
 --- a/drivers/infiniband/hw/qib/qib_pcie.c
 +++ b/drivers/infiniband/hw/qib/qib_pcie.c
