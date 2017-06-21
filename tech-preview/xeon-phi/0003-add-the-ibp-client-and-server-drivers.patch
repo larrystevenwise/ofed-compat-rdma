@@ -1,4 +1,4 @@
-From d6e76907bc776a15cf6cb48ea57f5031f37ff14e Mon Sep 17 00:00:00 2001
+From 67d4fd51e923adbfdec3c4bb8c37bfd0a087f2a7 Mon Sep 17 00:00:00 2001
 From: Jerrie Coffman <jerrie.l.coffman@intel.com>
 Date: Fri, 20 May 2016 16:17:43 -0700
 Subject: [PATCH 3/8] add the ibp client and server drivers
@@ -20,9 +20,9 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/cm/client_msg.c      |  232 +++
  drivers/infiniband/ibp/cm/cm_client.h       |   98 +
  drivers/infiniband/ibp/cm/cm_client_msg.c   |  785 ++++++++
- drivers/infiniband/ibp/cm/cm_ibp_abi.h      |  405 ++++
+ drivers/infiniband/ibp/cm/cm_ibp_abi.h      |  407 ++++
  drivers/infiniband/ibp/cm/cm_proxy.c        |  752 +++++++
- drivers/infiniband/ibp/cm/cm_server_msg.c   | 1065 ++++++++++
+ drivers/infiniband/ibp/cm/cm_server_msg.c   | 1072 ++++++++++
  drivers/infiniband/ibp/cm/common.h          |   55 +
  drivers/infiniband/ibp/cm/ibp-abi.h         |   94 +
  drivers/infiniband/ibp/cm/ibp_exports.h     |   50 +
@@ -51,11 +51,11 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/drv/hw/mlx5/main.h   |  327 ++++
  drivers/infiniband/ibp/drv/hw/mlx5/qp.c     |  714 +++++++
  drivers/infiniband/ibp/drv/hw/mlx5/srq.c    |  185 ++
- drivers/infiniband/ibp/drv/ibp-abi.h        |  651 +++++++
+ drivers/infiniband/ibp/drv/ibp-abi.h        |  669 +++++++
  drivers/infiniband/ibp/drv/ibp.h            |  260 +++
  drivers/infiniband/ibp/drv/server.c         |  503 +++++
  drivers/infiniband/ibp/drv/server.h         |  182 ++
- drivers/infiniband/ibp/drv/server_msg.c     | 2818 +++++++++++++++++++++++++++
+ drivers/infiniband/ibp/drv/server_msg.c     | 2825 +++++++++++++++++++++++++++
  drivers/infiniband/ibp/sa/Makefile          |   13 +
  drivers/infiniband/ibp/sa/client.c          |  134 ++
  drivers/infiniband/ibp/sa/client.h          |   90 +
@@ -67,12 +67,12 @@ Signed-off-by: Patrick McCormick <patrick.m.mccorick@intel.com>
  drivers/infiniband/ibp/sa/sa_client_msg.c   |  435 +++++
  drivers/infiniband/ibp/sa/sa_ibp_abi.h      |  251 +++
  drivers/infiniband/ibp/sa/sa_proxy.c        |  773 ++++++++
- drivers/infiniband/ibp/sa/sa_server_msg.c   |  962 +++++++++
+ drivers/infiniband/ibp/sa/sa_server_msg.c   |  965 +++++++++
  drivers/infiniband/ibp/sa/sa_table.h        |  131 ++
  drivers/infiniband/ibp/sa/server.c          |  218 +++
  drivers/infiniband/ibp/sa/server.h          |  173 ++
  drivers/infiniband/ibp/sa/server_msg.c      |  185 ++
- 62 files changed, 22342 insertions(+)
+ 62 files changed, 22379 insertions(+)
  create mode 100644 drivers/infiniband/ibp/Kconfig
  create mode 100644 drivers/infiniband/ibp/Makefile
  create mode 100644 drivers/infiniband/ibp/cm/Makefile
@@ -1602,10 +1602,10 @@ index 0000000..555e49a
 +}
 diff --git a/drivers/infiniband/ibp/cm/cm_ibp_abi.h b/drivers/infiniband/ibp/cm/cm_ibp_abi.h
 new file mode 100644
-index 0000000..650e159
+index 0000000..e7718a5
 --- /dev/null
 +++ b/drivers/infiniband/ibp/cm/cm_ibp_abi.h
-@@ -0,0 +1,405 @@
+@@ -0,0 +1,407 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -1645,9 +1645,6 @@ index 0000000..650e159
 +#include <rdma/ib_verbs.h>
 +#include <rdma/ib_cm.h>
 +
-+/* Increment this value if any changes break compatibility. */
-+#define IBP_CM_ABI_VERSION	1
-+
 +/*
 + * Make sure that all structs defined in this file are laid out to pack
 + * the same way on different architectures to avoid incompatibility.
@@ -1665,7 +1662,8 @@ index 0000000..650e159
 +	u8				event[0];
 +};
 +
-+
++/* struct ib_sa_path_rec */
++/* note missing some roce stuff: ifindex, dmac */
 +struct ibp_sa_path_rec {
 +	__be64				service_id;
 +	u64				dgid_prefix;
@@ -1676,12 +1674,12 @@ index 0000000..650e159
 +	__be16				slid;
 +	u32				raw_traffic;
 +	__be32				flow_label;
-+	u8				hop_limit;
-+	u8				traffic_class;
 +	u32				reversible;
-+	u8				numb_path;
 +	__be16				pkey;
 +	__be16				qos_class;
++	u8				numb_path;
++	u8				hop_limit;
++	u8				traffic_class;
 +	u8				sl;
 +	u8				mtu_selector;
 +	u8				mtu;
@@ -1690,6 +1688,7 @@ index 0000000..650e159
 +	u8				packet_life_time_selector;
 +	u8				packet_life_time;
 +	u8				preference;
++	u8				gid_type;
 +};
 +
 +struct ibp_create_cm_id_cmd {
@@ -1697,14 +1696,16 @@ index 0000000..650e159
 +	u64				device;
 +};
 +
++/* struct ib_cm_id */
 +struct ibp_create_cm_id_resp {
 +	u64				ibp_cm_id;
 +	__be64				service_id;
 +	__be64				service_mask;
++	u16				state;
++	u16				lap_state;
 +	__be32				local_id;
 +	__be32				remote_id;
 +	u32				remote_cm_qpn;
-+	u32				filler;
 +};
 +
 +struct ibp_destroy_cm_id_cmd {
@@ -1712,21 +1713,14 @@ index 0000000..650e159
 +	u64				ibp_cm_id;
 +};
 +
-+struct ibp_cm_compare_data {
-+#	define IBP_CM_COMPARE_SIZE	(64 / sizeof(u32))
-+	u32  data[IBP_CM_COMPARE_SIZE];
-+	u32  mask[IBP_CM_COMPARE_SIZE];
-+};
-+
 +struct ibp_cm_listen_cmd {
 +	struct ibp_msg_header		header;
 +	u64				ibp_cm_id;
 +	__be64				service_id;
 +	__be64				service_mask;
-+	u64				null_comp_data;
-+	struct ibp_cm_compare_data	compare_data; // backward compatibility
 +};
 +
++/* struct ib_cm_req_param */
 +struct ibp_send_cm_req_cmd {
 +	struct ibp_msg_header		header;
 +	u64				ibp_cm_id;
@@ -1734,7 +1728,7 @@ index 0000000..650e159
 +	struct ibp_sa_path_rec		alternate_path;
 +	__be64				service_id;
 +	u32				qp_num;
-+	enum ib_qp_type			qp_type;
++	u32				qp_type;
 +	u32				starting_psn;
 +	u8				peer_to_peer;
 +	u8				responder_resources;
@@ -1750,6 +1744,7 @@ index 0000000..650e159
 +	char				private_data[0];
 +};
 +
++/* struct ib_cm_rep_param */
 +struct ibp_send_cm_rep_cmd {
 +	struct ibp_msg_header		header;
 +	u64				ibp_cm_id;
@@ -1854,50 +1849,55 @@ index 0000000..650e159
 +	u64				qp_attr_state;
 +};
 +
++/* struct ib_qp_cap */
++struct ibp_qp_cap {
++	u32				max_send_wr;
++	u32				max_recv_wr;
++	u32				max_send_sge;
++	u32				max_recv_sge;
++	u32				max_inline_data;
++	u32				max_rdma_ctxs;
++};
++
++/* struct ib_global_route */
++struct ibp_global_route {
++	__be64				dgid_subnet_prefix;
++	__be64				dgid_interface_id;
++	u32				flow_label;
++	u8				sgid_index;
++	u8				hop_limit;
++	u8				traffic_class;
++	u8				reserved[1];
++};
++
++/* struct ib_ah_attr */
++struct ibp_ah_attr {
++	struct ibp_global_route		grh;
++	u16				dlid;
++	u8				sl;
++	u8				src_path_bits;
++	u8				static_rate;
++	u8				ah_flags;
++	u8				port_num;
++	u8				reserved[1];
++};
++
++/* struct ib_qp_attr */
 +struct ibp_cm_init_qp_attr_resp {
 +	u64				qp_attr_mask;
-+	u64				qp_access_flags;
-+	u64				qp_state;
-+	u64				cur_qp_state;
-+	u64				path_mtu;
-+	u64				path_mig_state;
++
++	u32				qp_state;
++	u32				cur_qp_state;
++	u32				path_mtu;
++	u32				path_mig_state;
 +	u32				qkey;
 +	u32				rq_psn;
 +	u32				sq_psn;
-+	u64				dest_qp_num;
-+
-+	u32				cap_max_send_wr;
-+	u32				cap_max_recv_wr;
-+	u32				cap_max_send_sge;
-+	u32				cap_max_recv_sge;
-+	u32				cap_max_inline_data;
-+
-+	u64				ah_attr_grh_dgid_subnet_prefix;
-+	u64				ah_attr_grh_dgid_interface_id;
-+	u32				ah_attr_grh_flow_label;
-+	u8				ah_attr_grh_sgid_index;
-+	u8				ah_attr_grh_hop_limit;
-+	u8				ah_attr_grh_traffic_class;
-+	u16				ah_attr_dlid;
-+	u8				ah_attr_sl;
-+	u8				ah_attr_src_path_bits;
-+	u8				ah_attr_static_rate;
-+	u8				ah_attr_ah_flags;
-+	u8				ah_attr_port_num;
-+
-+	u64				alt_attr_grh_dgid_subnet_prefix;
-+	u64				alt_attr_grh_dgid_interface_id;
-+	u32				alt_attr_grh_flow_label;
-+	u8				alt_attr_grh_sgid_index;
-+	u8				alt_attr_grh_hop_limit;
-+	u8				alt_attr_grh_traffic_class;
-+	u16				alt_attr_dlid;
-+	u8				alt_attr_sl;
-+	u8				alt_attr_src_path_bits;
-+	u8				alt_attr_static_rate;
-+	u8				alt_attr_ah_flags;
-+	u8				alt_attr_port_num;
-+
++	u32				dest_qp_num;
++	u32				qp_access_flags;
++	struct ibp_qp_cap		cap;
++	struct ibp_ah_attr		ah_attr;
++	struct ibp_ah_attr		alt_attr;
 +	u16				pkey_index;
 +	u16				alt_pkey_index;
 +	u8				en_sqd_async_notify;
@@ -1911,52 +1911,54 @@ index 0000000..650e159
 +	u8				rnr_retry;
 +	u8				alt_port_num;
 +	u8				alt_timeout;
-+
 +};
 +
++/* struct ib_cm_req_event_param */
 +struct ibp_cm_req_event_resp {
++	u64				listen_id;
 +	struct ibp_sa_path_rec		primary_path;
 +	struct ibp_sa_path_rec		alternate_path;
-+	u64				listen_id;
 +	__be64				remote_ca_guid;
-+	__u32				remote_qkey;
-+	__u32				remote_qpn;
-+	__u32				qp_type;
-+	__u32				starting_psn;
-+	__u8				responder_resources;
-+	__u8				initiator_depth;
-+	__u8				local_cm_response_timeout;
-+	__u8				flow_control;
-+	__u8				remote_cm_response_timeout;
-+	__u8				retry_count;
-+	__u8				rnr_retry_count;
-+	__u8				srq;
-+	__u8				port;
-+	__u8				reserved[7];
++	u32				remote_qkey;
++	u32				remote_qpn;
++	u32				qp_type;
++	u32				starting_psn;
++	u16				bth_pkey;
++	u8				port;
++	u8				responder_resources;
++	u8				initiator_depth;
++	u8				local_cm_response_timeout;
++	u8				flow_control;
++	u8				remote_cm_response_timeout;
++	u8				retry_count;
++	u8				rnr_retry_count;
++	u8				srq;
++	u8				reserved[5];
 +};
 +
++/* struct ib_cm_rep_event_param */
 +struct ibp_cm_rep_event_resp {
 +	__be64				remote_ca_guid;
-+	__u32				remote_qkey;
-+	__u32				remote_qpn;
-+	__u32				starting_psn;
-+	__u8				responder_resources;
-+	__u8				initiator_depth;
-+	__u8				target_ack_delay;
-+	__u8				failover_accepted;
-+	__u8				flow_control;
-+	__u8				rnr_retry_count;
-+	__u8				srq;
-+	__u8				reserved[5];
++	u32				remote_qkey;
++	u32				remote_qpn;
++	u32				starting_psn;
++	u8				responder_resources;
++	u8				initiator_depth;
++	u8				target_ack_delay;
++	u8				failover_accepted;
++	u8				flow_control;
++	u8				rnr_retry_count;
++	u8				srq;
++	u8				reserved[5];
 +};
 +
 +struct ibp_cm_rej_event_resp {
-+	__u32				reason;
++	u32				reason;
 +};
 +
 +struct ibp_cm_mra_event_resp {
-+	__u8				timeout;
-+	__u8				reserved[3];
++	u8				timeout;
++	u8				reserved[3];
 +};
 +
 +struct ibp_cm_lap_event_resp {
@@ -1964,26 +1966,26 @@ index 0000000..650e159
 +};
 +
 +struct ibp_cm_rtu_event_resp {
-+	__u32				status;
++	u32				status;
 +	__be32				local_id;
 +	__be32				remote_id;
 +};
 +
 +struct ibp_cm_apr_event_resp {
-+	__u32				status;
++	u32				status;
 +};
 +
 +struct ibp_cm_sidr_req_event_resp {
 +	u64				listen_id;
-+	__u16				pkey;
-+	__u8				port;
-+	__u8				reserved;
++	u16				pkey;
++	u8				port;
++	u8				reserved;
 +};
 +
 +struct ibp_cm_sidr_rep_event_resp {
-+	__u32				status;
-+	__u32				qkey;
-+	__u32				qpn;
++	u32				status;
++	u32				qkey;
++	u32				qpn;
 +};
 +
 +struct ibp_cm_event {
@@ -2771,10 +2773,10 @@ index 0000000..f08608e
 +EXPORT_SYMBOL(ib_cm_init_qp_attr);
 diff --git a/drivers/infiniband/ibp/cm/cm_server_msg.c b/drivers/infiniband/ibp/cm/cm_server_msg.c
 new file mode 100644
-index 0000000..5fd6f72
+index 0000000..7de2518
 --- /dev/null
 +++ b/drivers/infiniband/ibp/cm/cm_server_msg.c
-@@ -0,0 +1,1065 @@
+@@ -0,0 +1,1072 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -2837,6 +2839,7 @@ index 0000000..5fd6f72
 +	b->packet_life_time_selector	= a->packet_life_time_selector;
 +	b->packet_life_time		= a->packet_life_time;
 +	b->preference			= a->preference;
++	b->gid_type			= a->gid_type;
 +}
 +
 +void ib_copy_sa_path_rec(struct ibp_sa_path_rec *a, struct ib_sa_path_rec *b)
@@ -2865,6 +2868,7 @@ index 0000000..5fd6f72
 +	a->packet_life_time_selector	= b->packet_life_time_selector;
 +	a->packet_life_time		= b->packet_life_time;
 +	a->preference			= b->preference;
++	a->gid_type			= b->gid_type;
 +}
 +
 +static struct cm_entry *find_cm_entry(struct ib_cm_id *cm_id)
@@ -2958,6 +2962,8 @@ index 0000000..5fd6f72
 +	proxy_req->remote_qpn		      = req->remote_qpn;
 +	proxy_req->qp_type		      = req->qp_type;
 +	proxy_req->starting_psn		      = req->starting_psn;
++	proxy_req->bth_pkey		      = req->bth_pkey;
++	proxy_req->port			      = req->port;
 +	proxy_req->responder_resources	      = req->responder_resources;
 +	proxy_req->initiator_depth	      = req->initiator_depth;
 +	proxy_req->local_cm_response_timeout  = req->local_cm_response_timeout;
@@ -2966,8 +2972,9 @@ index 0000000..5fd6f72
 +	proxy_req->retry_count		      = req->retry_count;
 +	proxy_req->rnr_retry_count	      = req->rnr_retry_count;
 +	proxy_req->srq			      = req->srq;
-+	proxy_req->port			      = req->port;
++
 +	ib_copy_sa_path_rec(&proxy_req->primary_path, req->primary_path);
++
 +	if (req->alternate_path)
 +		ib_copy_sa_path_rec(&proxy_req->alternate_path,
 +				     req->alternate_path);
@@ -3750,7 +3757,7 @@ index 0000000..5fd6f72
 +	struct ibp_cm_init_qp_attr_cmd	*cmd;
 +	struct ibp_cm_init_qp_attr_resp	*resp;
 +	struct ib_cm_id			*cm_id;
-+	struct ib_qp_attr		 qp_attr;
++	struct ib_qp_attr		 qp_attr = { 0 };
 +	int				 qp_attr_mask;
 +	size_t				 len;
 +	int				 ret;
@@ -3774,7 +3781,7 @@ index 0000000..5fd6f72
 +	resp = (struct ibp_cm_init_qp_attr_resp *) msg->data;
 +
 +	resp->qp_attr_mask		= qp_attr_mask;
-+	resp->qp_access_flags		= qp_attr.qp_access_flags;
++
 +	resp->qp_state			= qp_attr.qp_state;
 +	resp->cur_qp_state		= qp_attr.cur_qp_state;
 +	resp->path_mtu			= qp_attr.path_mtu;
@@ -3783,43 +3790,45 @@ index 0000000..5fd6f72
 +	resp->rq_psn			= qp_attr.rq_psn;
 +	resp->sq_psn			= qp_attr.sq_psn;
 +	resp->dest_qp_num		= qp_attr.dest_qp_num;
++	resp->qp_access_flags		= qp_attr.qp_access_flags;
 +
-+	resp->cap_max_send_wr		= qp_attr.cap.max_send_wr;
-+	resp->cap_max_recv_wr		= qp_attr.cap.max_recv_wr;
-+	resp->cap_max_send_sge		= qp_attr.cap.max_send_sge;
-+	resp->cap_max_recv_sge		= qp_attr.cap.max_recv_sge;
-+	resp->cap_max_inline_data	= qp_attr.cap.max_inline_data;
++	resp->cap.max_send_wr		= qp_attr.cap.max_send_wr;
++	resp->cap.max_recv_wr		= qp_attr.cap.max_recv_wr;
++	resp->cap.max_send_sge		= qp_attr.cap.max_send_sge;
++	resp->cap.max_recv_sge		= qp_attr.cap.max_recv_sge;
++	resp->cap.max_inline_data	= qp_attr.cap.max_inline_data;
++	resp->cap.max_rdma_ctxs		= qp_attr.cap.max_rdma_ctxs;
 +
-+	resp->ah_attr_grh_dgid_subnet_prefix =
++	resp->ah_attr.grh.dgid_subnet_prefix =
 +			qp_attr.ah_attr.grh.dgid.global.subnet_prefix;
-+	resp->ah_attr_grh_dgid_interface_id =
++	resp->ah_attr.grh.dgid_interface_id =
 +			qp_attr.ah_attr.grh.dgid.global.interface_id;
-+	resp->ah_attr_grh_flow_label	= qp_attr.ah_attr.grh.flow_label;
-+	resp->ah_attr_grh_sgid_index	= qp_attr.ah_attr.grh.sgid_index;
-+	resp->ah_attr_grh_hop_limit	= qp_attr.ah_attr.grh.hop_limit;
-+	resp->ah_attr_grh_traffic_class	= qp_attr.ah_attr.grh.traffic_class;
-+	resp->ah_attr_dlid		= qp_attr.ah_attr.dlid;
-+	resp->ah_attr_sl		= qp_attr.ah_attr.sl;
-+	resp->ah_attr_src_path_bits	= qp_attr.ah_attr.src_path_bits;
-+	resp->ah_attr_static_rate	= qp_attr.ah_attr.static_rate;
-+	resp->ah_attr_ah_flags		= qp_attr.ah_attr.ah_flags;
-+	resp->ah_attr_port_num		= qp_attr.ah_attr.port_num;
++	resp->ah_attr.grh.flow_label	= qp_attr.ah_attr.grh.flow_label;
++	resp->ah_attr.grh.sgid_index	= qp_attr.ah_attr.grh.sgid_index;
++	resp->ah_attr.grh.hop_limit	= qp_attr.ah_attr.grh.hop_limit;
++	resp->ah_attr.grh.traffic_class	= qp_attr.ah_attr.grh.traffic_class;
++	resp->ah_attr.dlid		= qp_attr.ah_attr.dlid;
++	resp->ah_attr.sl		= qp_attr.ah_attr.sl;
++	resp->ah_attr.src_path_bits	= qp_attr.ah_attr.src_path_bits;
++	resp->ah_attr.static_rate	= qp_attr.ah_attr.static_rate;
++	resp->ah_attr.ah_flags		= qp_attr.ah_attr.ah_flags;
++	resp->ah_attr.port_num		= qp_attr.ah_attr.port_num;
 +
-+	resp->alt_attr_grh_dgid_subnet_prefix =
++	resp->alt_attr.grh.dgid_subnet_prefix =
 +			qp_attr.alt_ah_attr.grh.dgid.global.subnet_prefix;
-+	resp->alt_attr_grh_dgid_interface_id =
++	resp->alt_attr.grh.dgid_interface_id =
 +			qp_attr.alt_ah_attr.grh.dgid.global.interface_id;
-+	resp->alt_attr_grh_flow_label	= qp_attr.alt_ah_attr.grh.flow_label;
-+	resp->alt_attr_grh_sgid_index	= qp_attr.alt_ah_attr.grh.sgid_index;
-+	resp->alt_attr_grh_hop_limit	= qp_attr.alt_ah_attr.grh.hop_limit;
-+	resp->alt_attr_grh_traffic_class
++	resp->alt_attr.grh.flow_label	= qp_attr.alt_ah_attr.grh.flow_label;
++	resp->alt_attr.grh.sgid_index	= qp_attr.alt_ah_attr.grh.sgid_index;
++	resp->alt_attr.grh.hop_limit	= qp_attr.alt_ah_attr.grh.hop_limit;
++	resp->alt_attr.grh.traffic_class
 +					= qp_attr.alt_ah_attr.grh.traffic_class;
-+	resp->alt_attr_dlid		= qp_attr.alt_ah_attr.dlid;
-+	resp->alt_attr_sl		= qp_attr.alt_ah_attr.sl;
-+	resp->alt_attr_src_path_bits	= qp_attr.alt_ah_attr.src_path_bits;
-+	resp->alt_attr_static_rate	= qp_attr.alt_ah_attr.static_rate;
-+	resp->alt_attr_ah_flags		= qp_attr.alt_ah_attr.ah_flags;
-+	resp->alt_attr_port_num		= qp_attr.alt_ah_attr.port_num;
++	resp->alt_attr.dlid		= qp_attr.alt_ah_attr.dlid;
++	resp->alt_attr.sl		= qp_attr.alt_ah_attr.sl;
++	resp->alt_attr.src_path_bits	= qp_attr.alt_ah_attr.src_path_bits;
++	resp->alt_attr.static_rate	= qp_attr.alt_ah_attr.static_rate;
++	resp->alt_attr.ah_flags		= qp_attr.alt_ah_attr.ah_flags;
++	resp->alt_attr.port_num		= qp_attr.alt_ah_attr.port_num;
 +
 +	resp->pkey_index		= qp_attr.pkey_index;
 +	resp->alt_pkey_index		= qp_attr.alt_pkey_index;
@@ -4602,7 +4611,7 @@ index 0000000..bc3f009
 +}
 diff --git a/drivers/infiniband/ibp/compat.h b/drivers/infiniband/ibp/compat.h
 new file mode 100644
-index 0000000..7eb128c
+index 0000000..cf0f491
 --- /dev/null
 +++ b/drivers/infiniband/ibp/compat.h
 @@ -0,0 +1,101 @@
@@ -4659,7 +4668,7 @@ index 0000000..7eb128c
 +
 +
 +#define DRV_DESC	"CCL Direct " DRV_ROLE
-+#define DRV_VERSION	"1.1"
++#define DRV_VERSION	"1.2"
 +#define DRV_PFX		DRV_NAME ": "
 +
 +#define DRV_COPYRIGHT	"Copyright (c) 2011-2016 Intel Corporation"
@@ -14393,10 +14402,10 @@ index 0000000..c9a5524
 +}
 diff --git a/drivers/infiniband/ibp/drv/ibp-abi.h b/drivers/infiniband/ibp/drv/ibp-abi.h
 new file mode 100644
-index 0000000..cad1e30
+index 0000000..8fd5cf6
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/ibp-abi.h
-@@ -0,0 +1,651 @@
+@@ -0,0 +1,669 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -14647,6 +14656,7 @@ index 0000000..cad1e30
 +	struct ibp_msg_header	header;
 +};
 +
++/* struct ib_device_attr */
 +struct ibp_query_device_resp {
 +	u64			fw_ver;
 +	__be64			sys_image_guid;
@@ -14657,7 +14667,7 @@ index 0000000..cad1e30
 +	u32			hw_ver;
 +	u32			max_qp;
 +	u32			max_qp_wr;
-+	u32			device_cap_flags;
++	u64			device_cap_flags;
 +	u32			max_sge;
 +	u32			max_sge_rd;
 +	u32			max_cq;
@@ -14688,7 +14698,12 @@ index 0000000..cad1e30
 +	u32			max_fast_reg_page_list_len;
 +	u16			max_pkeys;
 +	u8			local_ca_ack_delay;
-+	u8			reserved[5];
++	u32			sig_prot_cap;
++	u32			sig_guard_cap;
++	/* odp_caps not supported/reported on Xeon Phi */
++	u64			timestamp_mask;
++	u64			hca_core_clock;
++	u8			reserved[1];
 +};
 +
 +struct ibp_query_port_cmd {
@@ -14697,18 +14712,21 @@ index 0000000..cad1e30
 +	u8			reserved[7];
 +};
 +
++/* struct ib_port_attr */
 +struct ibp_query_port_resp {
++	u64			subnet_prefix;
++	u8			state;
++	u8			max_mtu;
++	u8			active_mtu;
++	u8			grh_required;	/* here for alignment */
++	u32			gid_tbl_len;
 +	u32			port_cap_flags;
 +	u32			max_msg_sz;
 +	u32			bad_pkey_cntr;
 +	u32			qkey_viol_cntr;
-+	u32			gid_tbl_len;
 +	u16			pkey_tbl_len;
 +	u16			lid;
 +	u16			sm_lid;
-+	u8			state;
-+	u8			max_mtu;
-+	u8			active_mtu;
 +	u8			lmc;
 +	u8			max_vl_num;
 +	u8			sm_sl;
@@ -14718,7 +14736,7 @@ index 0000000..cad1e30
 +	u8			active_speed;
 +	u8			phys_state;
 +	u8			link_layer;
-+	u8			reserved[2];
++	u8			reserved[3];
 +};
 +
 +struct ibp_query_gid_cmd {
@@ -14762,6 +14780,7 @@ index 0000000..cad1e30
 +	u64			pd;
 +};
 +
++/* struct ib_global_route */
 +struct ibp_global_route {
 +	__be64			dgid_subnet_prefix;
 +	__be64			dgid_interface_id;
@@ -14772,6 +14791,7 @@ index 0000000..cad1e30
 +	u8			reserved[1];
 +};
 +
++/* struct ib_ah_attr */
 +struct ibp_ah_attr {
 +	struct ibp_global_route	grh;
 +	u16			dlid;
@@ -14807,6 +14827,7 @@ index 0000000..cad1e30
 +	u64			ah;
 +};
 +
++/* struct ib_srq_attr */
 +struct ibp_srq_attr {
 +	u32			max_wr;
 +	u32			max_sge;
@@ -14856,15 +14877,17 @@ index 0000000..cad1e30
 +	u64			srq;
 +};
 +
++/* struct ib_qp_cap */
 +struct ibp_qp_cap {
 +	u32			max_send_wr;
 +	u32			max_recv_wr;
 +	u32			max_send_sge;
 +	u32			max_recv_sge;
 +	u32			max_inline_data;
-+	u8			reserved[4];
++	u32			max_rdma_ctxs;
 +};
 +
++/* struct ib_qp_init_attr */
 +struct ibp_create_qp_cmd {
 +	struct ibp_msg_header	header;
 +	u64			pd;
@@ -14874,10 +14897,11 @@ index 0000000..cad1e30
 +	u64			xrc_domain;
 +	u64			qp_context;
 +	struct ibp_qp_cap	cap;
++	u32			qp_type;
++	u32			create_flags;
 +	u8			sq_sig_type;
-+	u8			qp_type;
-+	u8			create_flags;
 +	u8			port_num;
++	u8			reserved[6];
 +	u64			data[0];
 +};
 +
@@ -14896,6 +14920,8 @@ index 0000000..cad1e30
 +	u8			reserved[4];
 +};
 +
++/* struct ib_qp_attr */
++/* struct ib_qp_init_attr */
 +struct ibp_query_qp_resp {
 +	u32			qp_state;
 +	u32			cur_qp_state;
@@ -14927,6 +14953,7 @@ index 0000000..cad1e30
 +	u8			init_sq_sig_type;
 +};
 +
++/* struct ib_qp_attr */
 +struct ibp_modify_qp_cmd {
 +	struct ibp_msg_header	header;
 +	u64			qp;
@@ -16013,10 +16040,10 @@ index 0000000..faf8dae
 +#endif /* SERVER_H */
 diff --git a/drivers/infiniband/ibp/drv/server_msg.c b/drivers/infiniband/ibp/drv/server_msg.c
 new file mode 100644
-index 0000000..c6a15df
+index 0000000..733daf8
 --- /dev/null
 +++ b/drivers/infiniband/ibp/drv/server_msg.c
-@@ -0,0 +1,2818 @@
+@@ -0,0 +1,2825 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + *
@@ -16479,6 +16506,10 @@ index 0000000..c6a15df
 +	resp->max_fast_reg_page_list_len = attr->max_fast_reg_page_list_len;
 +	resp->max_pkeys			 = attr->max_pkeys;
 +	resp->local_ca_ack_delay	 = attr->local_ca_ack_delay;
++	resp->sig_prot_cap		 = attr->sig_prot_cap;
++	resp->sig_guard_cap		 = attr->sig_guard_cap;
++	resp->timestamp_mask		 = attr->timestamp_mask;
++	resp->hca_core_clock		 = attr->hca_core_clock;
 +
 +	IBP_INIT_RESP(device, msg, len, VERB_RESPONSE, hdr->request, 0);
 +	return ibp_send(client->ep, msg, len);
@@ -16509,9 +16540,11 @@ index 0000000..c6a15df
 +	resp = (struct ibp_query_port_resp *) msg->data;
 +	len += sizeof(*resp);
 +
++	resp->subnet_prefix	= attr.subnet_prefix;
 +	resp->state		= attr.state;
 +	resp->max_mtu		= attr.max_mtu;
 +	resp->active_mtu	= attr.active_mtu;
++	resp->grh_required	= attr.grh_required;
 +	resp->gid_tbl_len	= attr.gid_tbl_len;
 +	resp->port_cap_flags	= attr.port_cap_flags;
 +	resp->max_msg_sz	= attr.max_msg_sz;
@@ -17603,6 +17636,7 @@ index 0000000..c6a15df
 +	init_attr.attr.max_wr	 = cmd->attr.max_wr;
 +	init_attr.attr.max_sge	 = cmd->attr.max_sge;
 +	init_attr.attr.srq_limit = cmd->attr.srq_limit;
++	init_attr.srq_type	 = IB_SRQT_BASIC;
 +
 +	srq = device->ib_dev->create_srq(pd, &init_attr, &udata);
 +	if (IS_ERR(srq)) {
@@ -17616,7 +17650,7 @@ index 0000000..c6a15df
 +	srq->pd		   = pd;
 +	srq->event_handler = init_attr.event_handler;
 +	srq->srq_context   = init_attr.srq_context;
-+	srq->srq_type      = 0;
++	srq->srq_type      = IB_SRQT_BASIC;
 +	srq->ext.xrc.cq	   = NULL;
 +	srq->ext.xrc.xrcd  = NULL;
 +
@@ -17805,7 +17839,7 @@ index 0000000..c6a15df
 +	struct ib_uobject		*uobj;
 +	struct ib_pd			*pd;
 +	struct ibp_qp			*qp;
-+	struct ib_qp_init_attr		init_attr;
++	struct ib_qp_init_attr		init_attr = { 0 };
 +	struct ib_udata			udata;
 +	size_t				len;
 +	size_t				outlen;
@@ -17842,8 +17876,6 @@ index 0000000..c6a15df
 +		goto send_resp;
 +	}
 +
-+	memset(&init_attr, 0, sizeof(init_attr));
-+
 +	init_attr.send_cq	      = (struct ib_cq *) cmd->send_cq;
 +	init_attr.recv_cq	      = (struct ib_cq *) cmd->recv_cq;
 +	init_attr.srq		      = (struct ib_srq *) cmd->srq;
@@ -17853,6 +17885,7 @@ index 0000000..c6a15df
 +	init_attr.cap.max_send_sge    = cmd->cap.max_send_sge;
 +	init_attr.cap.max_recv_sge    = cmd->cap.max_recv_sge;
 +	init_attr.cap.max_inline_data = cmd->cap.max_inline_data;
++	init_attr.cap.max_rdma_ctxs   = cmd->cap.max_rdma_ctxs;
 +	init_attr.sq_sig_type	      = cmd->sq_sig_type;
 +	init_attr.qp_type	      = cmd->qp_type;
 +	init_attr.create_flags	      = cmd->create_flags;
@@ -17908,6 +17941,7 @@ index 0000000..c6a15df
 +	resp->cap.max_send_sge	  = init_attr.cap.max_send_sge;
 +	resp->cap.max_recv_sge	  = init_attr.cap.max_recv_sge;
 +	resp->cap.max_inline_data = init_attr.cap.max_inline_data;
++	resp->cap.max_rdma_ctxs   = init_attr.cap.max_rdma_ctxs;
 +
 +send_resp:
 +	if (ret)
@@ -17944,8 +17978,6 @@ index 0000000..c6a15df
 +	INIT_UDATA(&udata, cmd->data, resp->data, len, outlen);
 +
 +	len = sizeof(*msg);
-+
-+	memset(&attr, 0, sizeof(attr));
 +
 +	attr.qp_state			= cmd->qp_state;
 +	attr.cur_qp_state		= cmd->cur_qp_state;
@@ -18068,6 +18100,7 @@ index 0000000..c6a15df
 +	resp->init_cap.max_send_sge    = qp_init_attr.cap.max_send_sge;
 +	resp->init_cap.max_recv_sge    = qp_init_attr.cap.max_recv_sge;
 +	resp->init_cap.max_inline_data = qp_init_attr.cap.max_inline_data;
++	resp->init_cap.max_rdma_ctxs   = qp_init_attr.cap.max_rdma_ctxs;
 +	resp->init_create_flags	       = qp_init_attr.create_flags;
 +	resp->init_sq_sig_type	       = qp_init_attr.sq_sig_type;
 +
@@ -18076,6 +18109,7 @@ index 0000000..c6a15df
 +	resp->cap.max_send_sge	  = qp_attr.cap.max_send_sge;
 +	resp->cap.max_recv_sge	  = qp_attr.cap.max_recv_sge;
 +	resp->cap.max_inline_data = qp_attr.cap.max_inline_data;
++	resp->cap.max_rdma_ctxs   = qp_attr.cap.max_rdma_ctxs;
 +
 +	resp->ah.grh.dgid_subnet_prefix	=
 +			qp_attr.ah_attr.grh.dgid.global.subnet_prefix;
@@ -20122,7 +20156,7 @@ index 0000000..5e8f70c
 +}
 diff --git a/drivers/infiniband/ibp/sa/sa_ibp_abi.h b/drivers/infiniband/ibp/sa/sa_ibp_abi.h
 new file mode 100644
-index 0000000..09bc840
+index 0000000..451ad56
 --- /dev/null
 +++ b/drivers/infiniband/ibp/sa/sa_ibp_abi.h
 @@ -0,0 +1,251 @@
@@ -20165,9 +20199,6 @@ index 0000000..09bc840
 +#include <rdma/ib_verbs.h>
 +#include <rdma/ib_sa.h>
 +
-+/* Increment this value if any changes break compatibility. */
-+#define IBP_SA_ABI_VERSION	1
-+
 +/*
 + * Make sure that all structs defined in this file are laid out to pack
 + * the same way on different architectures to avoid incompatibility.
@@ -20185,6 +20216,8 @@ index 0000000..09bc840
 +	u64				ibp_client;
 +};
 +
++/* struct ib_sa_path_rec */
++/* note missing some roce stuff: ifindex, dmac */
 +struct ibp_sa_path_rec {
 +	__be64				service_id;
 +	u64				dgid_prefix;
@@ -20195,12 +20228,12 @@ index 0000000..09bc840
 +	__be16				slid;
 +	u32				raw_traffic;
 +	__be32				flow_label;
-+	u8				hop_limit;
-+	u8				traffic_class;
 +	u32				reversible;
-+	u8				numb_path;
 +	__be16				pkey;
 +	__be16				qos_class;
++	u8				numb_path;
++	u8				hop_limit;
++	u8				traffic_class;
 +	u8				sl;
 +	u8				mtu_selector;
 +	u8				mtu;
@@ -20209,37 +20242,38 @@ index 0000000..09bc840
 +	u8				packet_life_time_selector;
 +	u8				packet_life_time;
 +	u8				preference;
++	u8				gid_type;
 +};
 +
 +struct path_rec_data {
 +	u64				entry;
 +	u64				query;
 +	struct ibp_sa_path_rec		resp;
-+	u8				reserved[1];
 +};
 +
++/* struct ib_sa_mcmember_rec */
 +struct ibp_sa_mcmember_rec {
 +	u64				mgid_prefix;
 +	u64				mgid_id;
 +	u64				port_gid_prefix;
 +	u64				port_gid_id;
++	__be32				flow_label;
 +	__be32				qkey;
 +	__be16				mlid;
++	__be16				pkey;
++	u32				proxy_join;
 +	u8				mtu_selector;
 +	u8				mtu;
 +	u8				traffic_class;
-+	__be16				pkey;
 +	u8				rate_selector;
 +	u8				rate;
 +	u8				packet_life_time_selector;
 +	u8				packet_life_time;
 +	u8				sl;
-+	__be32				flow_label;
 +	u8				hop_limit;
 +	u8				scope;
 +	u8				join_state;
-+	u64				proxy_join;
-+	u8				reserved[1];
++	u8				reserved[5];
 +};
 +
 +struct mc_join_data {
@@ -21158,10 +21192,10 @@ index 0000000..b20dde8
 +EXPORT_SYMBOL(ib_init_ah_from_mcmember);
 diff --git a/drivers/infiniband/ibp/sa/sa_server_msg.c b/drivers/infiniband/ibp/sa/sa_server_msg.c
 new file mode 100644
-index 0000000..2f10f49
+index 0000000..7119f67
 --- /dev/null
 +++ b/drivers/infiniband/ibp/sa/sa_server_msg.c
-@@ -0,0 +1,962 @@
+@@ -0,0 +1,965 @@
 +/*
 + * Copyright (c) 2011-2013 Intel Corporation. All rights reserved.
 + * * This software is available to you under a choice of one of two
@@ -21461,6 +21495,7 @@ index 0000000..2f10f49
 +				= cmd->rec.packet_life_time_selector;
 +	rec.packet_life_time	= cmd->rec.packet_life_time;
 +	rec.preference		= cmd->rec.preference;
++	rec.gid_type		= cmd->rec.gid_type;
 +
 +	ret = ib_init_ah_from_path(device, port_num, &rec, &attr);
 +	if (ret)
@@ -21734,6 +21769,7 @@ index 0000000..2f10f49
 +					= resp->packet_life_time_selector;
 +	path_rec->resp.packet_life_time	= resp->packet_life_time;
 +	path_rec->resp.preference	= resp->preference;
++	path_rec->resp.gid_type		= resp->gid_type;
 +
 +queue_work:
 +	free_query_list(entry);
@@ -21818,6 +21854,7 @@ index 0000000..2f10f49
 +				= cmd->rec.packet_life_time_selector;
 +	rec.packet_life_time	= cmd->rec.packet_life_time;
 +	rec.preference		= cmd->rec.preference;
++	rec.gid_type		= cmd->rec.gid_type;
 +
 +	mutex_init(&data->lock);
 +	mutex_lock(&data->lock);
