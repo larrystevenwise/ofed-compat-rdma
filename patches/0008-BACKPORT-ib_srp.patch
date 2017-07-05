@@ -4,9 +4,9 @@ Subject: [PATCH] BACKPORT: ib_srp
 Change-Id: Ic90bc43f6bd61818530da7fb700962a8e1ef4aa5
 Signed-off-by: Israel Rukshin <israelr@mellanox.com>
 ---
- drivers/infiniband/ulp/srp/ib_srp.c | 175 ++++++++++++++++++++++++++++++++++++
+ drivers/infiniband/ulp/srp/ib_srp.c | 177 +++++++++++++++++++++++++++++++++++-
  drivers/infiniband/ulp/srp/ib_srp.h |   7 ++
- 2 files changed, 182 insertions(+)
+ 2 files changed, 183 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/infiniband/ulp/srp/ib_srp.c b/drivers/infiniband/ulp/srp/ib_srp.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -26,6 +26,15 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  module_param(allow_ext_sg, bool, 0444);
  MODULE_PARM_DESC(allow_ext_sg,
+@@ -105,7 +110,7 @@ MODULE_PARM_DESC(never_register, "Never register memory");
+ 
+ static const struct kernel_param_ops srp_tmo_ops;
+ 
+-static int srp_reconnect_delay = 10;
++static int srp_reconnect_delay = 20;
+ module_param_cb(reconnect_delay, &srp_tmo_ops, &srp_reconnect_delay,
+ 		S_IRUGO | S_IWUSR);
+ MODULE_PARM_DESC(reconnect_delay, "Time between successive reconnect attempts");
 @@ -131,8 +136,12 @@ MODULE_PARM_DESC(dev_loss_tmo,
  
  static unsigned ch_count;
