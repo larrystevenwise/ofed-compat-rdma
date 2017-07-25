@@ -1,0 +1,18 @@
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_dcbx.c b/drivers/net/ethernet/qlogic/qed/qed_dcbx.c
+--- a/drivers/net/ethernet/qlogic/qed/qed_dcbx.c	2017-07-25 17:52:40.238977830 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_dcbx.c	2017-07-25 17:56:27.971737044 +0300
+@@ -64,10 +64,10 @@
+ 	((u32)(prio_tc_tbl >> ((7 - prio) * 4)) & 0x7)
+ 
+ static const struct qed_dcbx_app_metadata qed_dcbx_app_update[] = {
+-	{DCBX_PROTOCOL_ISCSI, "ISCSI", QED_PCI_DEFAULT},
+-	{DCBX_PROTOCOL_FCOE, "FCOE", QED_PCI_DEFAULT},
+-	{DCBX_PROTOCOL_ROCE, "ROCE", QED_PCI_DEFAULT},
+-	{DCBX_PROTOCOL_ROCE_V2, "ROCE_V2", QED_PCI_DEFAULT},
++	{DCBX_PROTOCOL_ISCSI, "ISCSI", QED_PCI_ISCSI},
++	{DCBX_PROTOCOL_FCOE, "FCOE", QED_PCI_FCOE},
++	{DCBX_PROTOCOL_ROCE, "ROCE", QED_PCI_ETH_ROCE},
++	{DCBX_PROTOCOL_ROCE_V2, "ROCE_V2", QED_PCI_ETH_ROCE},
+ 	{DCBX_PROTOCOL_ETH, "ETH", QED_PCI_ETH}
+ };
+ 

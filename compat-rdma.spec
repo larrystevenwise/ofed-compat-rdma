@@ -58,6 +58,8 @@
 %define build_ibp_server %(if ( echo %{configure_options} | grep "with-ibp-server-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_ibscif %(if ( echo %{configure_options} | grep "with-ibscif-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_vmw_pvrdma %(if ( echo %{configure_options} | grep "with-vmw_pvrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_qedr %(if ( echo %{configure_options} | grep "with-qedr-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_compat_rdma_firmware %(if ( echo %{configure_options} | grep "with-firmware" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 
 %{!?LIB_MOD_DIR: %define LIB_MOD_DIR /lib/modules/%{KVERSION}/updates}
 
@@ -245,6 +247,12 @@ install -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ib_ipoib.conf $
 install -d $RPM_BUILD_ROOT/etc/sysconfig/mic
 install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/ofed_scripts/ipoib.conf $RPM_BUILD_ROOT/etc/mpss/ipoib.conf
 install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/docs/lustre-phi.txt $RPM_BUILD_ROOT/usr/share/doc/%{_name}-%{_version}/lustre-phi.txt
+%endif
+%endif
+
+%if %{build_compat_rdma_firmware}
+%if %{build_qedr}
+install -D -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/linux-firmware/qed/* /lib/firmware/qed/
 %endif
 %endif
 

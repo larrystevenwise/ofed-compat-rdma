@@ -1,0 +1,209 @@
+diff -Naur a/drivers/net/ethernet/qlogic/qed/Makefile b/drivers/net/ethernet/qlogic/qed/Makefile
+--- a/drivers/net/ethernet/qlogic/qed/Makefile	2017-07-25 18:07:13.682393749 +0300
++++ b/drivers/net/ethernet/qlogic/qed/Makefile	2017-07-25 18:07:40.238832021 +0300
+@@ -4,7 +4,9 @@
+ 	 qed_int.o qed_main.o qed_mcp.o qed_sp_commands.o qed_spq.o qed_l2.o \
+ 	 qed_selftest.o qed_dcbx.o qed_debug.o qed_ptp.o
+ qed-$(CONFIG_QED_SRIOV) += qed_sriov.o qed_vf.o
+-qed-$(CONFIG_QED_LL2) += qed_ll2.o
+-qed-$(CONFIG_QED_RDMA) += qed_roce.o
++#qed-$(CONFIG_QED_LL2) += qed_ll2.o
++qed-y += qed_ll2.o
++#qed-${CONFIG_QED_RDMA} += qed_roce.o
++qed-y += qed_roce.o
+ qed-$(CONFIG_QED_ISCSI) += qed_iscsi.o qed_ooo.o
+ qed-$(CONFIG_QED_FCOE) += qed_fcoe.o
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_dev.c b/drivers/net/ethernet/qlogic/qed/qed_dev.c
+--- a/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-07-25 18:07:13.683393765 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-07-25 18:07:40.239832038 +0300
+@@ -171,7 +171,7 @@
+ 		qed_eq_free(p_hwfn, p_hwfn->p_eq);
+ 		qed_consq_free(p_hwfn, p_hwfn->p_consq);
+ 		qed_int_free(p_hwfn);
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ 		qed_ll2_free(p_hwfn, p_hwfn->p_ll2_info);
+ #endif
+ 		if (p_hwfn->hw_info.personality == QED_PCI_FCOE)
+@@ -846,7 +846,7 @@
+ 	struct qed_iscsi_info *p_iscsi_info;
+ 	struct qed_fcoe_info *p_fcoe_info;
+ 	struct qed_ooo_info *p_ooo_info;
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ 	struct qed_ll2_info *p_ll2_info;
+ #endif
+ 	u32 rdma_tasks, excess_tasks;
+@@ -970,7 +970,7 @@
+ 			goto alloc_no_mem;
+ 		p_hwfn->p_consq = p_consq;
+ 
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ 		if (p_hwfn->using_ll2) {
+ 			p_ll2_info = qed_ll2_alloc(p_hwfn);
+ 			if (!p_ll2_info)
+@@ -1045,7 +1045,7 @@
+ 		qed_int_setup(p_hwfn, p_hwfn->p_main_ptt);
+ 
+ 		qed_iov_setup(p_hwfn, p_hwfn->p_main_ptt);
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ 		if (p_hwfn->using_ll2)
+ 			qed_ll2_setup(p_hwfn, p_hwfn->p_ll2_info);
+ #endif
+@@ -2015,7 +2015,7 @@
+ 	struct qed_sb_cnt_info sb_cnt_info;
+ 	u32 non_l2_sbs = 0;
+ 
+-	if (IS_ENABLED(CONFIG_QED_RDMA) &&
++	if ( //IS_ENABLED(CONFIG_QED_RDMA) &&
+ 	    p_hwfn->hw_info.personality == QED_PCI_ETH_ROCE) {
+ 		/* Roce CNQ each requires: 1 status block + 1 CNQ. We divide
+ 		 * the status blocks equally between L2 / RoCE but with
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h b/drivers/net/ethernet/qlogic/qed/qed_fcoe.h
+--- a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-07-25 18:07:13.683393765 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-07-25 18:07:40.239832038 +0300
+@@ -79,7 +79,7 @@
+ }
+ #endif /* CONFIG_QED_FCOE */
+ 
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ extern const struct qed_common_ops qed_common_ops_pass;
+ extern const struct qed_ll2_ops qed_ll2_ops_pass;
+ #endif
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed.h b/drivers/net/ethernet/qlogic/qed/qed.h
+--- a/drivers/net/ethernet/qlogic/qed/qed.h	2017-07-25 18:07:13.681393732 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed.h	2017-07-25 18:07:40.239832038 +0300
+@@ -684,7 +684,7 @@
+ 
+ 	struct qed_dbg_params		dbg_params;
+ 
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ 	struct qed_cb_ll2_info		*ll2;
+ 	u8				ll2_mac_address[ETH_ALEN];
+ #endif
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h b/drivers/net/ethernet/qlogic/qed/qed_iscsi.h
+--- a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-07-25 18:07:13.685393798 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-07-25 18:07:40.239832038 +0300
+@@ -52,7 +52,7 @@
+ 	iscsi_event_cb_t event_cb;
+ };
+ 
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ extern const struct qed_ll2_ops qed_ll2_ops_pass;
+ #endif
+ 
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/qlogic/qed/qed_main.c
+--- a/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-25 18:07:13.681393732 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-25 18:07:40.240832054 +0300
+@@ -800,7 +800,7 @@
+ 	cdev->int_params.fp_msix_cnt = cdev->int_params.out.num_vectors -
+ 				       cdev->num_hwfns;
+ 
+-	if (!IS_ENABLED(CONFIG_QED_RDMA) ||
++	if ( //!IS_ENABLED(CONFIG_QED_RDMA) ||
+ 	    QED_LEADING_HWFN(cdev)->hw_info.personality != QED_PCI_ETH_ROCE)
+ 		return 0;
+ 
+@@ -929,7 +929,7 @@
+ {
+ 	int i;
+ 
+-	if (IS_ENABLED(CONFIG_QED_RDMA)) {
++	if (1) { //IS_ENABLED(CONFIG_QED_RDMA)) {
+ 		params->rdma_pf_params.num_qps = QED_ROCE_QPS;
+ 		params->rdma_pf_params.min_dpis = QED_ROCE_DPIS;
+ 		/* divide by 3 the MRs to avoid MF ILT overflow */
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_mcp.c b/drivers/net/ethernet/qlogic/qed/qed_mcp.c
+--- a/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-07-25 18:07:13.682393749 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-07-25 18:07:40.240832054 +0300
+@@ -657,7 +657,7 @@
+ 	if (IS_ENABLED(CONFIG_QED_SRIOV))
+ 		config_bitmap |= CONFIG_QED_SRIOV_BITMAP_IDX;
+ 
+-	if (IS_ENABLED(CONFIG_QED_RDMA))
++	if (1) //IS_ENABLED(CONFIG_QED_RDMA))
+ 		config_bitmap |= CONFIG_QEDR_BITMAP_IDX;
+ 
+ 	if (IS_ENABLED(CONFIG_QED_FCOE))
+@@ -666,7 +666,7 @@
+ 	if (IS_ENABLED(CONFIG_QED_ISCSI))
+ 		config_bitmap |= CONFIG_QEDI_BITMAP_IDX;
+ 
+-	if (IS_ENABLED(CONFIG_QED_LL2))
++	if (1) //IS_ENABLED(CONFIG_QED_LL2))
+ 		config_bitmap |= CONFIG_QED_LL2_BITMAP_IDX;
+ 
+ 	return config_bitmap;
+@@ -1620,7 +1620,7 @@
+ 
+ 	switch (p_info->config & FUNC_MF_CFG_PROTOCOL_MASK) {
+ 	case FUNC_MF_CFG_PROTOCOL_ETHERNET:
+-		if (!IS_ENABLED(CONFIG_QED_RDMA))
++		if (0) //!IS_ENABLED(CONFIG_QED_RDMA))
+ 			*p_proto = QED_PCI_ETH;
+ 		else if (qed_mcp_get_shmem_proto_mfw(p_hwfn, p_ptt, p_proto))
+ 			qed_mcp_get_shmem_proto_legacy(p_hwfn, p_proto);
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_roce.h b/drivers/net/ethernet/qlogic/qed/qed_roce.h
+--- a/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-07-25 18:07:13.679393699 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-07-25 18:07:40.241832071 +0300
+@@ -164,7 +164,7 @@
+ 	dma_addr_t shared_queue_phys_addr;
+ };
+ 
+-#if IS_ENABLED(CONFIG_QED_RDMA)
++#if 1 //IS_ENABLED(CONFIG_QED_RDMA)
+ void qed_rdma_dpm_bar(struct qed_hwfn *p_hwfn, struct qed_ptt *p_ptt);
+ void qed_roce_async_event(struct qed_hwfn *p_hwfn,
+ 			  u8 fw_event_code, union rdma_eqe_data *rdma_data);
+diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/qlogic/qed/qed_spq.c
+--- a/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-25 18:07:13.680393716 +0300
++++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-25 18:07:40.241832071 +0300
+@@ -304,7 +304,8 @@
+ 			   struct event_ring_entry *p_eqe)
+ {
+ 	switch (p_eqe->protocol_id) {
+-#if IS_ENABLED(CONFIG_QED_RDMA)
++
++#if 1 //IS_ENABLED(CONFIG_QED_RDMA)
+ 	case PROTOCOLID_ROCE:
+ 		qed_roce_async_event(p_hwfn, p_eqe->opcode,
+ 				     &p_eqe->data.rdma_data);
+diff -Naur a/drivers/net/ethernet/qlogic/qede/Makefile b/drivers/net/ethernet/qlogic/qede/Makefile
+--- a/drivers/net/ethernet/qlogic/qede/Makefile	2017-07-25 18:07:13.687393831 +0300
++++ b/drivers/net/ethernet/qlogic/qede/Makefile	2017-07-25 18:07:40.241832071 +0300
+@@ -2,4 +2,5 @@
+ 
+ qede-y := qede_main.o qede_fp.o qede_filter.o qede_ethtool.o qede_ptp.o
+ qede-$(CONFIG_DCB) += qede_dcbnl.o
+-qede-$(CONFIG_QED_RDMA) += qede_roce.o
++#qede-$(CONFIG_QED_RDMA) += qede_roce.o
++qede-y += qede_roce.o
+diff -Naur a/include/linux/qed/qede_roce.h b/include/linux/qed/qede_roce.h
+--- a/include/linux/qed/qede_roce.h	2017-07-25 18:07:12.762378561 +0300
++++ b/include/linux/qed/qede_roce.h	2017-07-25 18:07:40.241832071 +0300
+@@ -68,7 +68,7 @@
+ 
+ bool qede_roce_supported(struct qede_dev *dev);
+ 
+-#if IS_ENABLED(CONFIG_QED_RDMA)
++#if 1 //IS_ENABLED(CONFIG_QED_RDMA)
+ int qede_roce_dev_add(struct qede_dev *dev);
+ void qede_roce_dev_event_open(struct qede_dev *dev);
+ void qede_roce_dev_event_close(struct qede_dev *dev);
+diff -Naur a/include/linux/qed/qed_ll2_if.h b/include/linux/qed/qed_ll2_if.h
+--- a/include/linux/qed/qed_ll2_if.h	2017-07-25 18:07:12.763378578 +0300
++++ b/include/linux/qed/qed_ll2_if.h	2017-07-25 18:07:40.242832087 +0300
+@@ -138,7 +138,7 @@
+ 	int (*get_stats)(struct qed_dev *cdev, struct qed_ll2_stats *stats);
+ };
+ 
+-#ifdef CONFIG_QED_LL2
++#if 1 //def CONFIG_QED_LL2
+ int qed_ll2_alloc_if(struct qed_dev *);
+ void qed_ll2_dealloc_if(struct qed_dev *);
+ #else
