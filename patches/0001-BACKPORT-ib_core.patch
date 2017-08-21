@@ -7,7 +7,7 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/cma.c           | 23 ++++++++
  drivers/infiniband/core/cma_configfs.c  | 97 ++++++++++++++++++++++++++++++++-
  drivers/infiniband/core/core_priv.h     | 28 ++++++----
- drivers/infiniband/core/cq.c            |  6 ++
+ drivers/infiniband/core/cq.c            | 35 +++++++++++-
  drivers/infiniband/core/mad.c           |  3 +
  drivers/infiniband/core/netlink.c       |  3 +
  drivers/infiniband/core/roce_gid_mgmt.c | 27 +++++++++
@@ -16,8 +16,8 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/user_mad.c      |  3 +
  drivers/infiniband/core/verbs.c         |  4 ++
  include/rdma/ib_addr.h                  | 23 ++++++++
- include/rdma/ib_verbs.h                 | 22 ++++++++
- 14 files changed, 286 insertions(+), 13 deletions(-)
+ include/rdma/ib_verbs.h                 | 28 ++++++++++
+ 14 files changed, 320 insertions(+), 14 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -356,41 +356,63 @@ index xxxxxxx..xxxxxxx xxxxxx
  static int ib_poll_handler(struct irq_poll *iop, int budget)
  {
  	struct ib_cq *cq = container_of(iop, struct ib_cq, iop);
-@@ -93,6 +94,7 @@ static void ib_cq_completion_softirq(struct ib_cq *cq, void *private)
+@@ -93,6 +94,30 @@ static void ib_cq_completion_softirq(struct ib_cq *cq, void *private)
  {
  	irq_poll_sched(&cq->iop);
  }
++#else
++static int ib_poll_handler(struct blk_iopoll *iop, int budget)
++{
++	struct ib_cq *cq = container_of(iop, struct ib_cq, iop);
++	int completed;
++
++	completed = __ib_process_cq(cq, budget);
++	if (completed < budget) {
++		blk_iopoll_complete(&cq->iop);
++		if (ib_req_notify_cq(cq, IB_POLL_FLAGS) > 0) {
++			if (!blk_iopoll_sched_prep(&cq->iop))
++				blk_iopoll_sched(&cq->iop);
++		}
++	}
++
++	return completed;
++}
++
++static void ib_cq_completion_softirq(struct ib_cq *cq, void *private)
++{
++	if (!blk_iopoll_sched_prep(&cq->iop))
++		blk_iopoll_sched(&cq->iop);
++}
 +#endif
  
  static void ib_cq_poll_work(struct work_struct *work)
  {
-@@ -152,12 +154,14 @@ struct ib_cq *ib_alloc_cq(struct ib_device *dev, void *private,
- 	case IB_POLL_DIRECT:
- 		cq->comp_handler = ib_cq_completion_direct;
+@@ -154,8 +179,12 @@ struct ib_cq *ib_alloc_cq(struct ib_device *dev, void *private,
  		break;
-+#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
  	case IB_POLL_SOFTIRQ:
  		cq->comp_handler = ib_cq_completion_softirq;
- 
+-
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
  		irq_poll_init(&cq->iop, IB_POLL_BUDGET_IRQ, ib_poll_handler);
++#else
++		blk_iopoll_init(&cq->iop, IB_POLL_BUDGET_IRQ, ib_poll_handler);
++		blk_iopoll_enable(&cq->iop);
++#endif
  		ib_req_notify_cq(cq, IB_CQ_NEXT_COMP);
  		break;
-+#endif
  	case IB_POLL_WORKQUEUE:
- 		cq->comp_handler = ib_cq_completion_workqueue;
- 		INIT_WORK(&cq->work, ib_cq_poll_work);
-@@ -192,9 +196,11 @@ void ib_free_cq(struct ib_cq *cq)
- 	switch (cq->poll_ctx) {
+@@ -193,7 +222,11 @@ void ib_free_cq(struct ib_cq *cq)
  	case IB_POLL_DIRECT:
  		break;
-+#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
  	case IB_POLL_SOFTIRQ:
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
  		irq_poll_disable(&cq->iop);
- 		break;
++#else
++		blk_iopoll_disable(&cq->iop);
 +#endif
+ 		break;
  	case IB_POLL_WORKQUEUE:
  		flush_work(&cq->work);
- 		break;
 diff --git a/drivers/infiniband/core/mad.c b/drivers/infiniband/core/mad.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/mad.c
@@ -756,17 +778,31 @@ diff --git a/include/rdma/ib_verbs.h b/include/rdma/ib_verbs.h
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/include/rdma/ib_verbs.h
 +++ b/include/rdma/ib_verbs.h
-@@ -1410,7 +1410,9 @@ struct ib_cq {
+@@ -49,7 +49,11 @@
+ #include <linux/scatterlist.h>
+ #include <linux/workqueue.h>
+ #include <linux/socket.h>
++#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
+ #include <linux/irq_poll.h>
++#else
++#include <linux/blk-iopoll.h>
++#endif
+ #include <uapi/linux/if_ether.h>
+ #include <net/ipv6.h>
+ #include <net/ip.h>
+@@ -1410,7 +1414,11 @@ struct ib_cq {
  	enum ib_poll_context	poll_ctx;
  	struct ib_wc		*wc;
  	union {
 +#if defined(HAVE_IRQ_POLL_H) && IS_ENABLED(CONFIG_IRQ_POLL)
  		struct irq_poll		iop;
++#else
++		struct blk_iopoll	iop;
 +#endif
  		struct work_struct	work;
  	};
  };
-@@ -2000,8 +2002,10 @@ struct ib_device {
+@@ -2000,8 +2008,10 @@ struct ib_device {
  							int state);
  	int			   (*get_vf_config)(struct ib_device *device, int vf, u8 port,
  						   struct ifla_vf_info *ivf);
@@ -777,7 +813,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  	int			   (*set_vf_guid)(struct ib_device *device, int vf, u8 port, u64 guid,
  						  int type);
  	struct ib_wq *		   (*create_wq)(struct ib_pd *pd,
-@@ -2474,8 +2478,10 @@ int ib_set_vf_link_state(struct ib_device *device, int vf, u8 port,
+@@ -2474,8 +2484,10 @@ int ib_set_vf_link_state(struct ib_device *device, int vf, u8 port,
  			 int state);
  int ib_get_vf_config(struct ib_device *device, int vf, u8 port,
  		     struct ifla_vf_info *info);
@@ -788,7 +824,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  int ib_set_vf_guid(struct ib_device *device, int vf, u8 port, u64 guid,
  		   int type);
  
-@@ -2911,7 +2917,11 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
+@@ -2911,7 +2923,11 @@ static inline void ib_dma_unmap_single(struct ib_device *dev,
  static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
  					  void *cpu_addr, size_t size,
  					  enum dma_data_direction direction,
@@ -800,7 +836,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_map_single_attrs(dev->dma_device, cpu_addr, size,
  				    direction, dma_attrs);
-@@ -2920,7 +2930,11 @@ static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
+@@ -2920,7 +2936,11 @@ static inline u64 ib_dma_map_single_attrs(struct ib_device *dev,
  static inline void ib_dma_unmap_single_attrs(struct ib_device *dev,
  					     u64 addr, size_t size,
  					     enum dma_data_direction direction,
@@ -812,7 +848,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_unmap_single_attrs(dev->dma_device, addr, size,
  				      direction, dma_attrs);
-@@ -2998,7 +3012,11 @@ static inline void ib_dma_unmap_sg(struct ib_device *dev,
+@@ -2998,7 +3018,11 @@ static inline void ib_dma_unmap_sg(struct ib_device *dev,
  static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
  				      struct scatterlist *sg, int nents,
  				      enum dma_data_direction direction,
@@ -824,7 +860,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  {
  	return dma_map_sg_attrs(dev->dma_device, sg, nents, direction,
  				dma_attrs);
-@@ -3007,7 +3025,11 @@ static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
+@@ -3007,7 +3031,11 @@ static inline int ib_dma_map_sg_attrs(struct ib_device *dev,
  static inline void ib_dma_unmap_sg_attrs(struct ib_device *dev,
  					 struct scatterlist *sg, int nents,
  					 enum dma_data_direction direction,
