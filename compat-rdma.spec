@@ -59,6 +59,7 @@
 %define build_ibscif %(if ( echo %{configure_options} | grep "with-ibscif-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_vmw_pvrdma %(if ( echo %{configure_options} | grep "with-vmw_pvrdma-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_qedr %(if ( echo %{configure_options} | grep "with-qedr-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
+%define build_bnxt_re %(if ( echo %{configure_options} | grep "with-bnxt_re-mod" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 %define build_compat_rdma_firmware %(if ( echo %{configure_options} | grep "with-firmware" > /dev/null ); then echo -n '1'; else echo -n '0'; fi)
 
 %{!?LIB_MOD_DIR: %define LIB_MOD_DIR /lib/modules/%{KVERSION}/updates}

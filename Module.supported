@@ -47,3 +47,5 @@ compat.ko external
 qed.ko external
 qede.ko external
 qedr.ko external
+bnxt_en.ko external
+bnxt_re.ko external

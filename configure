@@ -169,6 +169,12 @@ Usage:  `basename $0` [options]
     --with-be2net-mod    make CONFIG_BE2NET=m [no]
     --without-be2net-mod    [yes]
 
+    --with-bnxt_en-mod    make CONFIG_BNXT=m [no]
+    --without-bnxt_en-mod    [yes]
+
+    --with-bnxt_re-mod    make CONFIG_INFINIBAND_BNXT_RE=m [no]
+    --without-bnxt_re-mod    [yes]
+
     --with-nes_debug-mod    make CONFIG_INFINIBAND_NES_DEBUG=y [no]
     --without-nes_debug-mod    [yes]
 
@@ -713,6 +719,21 @@ main()
                         --without-be2net-mod)
                             CONFIG_BE2NET=
                         ;;
+			--with-bnxt_re-mod)
+                            CONFIG_INFINIBAND_BNXT_RE="m"
+                            CONFIG_BNXT="y"
+                            add_conf "# Load BNXT_RE modules" "BNXT_RE_LOAD=yes"
+                        ;;
+                        --without-bnxt_re-mod)
+                            CONFIG_INFINIBAND_BNXT_RE=
+                        ;;
+                        --with-bnxt_en-mod)
+                            CONFIG_BNXT="m"
+                        ;;
+                        --without-bnxt_en-mod)
+                            CONFIG_BNXT=
+                        ;;
+
                         --with-nfsrdma-mod)
                             CONFIG_SUNRPC_XPRT_RDMA="m"
                             CONFIG_SUNRPC_XPRT_RDMA_CLIENT="m"
@@ -901,6 +922,8 @@ CONFIG_I40E=${CONFIG_I40E:-''}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES:-''}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA:-''}
 CONFIG_BE2NET=${CONFIG_BE2NET:-''}
+CONFIG_INFINIBAND_BNXT_RE=${CONFIG_INFINIBAND_BNXT_RE:-''}
+CONFIG_BNXT=${CONFIG_BNXT:-''}
 CONFIG_INFINIBAND_VMWARE_PVRDMA=${CONFIG_INFINIBAND_VMWARE_PVRDMA:-''}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA:-''}
@@ -1045,6 +1068,8 @@ CONFIG_I40E=${CONFIG_I40E}
 CONFIG_INFINIBAND_NES=${CONFIG_INFINIBAND_NES}
 CONFIG_INFINIBAND_OCRDMA=${CONFIG_INFINIBAND_OCRDMA}
 CONFIG_BE2NET=${CONFIG_BE2NET}
+CONFIG_INFINIBAND_BNXT_RE=${CONFIG_INFINIBAND_BNXT_RE}
+CONFIG_BNXT=${CONFIG_BNXT}
 CONFIG_INFINIBAND_VMWARE_PVRDMA=${CONFIG_INFINIBAND_VMWARE_PVRDMA}
 
 CONFIG_SUNRPC_XPRT_RDMA=${CONFIG_SUNRPC_XPRT_RDMA}
@@ -1360,6 +1385,16 @@ if [ "X${CONFIG_BE2NET}" == "Xm" ]; then
 else
         DEFINE_BE2NET="#undef CONFIG_BE2NET"
 fi
+if [ "X${CONFIG_INFINIBAND_BNXT_RE}" == "Xm" ]; then
+        DEFINE_INFINIBAND_BNXT_RE="#undef CONFIG_INFINIBAND_BNXT_RE\n#define CONFIG_INFINIBAND_BNXT_RE 1"
+else
+        DEFINE_INFINIBAND_BNXT_RE="#undef CONFIG_INFINIBAND_BNXT_RE"
+fi
+if [ "X${CONFIG_BNXT}" == "Xm" ]; then
+        DEFINE_BNXT="#undef CONFIG_BNXT\n#define CONFIG_BNXT 1"
+else
+        DEFINE_BNXT="#undef CONFIG_BNXT"
+fi
 if [ "X${CONFIG_INFINIBAND_NES_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_NES_DEBUG="#undef CONFIG_INFINIBAND_NES_DEBUG\n#define CONFIG_INFINIBAND_NES_DEBUG 1"
 else
@@ -1466,6 +1501,8 @@ $(echo -e "${DEFINE_I40E}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_NES}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}" | grep -v undef)
 $(echo -e "${DEFINE_BE2NET}" | grep -v undef)
+$(echo -e "${DEFINE_INFINIBAND_BNXT_RE}" | grep -v undef)
+$(echo -e "${DEFINE_BNXT}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_VMWARE_PVRDMA}" | grep -v undef)
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}" | grep -v undef)
@@ -1581,6 +1618,8 @@ else
 #undef CONFIG_INFINIBAND_NES_DEBUG
 #undef CONFIG_INFINIBAND_OCRDMA
 #undef CONFIG_BE2NET
+#undef CONFIG_INFINIBAND_BNXT_RE
+#undef CONFIG_BNXT
 #undef CONFIG_INFINIBAND_VMWARE_PVRDMA
 
 #undef CONFIG_SUNRPC_XPRT_RDMA
@@ -1631,6 +1670,8 @@ $(echo -e "${DEFINE_I40E}")
 $(echo -e "${DEFINE_INFINIBAND_NES}")
 $(echo -e "${DEFINE_INFINIBAND_OCRDMA}")
 $(echo -e "${DEFINE_BE2NET}")
+$(echo -e "${DEFINE_INFINIBAND_BNXT_RE}")
+$(echo -e "${DEFINE_BNXT}")
 $(echo -e "${DEFINE_INFINIBAND_VMWARE_PVRDMA}")
 
 $(echo -e "${DEFINE_SUNRPC_XPRT_RDMA}")
