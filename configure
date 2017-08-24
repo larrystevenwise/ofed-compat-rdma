@@ -1560,7 +1560,7 @@ $(echo -e "${DEFINE_QED_RDMA}" | grep -v undef)
 $(echo -e "${DEFINE_QEDE}" | grep -v undef)
 $(echo -e "${DEFINE_INFINIBAND_QEDR}" | grep -v undef)
 
-else
+#else
 #undef CONFIG_MEMTRACK
 #undef CONFIG_DEBUG_INFO
 #undef CONFIG_INFINIBAND
