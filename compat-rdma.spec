@@ -253,7 +253,8 @@ install -D -m 0644 $RPM_BUILD_DIR/%{_name}-%{_version}/docs/lustre-phi.txt $RPM_
 
 %if %{build_compat_rdma_firmware}
 %if %{build_qedr}
-install -D -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/linux-firmware/qed/* /lib/firmware/qed/
+install -d $RPM_BUILD_ROOT/lib/firmware/qed
+install -D -m 0755 $RPM_BUILD_DIR/%{_name}-%{_version}/linux-firmware/qed/* $RPM_BUILD_ROOT/lib/firmware/qed/
 %endif
 %endif
 
@@ -449,6 +450,11 @@ fi
 %if %{build_mlx4_en}
 /sbin/connectx_port_config
 %config(noreplace) %{RDMA_CONF_DIR}/connectx.conf
+%endif
+%if %{build_compat_rdma_firmware}
+%if %{build_qedr}
+/lib/firmware/qed/*
+%endif
 %endif
 
 %files -n compat-rdma-devel
