@@ -1,0 +1,82 @@
+diff --git a/net/sunrpc/xprtrdma/xprt_rdma.h b/net/sunrpc/xprtrdma/xprt_rdma.h
+index a71b0f5..4fd3708 100644
+--- a/net/sunrpc/xprtrdma/xprt_rdma.h
++++ b/net/sunrpc/xprtrdma/xprt_rdma.h
+@@ -52,6 +52,10 @@
+ #include <linux/sunrpc/rpc_rdma.h> 	/* RPC/RDMA protocol */
+ #include <linux/sunrpc/xprtrdma.h> 	/* xprt parameters */
+ 
++#ifndef HAVE_XPRT_PUT_EXPORTED
++#include <linux/debugfs.h>
++#endif
++
+ #define RDMA_RESOLVE_TIMEOUT	(5000)	/* 5 seconds */
+ #define RDMA_CONNECT_RETRY_MAX	(2)	/* retries if no listener backlog */
+ 
+@@ -541,4 +541,30 @@ void xprt_rdma_bc_destroy(struct rpc_xprt *, unsigned int);
+ 
+ extern struct xprt_class xprt_rdma_bc;
+ 
++#ifndef HAVE_XPRT_PUT_EXPORTED
++static inline void backport_xprt_put(struct rpc_xprt *xprt)
++{
++	if (atomic_dec_and_test(&xprt->count)) {
++		printk("RPC:       destroying transport %p\n", xprt);
++
++		/* Exclude transport connect/disconnect handlers */
++		wait_on_bit_lock(&xprt->state, XPRT_LOCKED, TASK_UNINTERRUPTIBLE);
++
++		del_timer_sync(&xprt->timer);
++
++		debugfs_remove_recursive(xprt->debugfs);
++		xprt->debugfs = NULL;
++		rpc_destroy_wait_queue(&xprt->binding);
++		rpc_destroy_wait_queue(&xprt->pending);
++		rpc_destroy_wait_queue(&xprt->sending);
++		rpc_destroy_wait_queue(&xprt->backlog);
++		cancel_work_sync(&xprt->task_cleanup);
++		kfree(xprt->servername);
++		/*
++ 	 	 * Tear down transport state and free the rpc_xprt
++ 	 	 */
++		xprt->ops->destroy(xprt);
++	}
++}
++#endif
+ #endif				/* _LINUX_SUNRPC_XPRT_RDMA_H */
+diff --git a/net/sunrpc/xprtrdma/svc_rdma_backchannel.c b/net/sunrpc/xprtrdma/svc_rdma_backchannel.c
+index a2a7519..1d2703c 100644
+--- a/net/sunrpc/xprtrdma/svc_rdma_backchannel.c
++++ b/net/sunrpc/xprtrdma/svc_rdma_backchannel.c
+@@ -350,7 +350,11 @@ xprt_setup_rdma_bc(struct xprt_create *args)
+ out_fail:
+ 	xprt_rdma_free_addresses(xprt);
+ 	args->bc_xprt->xpt_bc_xprt = NULL;
++#ifdef HAVE_XPRT_PUT_EXPORTED
+ 	xprt_put(xprt);
++#else
++	backport_xprt_put(xprt);
++#endif
+ 	xprt_free(xprt);
+ 	return ERR_PTR(-EINVAL);
+ }
+diff --git a/net/sunrpc/xprtrdma/svc_rdma_transport.c b/net/sunrpc/xprtrdma/svc_rdma_transport.c
+index dd94401..a9f812f 100644
+--- a/net/sunrpc/xprtrdma/svc_rdma_transport.c
++++ b/net/sunrpc/xprtrdma/svc_rdma_transport.c
+@@ -1223,7 +1223,11 @@ static void __svc_rdma_free(struct work_struct *work)
+ 
+ 	/* Final put of backchannel client transport */
+ 	if (xprt->xpt_bc_xprt) {
++#ifdef HAVE_XPRT_PUT_EXPORTED
+ 		xprt_put(xprt->xpt_bc_xprt);
++#else
++		backport_xprt_put(xprt->xpt_bc_xprt);
++#endif
+ 		xprt->xpt_bc_xprt = NULL;
+ 	}
+ 
+diff --git a/net/sunrpc/xprtrdma/xprt_rdma.h b/net/sunrpc/xprtrdma/xprt_rdma.h
+index a71b0f5..607c94c 100644
+--- a/net/sunrpc/xprtrdma/xprt_rdma.h
++++ b/net/sunrpc/xprtrdma/xprt_rdma.h
