@@ -1,0 +1,257 @@
+From c4ba116adbd25e45f5481a31f396a3bb0f77e7ec Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Mon, 4 Sep 2017 06:17:10 -0400
+Subject: [PATCH] BACKPORT: bnxt_re backports for
+ SLES12SP2/SLES12SP1/SLES12SP0/RHEL7.1/RHEL7.0
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/main.c              |  1 +
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c         | 54 ++++++++++++++++++++---
+ drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c | 13 +++++-
+ 3 files changed, 62 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/main.c b/drivers/infiniband/hw/bnxt_re/main.c
+index c2b3d7e..ea89024 100644
+--- a/drivers/infiniband/hw/bnxt_re/main.c
++++ b/drivers/infiniband/hw/bnxt_re/main.c
+@@ -48,6 +48,7 @@
+ #include <net/ipv6.h>
+ #include <net/addrconf.h>
+ #include <linux/if_ether.h>
++#include <linux/interrupt.h>
+ 
+ #include <rdma/ib_verbs.h>
+ #include <rdma/ib_user_verbs.h>
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index f18d0cc..c64f2f5 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -39,7 +39,10 @@
+ #include <net/udp.h>
+ #include <net/checksum.h>
+ #include <net/ip6_checksum.h>
++#ifdef HAVE_UDP_TUNNEL_GET_RX_INFO
+ #include <net/udp_tunnel.h>
++#endif
++
+ #ifdef CONFIG_NET_RX_BUSY_POLL
+ #include <net/busy_poll.h>
+ #endif
+@@ -875,7 +878,11 @@ static inline struct sk_buff *bnxt_copy_skb(struct bnxt_napi *bnapi, u8 *data,
+ 	struct pci_dev *pdev = bp->pdev;
+ 	struct sk_buff *skb;
+ 
++#ifdef HAVE_NAPI_ALLOC_SKB
+ 	skb = napi_alloc_skb(&bnapi->napi, len);
++#else
++	skb = netdev_alloc_skb_ip_align(bnapi->napi.dev, len);
++#endif
+ 	if (!skb)
+ 		return NULL;
+ 
+@@ -1062,6 +1069,7 @@ static struct sk_buff *bnxt_gro_func_5731x(struct bnxt_tpa_info *tpa_info,
+ 		th = tcp_hdr(skb);
+ 		th->check = ~tcp_v4_check(len, iph->saddr, iph->daddr, 0);
+ 	}
++#ifdef HAVE_UDP_TUNNEL_GET_RX_INFO
+ 
+ 	if (inner_mac_off) { /* tunnel */
+ 		struct udphdr *uh = NULL;
+@@ -1088,9 +1096,13 @@ static struct sk_buff *bnxt_gro_func_5731x(struct bnxt_tpa_info *tpa_info,
+ 		}
+ 	}
+ #endif
++
++#endif
+ 	return skb;
+ }
+ 
++
++
+ #define BNXT_IPV4_HDR_SIZE	(sizeof(struct iphdr) + sizeof(struct tcphdr))
+ #define BNXT_IPV6_HDR_SIZE	(sizeof(struct ipv6hdr) + sizeof(struct tcphdr))
+ 
+@@ -1133,6 +1145,8 @@ static struct sk_buff *bnxt_gro_func_5730x(struct bnxt_tpa_info *tpa_info,
+ 	}
+ 	tcp_gro_complete(skb);
+ 
++#ifdef HAVE_UDP_TUNNEL_GET_RX_INFO
++
+ 	if (nw_off) { /* tunnel */
+ 		struct udphdr *uh = NULL;
+ 
+@@ -1156,6 +1170,8 @@ static struct sk_buff *bnxt_gro_func_5730x(struct bnxt_tpa_info *tpa_info,
+ 		}
+ 	}
+ #endif
++
++#endif
+ 	return skb;
+ }
+ 
+@@ -1290,8 +1306,10 @@ static inline struct sk_buff *bnxt_tpa_end(struct bnxt *bp,
+ 	skb_checksum_none_assert(skb);
+ 	if (likely(tpa_info->flags2 & RX_TPA_START_CMP_FLAGS2_L4_CS_CALC)) {
+ 		skb->ip_summed = CHECKSUM_UNNECESSARY;
++#ifdef HAVE_SK_BUFF_CSUM_LEVEL
+ 		skb->csum_level =
+ 			(tpa_info->flags2 & RX_CMP_FLAGS2_T_L4_CS_CALC) >> 3;
++#endif
+ 	}
+ 
+ 	if (TPA_END_GRO(tpa_end))
+@@ -1451,7 +1469,9 @@ static int bnxt_rx_pkt(struct bnxt *bp, struct bnxt_napi *bnapi, u32 *raw_cons,
+ 	if (RX_CMP_L4_CS_OK(rxcmp1)) {
+ 		if (dev->features & NETIF_F_RXCSUM) {
+ 			skb->ip_summed = CHECKSUM_UNNECESSARY;
++#ifdef HAVE_SK_BUFF_CSUM_LEVEL
+ 			skb->csum_level = RX_CMP_ENCAP(rxcmp1);
++#endif
+ 		}
+ 	} else {
+ 		if (rxcmp1->rx_cmp_cfa_code_errors_v2 & RX_CMP_L4_CS_ERR_BITS) {
+@@ -4263,7 +4283,9 @@ static int bnxt_hwrm_func_qcaps(struct bnxt *bp)
+ 
+ 		pf->fw_fid = le16_to_cpu(resp->fid);
+ 		pf->port_id = le16_to_cpu(resp->port_id);
++#ifdef HAVE_NET_DEVICE_DEV_PORT
+ 		bp->dev->dev_port = pf->port_id;
++#endif
+ 		memcpy(pf->mac_addr, resp->mac_address, ETH_ALEN);
+ 		memcpy(bp->dev->dev_addr, pf->mac_addr, ETH_ALEN);
+ 		pf->max_rsscos_ctxs = le16_to_cpu(resp->max_rsscos_ctx);
+@@ -4970,7 +4992,17 @@ static int bnxt_init_msix(struct bnxt *bp)
+ 	if (!(bp->flags & BNXT_FLAG_SHARED_RINGS))
+ 		min = 2;
+ 
++#ifdef HAVE_PCI_ENABLE_MSIX_RANGE
+ 	total_vecs = pci_enable_msix_range(bp->pdev, msix_ent, min, total_vecs);
++#else
++
++	while (total_vecs >= min) {
++		rc = pci_enable_msix(bp->pdev, msix_ent, total_vecs);
++		if (!rc)
++			break;
++		total_vecs = rc;
++	}
++#endif
+ 	if (total_vecs < 0) {
+ 		rc = -ENODEV;
+ 		goto msix_setup_exit;
+@@ -6694,8 +6726,11 @@ static int bnxt_rx_flow_steer(struct net_device *dev, const struct sk_buff *skb,
+ 
+ 	memcpy(new_fltr->dst_mac_addr, eth->h_dest, ETH_ALEN);
+ 	memcpy(new_fltr->src_mac_addr, eth->h_source, ETH_ALEN);
+-
++#ifdef HAVE_SKB_GET_HASH_RAW
+ 	idx = skb_get_hash_raw(skb) & BNXT_NTP_FLTR_HASH_MASK;
++#else
++	idx = 0;
++#endif
+ 	head = &bp->ntp_fltr_hash_tbl[idx];
+ 	rcu_read_lock();
+ 	hlist_for_each_entry_rcu(fltr, head, hash) {
+@@ -7130,7 +7165,11 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	struct bnxt *bp;
+ 	int rc, max_irqs;
+ 
+-	if (pdev->device == 0x16cd && pci_is_bridge(pdev))
++	if (pdev->device == 0x16cd
++#ifdef HAVE_PCI_IS_BRIDGE
++	&& pci_is_bridge(pdev)
++#endif
++)
+ 		return -ENODEV;
+ 
+ 	if (version_printed++ == 0)
+@@ -7176,7 +7215,11 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ #if 0
+ 			   NETIF_F_GSO_IPXIP4 |
+ #endif
+-			   NETIF_F_GSO_UDP_TUNNEL_CSUM | NETIF_F_GSO_GRE_CSUM
++			   NETIF_F_GSO_UDP_TUNNEL_CSUM
++#if 0 //TODO
++| NETIF_F_GSO_GRE_CSUM
++#endif
++
+ #ifdef HAVE_NET_DEVICE_GSO_PARTIAL_FEATURES
+ 			   | NETIF_F_GSO_PARTIAL
+ #endif
+@@ -7190,8 +7233,9 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 			NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM | NETIF_F_SG |
+ 			NETIF_F_TSO | NETIF_F_TSO6 |
+ 			NETIF_F_GSO_UDP_TUNNEL | NETIF_F_GSO_GRE |
+-			NETIF_F_GSO_UDP_TUNNEL_CSUM | NETIF_F_GSO_GRE_CSUM
+-#if 0
++			NETIF_F_GSO_UDP_TUNNEL_CSUM
++#if 0 //TODO
++			| NETIF_F_GSO_GRE_CSUM
+ 			| NETIF_F_GSO_IPXIP4 
+ #endif
+ #ifdef HAVE_NET_DEVICE_GSO_PARTIAL_FEATURES
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+index 198caa5..df15a20 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+@@ -525,7 +525,7 @@ static int bnxt_grxclsrule(struct bnxt *bp, struct ethtool_rxnfc *cmd)
+ fltr_found:
+ 	fkeys = &fltr->fkeys;
+ 
+-#ifdef NEW_FLOW_KEYS
++#ifdef HAVE_SKB_FLOW_DISSECT_FLOW_KEYS
+         if (fkeys->basic.n_proto == htons(ETH_P_IP)) {
+                 if (fkeys->basic.ip_proto == IPPROTO_TCP)
+                         fs->flow_type = TCP_V4_FLOW;
+@@ -770,11 +770,14 @@ static int bnxt_set_rxnfc(struct net_device *dev, struct ethtool_rxnfc *cmd)
+ 	return rc;
+ }
+ 
++#if defined(HAVE_RXFH_INDIR_SIZE) && !defined(HAVE_RXFH_INDIR_SIZE_EXT)
+ static u32 bnxt_get_rxfh_indir_size(struct net_device *dev)
+ {
+ 	return HW_HASH_INDEX_SIZE;
+ }
++#endif
+ 
++#if defined(HAVE_GET_SET_RXFH) && !defined(HAVE_GET_SET_RXFH_INDIR_EXT)
+ static u32 bnxt_get_rxfh_key_size(struct net_device *dev)
+ {
+ 	return HW_HASH_KEY_SIZE;
+@@ -787,8 +790,10 @@ static int bnxt_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
+ 	struct bnxt_vnic_info *vnic = &bp->vnic_info[0];
+ 	int i = 0;
+ 
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
+ 	if (hfunc)
+ 		*hfunc = ETH_RSS_HASH_TOP;
++#endif
+ 
+ 	if (indir)
+ 		for (i = 0; i < HW_HASH_INDEX_SIZE; i++)
+@@ -800,6 +805,8 @@ static int bnxt_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
+ 	return 0;
+ }
+ 
++#endif
++
+ static void bnxt_get_drvinfo(struct net_device *dev,
+ 			     struct ethtool_drvinfo *info)
+ {
+@@ -2277,9 +2284,13 @@ const struct ethtool_ops bnxt_ethtool_ops = {
+ 	.set_channels		= bnxt_set_channels,
+ 	.get_rxnfc		= bnxt_get_rxnfc,
+ 	.set_rxnfc		= bnxt_set_rxnfc,
++#if defined(HAVE_RXFH_INDIR_SIZE) && !defined(HAVE_RXFH_INDIR_SIZE_EXT)
+ 	.get_rxfh_indir_size    = bnxt_get_rxfh_indir_size,
++#endif
++#if defined(HAVE_GET_SET_RXFH) && !defined(HAVE_GET_SET_RXFH_INDIR_EXT)
+ 	.get_rxfh_key_size      = bnxt_get_rxfh_key_size,
+ 	.get_rxfh               = bnxt_get_rxfh,
++#endif
+ 	.flash_device		= bnxt_flash_device,
+ 	.get_eeprom_len         = bnxt_get_eeprom_len,
+ 	.get_eeprom             = bnxt_get_eeprom,
+-- 
+1.8.3.1
+
