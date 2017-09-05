@@ -1,0 +1,36 @@
+From 7dca8017cf003bc87e40020aa9324792c9437be8 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Thu, 24 Aug 2017 15:17:22 +0530
+Subject: [PATCH 8/9] bnxt_re: Fix memory leak in FRMR path
+
+This patch fixes a memory leak issue when alloc_mr is used.
+mr->pages and mr->npages are used only in alloc_mr path. mr->pages
+is allocated when alloc_mr is called or in the case of FRMR, while
+creating the MR. mr->npages is updated only when the MR created
+is used i.e. after invoking map_mr_sg verb, before data transfer.
+In the dereg_mr path, if mr->npages is 0, driver ends up not freeing
+the memory created.
+Removing the npages check from the dereg_mr path for kernel consumers.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+Signed-off-by: Somnath Kotur <somnath.kotur@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/ib_verbs.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/ib_verbs.c b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+index 101b6ec..5697df2 100644
+--- a/drivers/infiniband/hw/bnxt_re/ib_verbs.c
++++ b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+@@ -3134,7 +3134,7 @@ int bnxt_re_dereg_mr(struct ib_mr *ib_mr)
+ 		return rc;
+ 	}
+ 
+-	if (mr->npages && mr->pages) {
++	if (mr->pages) {
+ 		rc = bnxt_qplib_free_fast_reg_page_list(&rdev->qplib_res,
+ 							&mr->qplib_frpl);
+ 		kfree(mr->pages);
+-- 
+1.8.3.1
+

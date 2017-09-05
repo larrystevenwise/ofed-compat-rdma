@@ -1,0 +1,30 @@
+From fc14e62c1c9264ad8031d48be47c4dcbdacde50b Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@broadcom.com>
+Date: Thu, 24 Aug 2017 15:13:01 +0530
+Subject: [PATCH 5/9] bnxt_re: Fix compare and swap atomic operands
+
+Driver must assign the user supplied compare/swap values in
+the wqe to successfully complete the atomic compare and
+swap operation.
+
+Signed-off-by: Devesh Sharma <devesh.sharma@broadcom.com>
+Signed-off-by: Somnath Kotur <somnath.kotur@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/ib_verbs.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/ib_verbs.c b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+index 27235f2..101b6ec 100644
+--- a/drivers/infiniband/hw/bnxt_re/ib_verbs.c
++++ b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+@@ -1979,6 +1979,7 @@ static int bnxt_re_build_atomic_wqe(struct ib_send_wr *wr,
+ 	switch (wr->opcode) {
+ 	case IB_WR_ATOMIC_CMP_AND_SWP:
+ 		wqe->type = BNXT_QPLIB_SWQE_TYPE_ATOMIC_CMP_AND_SWP;
++		wqe->atomic.cmp_data = atomic_wr(wr)->compare_add;
+ 		wqe->atomic.swap_data = atomic_wr(wr)->swap;
+ 		break;
+ 	case IB_WR_ATOMIC_FETCH_AND_ADD:
+-- 
+1.8.3.1
+

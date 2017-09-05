@@ -1,0 +1,39 @@
+From f957acb58c6baac68afd181810ac69f94a1216d7 Mon Sep 17 00:00:00 2001
+From: Devesh Sharma <devesh.sharma@broadcom.com>
+Date: Thu, 24 Aug 2017 14:21:55 +0530
+Subject: [PATCH 3/9] bnxt_re: Fix update of qplib_qp.mtu when modified
+
+The MTU value in the qplib_qp.mtu should be
+consistent with whatever mtu was set during
+INIT to RTR.The Next PSN and number of packets
+are calculated based on this member in the qplib_qp structure.
+
+Signed-off-by: Narender Reddy <narender.reddy@broadcom.com>
+Signed-off-by: Devesh Sharma <devesh.sharma@broadcom.com>
+Signed-off-by: Somnath Kotur <somnath.kotur@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/ib_verbs.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/ib_verbs.c b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+index 97c3343..27235f2 100644
+--- a/drivers/infiniband/hw/bnxt_re/ib_verbs.c
++++ b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+@@ -1504,11 +1504,14 @@ int bnxt_re_modify_qp(struct ib_qp *ib_qp, struct ib_qp_attr *qp_attr,
+ 		qp->qplib_qp.modify_flags |=
+ 				CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU;
+ 		qp->qplib_qp.path_mtu = __from_ib_mtu(qp_attr->path_mtu);
++		qp->qplib_qp.mtu = ib_mtu_enum_to_int(qp_attr->path_mtu);
+ 	} else if (qp_attr->qp_state == IB_QPS_RTR) {
+ 		qp->qplib_qp.modify_flags |=
+ 			CMDQ_MODIFY_QP_MODIFY_MASK_PATH_MTU;
+ 		qp->qplib_qp.path_mtu =
+ 			__from_ib_mtu(iboe_get_mtu(rdev->netdev->mtu));
++		qp->qplib_qp.mtu =
++			ib_mtu_enum_to_int(iboe_get_mtu(rdev->netdev->mtu));
+ 	}
+ 
+ 	if (qp_attr_mask & IB_QP_TIMEOUT) {
+-- 
+1.8.3.1
+
