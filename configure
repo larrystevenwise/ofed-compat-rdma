@@ -721,7 +721,7 @@ main()
                         ;;
 			--with-bnxt_re-mod)
                             CONFIG_INFINIBAND_BNXT_RE="m"
-                            CONFIG_BNXT="y"
+                            CONFIG_BNXT="m"
                             add_conf "# Load BNXT_RE modules" "BNXT_RE_LOAD=yes"
                         ;;
                         --without-bnxt_re-mod)
