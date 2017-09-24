@@ -1,0 +1,45 @@
+From 90c694bb71819fb5bd3501ac397307d7e41ddeca Mon Sep 17 00:00:00 2001
+From: Michael Chan <michael.chan@broadcom.com>
+Date: Wed, 25 Jan 2017 02:55:09 -0500
+Subject: [PATCH 3/3] bnxt_en: Fix RTNL lock usage on
+ bnxt_get_port_module_status().
+
+bnxt_get_port_module_status() calls bnxt_update_link() which expects
+RTNL to be held.  In bnxt_sp_task() that does not hold RTNL, we need to
+call it with a prior call to bnxt_rtnl_lock_sp() and the call needs to
+be moved to the end of bnxt_sp_task().
+
+Signed-off-by: Michael Chan <michael.chan@broadcom.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index 69b0fce..4fcc6a8 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -6259,9 +6259,6 @@ static void bnxt_sp_task(struct work_struct *work)
+ 		bnxt_hwrm_tunnel_dst_port_free(
+ 			bp, TUNNEL_DST_PORT_FREE_REQ_TUNNEL_TYPE_GENEVE);
+ 	}
+-	if (test_and_clear_bit(BNXT_HWRM_PORT_MODULE_SP_EVENT, &bp->sp_event))
+-		bnxt_get_port_module_status(bp);
+-
+ 	if (test_and_clear_bit(BNXT_PERIODIC_STATS_SP_EVENT, &bp->sp_event))
+ 		bnxt_hwrm_port_qstats(bp);
+ 
+@@ -6283,6 +6280,12 @@ static void bnxt_sp_task(struct work_struct *work)
+ 			netdev_err(bp->dev, "SP task can't update link (rc: %x)\n",
+ 				   rc);
+ 	}
++	if (test_and_clear_bit(BNXT_HWRM_PORT_MODULE_SP_EVENT, &bp->sp_event)) {
++		bnxt_rtnl_lock_sp(bp);
++		if (test_bit(BNXT_STATE_OPEN, &bp->state))
++			bnxt_get_port_module_status(bp);
++		bnxt_rtnl_unlock_sp(bp);
++	}
+ 	if (test_and_clear_bit(BNXT_RESET_TASK_SP_EVENT, &bp->sp_event))
+ 		bnxt_reset(bp, false);
+ 
+-- 
+2.5.5
+
