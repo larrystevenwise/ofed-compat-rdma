@@ -1,0 +1,51 @@
+From be8822db62ddda6d316d2dd682679732ed2f0abf Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Fri, 23 Jun 2017 16:03:55 -0500
+Subject: [PATCH 12647/13040] i40iw: Fix order of cleanup in close
+
+The order for calling i40iw_destroy_pble_pool is incorrect.
+Also, add PBLE_CHUNK_MEM init state to track pble pool
+creation and destruction.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_main.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_main.c b/drivers/infiniband/hw/i40iw/i40iw_main.c
+index e0f47cc..8fc61b3 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_main.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_main.c
+@@ -1474,6 +1474,9 @@ static void i40iw_deinit_device(struct i40iw_device *iwdev, bool reset)
+ 			unregister_inet6addr_notifier(&i40iw_inetaddr6_notifier);
+ 		}
+ 		/* fallthrough */
++	case PBLE_CHUNK_MEM:
++		i40iw_destroy_pble_pool(dev, iwdev->pble_rsrc);
++		/* fallthrough */
+ 	case CEQ_CREATED:
+ 		i40iw_dele_ceqs(iwdev, reset);
+ 		/* fallthrough */
+@@ -1489,9 +1492,6 @@ static void i40iw_deinit_device(struct i40iw_device *iwdev, bool reset)
+ 	case CCQ_CREATED:
+ 		i40iw_destroy_ccq(iwdev, reset);
+ 		/* fallthrough */
+-	case PBLE_CHUNK_MEM:
+-		i40iw_destroy_pble_pool(dev, iwdev->pble_rsrc);
+-		/* fallthrough */
+ 	case HMC_OBJS_CREATED:
+ 		i40iw_del_hmc_objects(dev, dev->hmc_info, true, reset);
+ 		/* fallthrough */
+@@ -1670,6 +1670,7 @@ static int i40iw_open(struct i40e_info *ldev, struct i40e_client *client)
+ 		status = i40iw_hmc_init_pble(&iwdev->sc_dev, iwdev->pble_rsrc);
+ 		if (status)
+ 			break;
++		iwdev->init_state = PBLE_CHUNK_MEM;
+ 		iwdev->virtchnl_wq = alloc_ordered_workqueue("iwvch", WQ_MEM_RECLAIM);
+ 		i40iw_register_notifiers();
+ 		iwdev->init_state = INET_NOTIFIER;
+-- 
+2.1.3
+

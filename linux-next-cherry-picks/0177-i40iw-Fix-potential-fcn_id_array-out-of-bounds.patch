@@ -1,0 +1,31 @@
+From aa939c12ab8a0c094420ad1b909a957ac590e43e Mon Sep 17 00:00:00 2001
+From: Christopher N Bednarz <christopher.n.bednarz@intel.com>
+Date: Tue, 8 Aug 2017 20:38:48 -0500
+Subject: [PATCH 12864/13040] i40iw: Fix potential fcn_id_array out of bounds
+
+Avoid out of bounds error by utilizing I40IW_MAX_STATS_COUNT
+instead of I40IW_INVALID_FCN_ID.
+
+Signed-off-by: Christopher N Bednarz <christoper.n.bednarz@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_ctrl.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+index ef4a73c..a49ff2e 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+@@ -4881,7 +4881,7 @@ void i40iw_vsi_stats_free(struct i40iw_sc_vsi *vsi)
+ {
+ 	u8 fcn_id = vsi->fcn_id;
+ 
+-	if ((vsi->stats_fcn_id_alloc) && (fcn_id != I40IW_INVALID_FCN_ID))
++	if (vsi->stats_fcn_id_alloc && fcn_id < I40IW_MAX_STATS_COUNT)
+ 		vsi->dev->fcn_id_array[fcn_id] = false;
+ 	i40iw_hw_stats_stop_timer(vsi);
+ }
+-- 
+2.1.3
+

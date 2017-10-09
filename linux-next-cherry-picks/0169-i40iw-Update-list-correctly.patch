@@ -1,0 +1,33 @@
+From c709d7f229a273c7c5664e9dfe5432b031842d0c Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Fri, 23 Jun 2017 16:04:01 -0500
+Subject: [PATCH 12653/13040] i40iw: Update list correctly
+
+To avoid infinite loop, in i40iw_ieq_handle_exception, update
+plist inside while loop.
+
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_puda.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_puda.c b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+index 1bb1681..71050c5 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_puda.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+@@ -1414,10 +1414,10 @@ static void i40iw_ieq_handle_exception(struct i40iw_puda_rsrc *ieq,
+ 
+ 	if (!list_empty(rxlist)) {
+ 		tmpbuf = (struct i40iw_puda_buf *)rxlist->next;
+-		plist = &tmpbuf->list;
+ 		while ((struct list_head *)tmpbuf != rxlist) {
+ 			if ((int)(buf->seqnum - tmpbuf->seqnum) < 0)
+ 				break;
++			plist = &tmpbuf->list;
+ 			tmpbuf = (struct i40iw_puda_buf *)plist->next;
+ 		}
+ 		/* Insert buf before tmpbuf */
+-- 
+2.1.3
+

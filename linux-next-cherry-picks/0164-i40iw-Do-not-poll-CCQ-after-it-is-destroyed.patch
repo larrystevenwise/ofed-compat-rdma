@@ -1,0 +1,32 @@
+From 415920aa174666c0ac8c47eee974acc9f49efec4 Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Fri, 23 Jun 2017 16:03:56 -0500
+Subject: [PATCH 12648/13040] i40iw: Do not poll CCQ after it is destroyed
+
+Control Queue Pair (CQP) OPs, in this case - Update SDs,
+cannot poll the Control Completion Queue (CCQ) after CCQ is
+destroyed. Instead, poll via registers.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_ctrl.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+index a027e20..9ec1ae9 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_ctrl.c
+@@ -1970,6 +1970,8 @@ static enum i40iw_status_code i40iw_sc_ccq_destroy(struct i40iw_sc_cq *ccq,
+ 		ret_code = i40iw_cqp_poll_registers(cqp, tail, 1000);
+ 	}
+ 
++	cqp->process_cqp_sds = i40iw_update_sds_noccq;
++
+ 	return ret_code;
+ }
+ 
+-- 
+2.1.3
+

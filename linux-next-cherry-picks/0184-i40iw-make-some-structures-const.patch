@@ -1,0 +1,47 @@
+From cfeca08faf452acaf807576859275968cdb7e7a2 Mon Sep 17 00:00:00 2001
+From: Bhumika Goyal <bhumirks@gmail.com>
+Date: Mon, 28 Aug 2017 21:51:23 +0530
+Subject: [PATCH 12991/13040] i40iw: make some structures const
+
+Make some structures const as they are only used during a copy
+operation.
+
+Signed-off-by: Bhumika Goyal <bhumirks@gmail.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_uk.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+index 1060725..0aadb7a 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_uk.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+@@ -912,7 +912,7 @@ enum i40iw_status_code i40iw_get_wqe_shift(u32 wqdepth, u32 sge, u32 inline_data
+ 	return 0;
+ }
+ 
+-static struct i40iw_qp_uk_ops iw_qp_uk_ops = {
++static const struct i40iw_qp_uk_ops iw_qp_uk_ops = {
+ 	.iw_qp_post_wr = i40iw_qp_post_wr,
+ 	.iw_qp_ring_push_db = i40iw_qp_ring_push_db,
+ 	.iw_rdma_write = i40iw_rdma_write,
+@@ -926,14 +926,14 @@ static struct i40iw_qp_uk_ops iw_qp_uk_ops = {
+ 	.iw_post_nop = i40iw_nop
+ };
+ 
+-static struct i40iw_cq_ops iw_cq_ops = {
++static const struct i40iw_cq_ops iw_cq_ops = {
+ 	.iw_cq_request_notification = i40iw_cq_request_notification,
+ 	.iw_cq_poll_completion = i40iw_cq_poll_completion,
+ 	.iw_cq_post_entries = i40iw_cq_post_entries,
+ 	.iw_cq_clean = i40iw_clean_cq
+ };
+ 
+-static struct i40iw_device_uk_ops iw_device_uk_ops = {
++static const struct i40iw_device_uk_ops iw_device_uk_ops = {
+ 	.iwarp_cq_uk_init = i40iw_cq_uk_init,
+ 	.iwarp_qp_uk_init = i40iw_qp_uk_init,
+ };
+-- 
+2.1.3
+

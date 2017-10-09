@@ -1,0 +1,31 @@
+From c5c9d27e6c79ab3ab36092fe67fb7f2c6a120171 Mon Sep 17 00:00:00 2001
+From: Henry Orosco <henry.orosco@intel.com>
+Date: Fri, 23 Jun 2017 16:04:00 -0500
+Subject: [PATCH 12652/13040] i40iw: Add missing memory barrier
+
+Add missing write memory barrier before writing the
+header containing valid bit to the WQE in i40iw_puda_send.
+
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_puda.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_puda.c b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+index db41ab4..1bb1681 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_puda.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+@@ -408,6 +408,9 @@ enum i40iw_status_code i40iw_puda_send(struct i40iw_sc_qp *qp,
+ 	set_64bit_val(wqe, 0, info->paddr);
+ 	set_64bit_val(wqe, 8, LS_64(info->len, I40IWQPSQ_FRAG_LEN));
+ 	set_64bit_val(wqe, 16, header[0]);
++
++	/* Ensure all data is written before writing valid bit */
++	wmb();
+ 	set_64bit_val(wqe, 24, header[1]);
+ 
+ 	i40iw_debug_buf(qp->dev, I40IW_DEBUG_PUDA, "PUDA SEND WQE", wqe, 32);
+-- 
+2.1.3
+

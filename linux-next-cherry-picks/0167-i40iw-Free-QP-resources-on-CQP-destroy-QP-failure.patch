@@ -1,0 +1,39 @@
+From b5e452a04a10f12763f9836d3d3999f3bb1e56fb Mon Sep 17 00:00:00 2001
+From: Shiraz Saleem <shiraz.saleem@intel.com>
+Date: Fri, 23 Jun 2017 16:03:59 -0500
+Subject: [PATCH 12651/13040] i40iw: Free QP resources on CQP destroy QP
+ failure
+
+Current flow leaves software QP structures in memory if
+Control Queue Pair (CQP) destroy QP OP fails. To fix this,
+free QP resources on fail of CQP destroy QP OP.
+
+Signed-off-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_utils.c | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_utils.c b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+index 56d9869..ded8e48 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_utils.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_utils.c
+@@ -546,8 +546,12 @@ void i40iw_rem_ref(struct ib_qp *ibqp)
+ 	cqp_info->in.u.qp_destroy.scratch = (uintptr_t)cqp_request;
+ 	cqp_info->in.u.qp_destroy.remove_hash_idx = true;
+ 	status = i40iw_handle_cqp_op(iwdev, cqp_request);
+-	if (status)
+-		i40iw_pr_err("CQP-OP Destroy QP fail");
++	if (!status)
++		return;
++
++	i40iw_rem_pdusecount(iwqp->iwpd, iwdev);
++	i40iw_free_qp_resources(iwdev, iwqp, qp_num);
++	i40iw_rem_devusecount(iwdev);
+ }
+ 
+ /**
+-- 
+2.1.3
+

@@ -1,0 +1,31 @@
+From 29c2415a6669bab354f0aa3445777fe147c7a05d Mon Sep 17 00:00:00 2001
+From: Mustafa Ismail <mustafa.ismail@intel.com>
+Date: Tue, 8 Aug 2017 20:38:46 -0500
+Subject: [PATCH 12862/13040] i40iw: Fix typecast of tcp_seq_num
+
+The typecast of tcp_seq_num incorrectly uses u8. Fix by
+casting to u32.
+
+Signed-off-by: Mustafa Ismail <mustafa.ismail@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_uk.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_uk.c b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+index 70a6b41..1060725 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_uk.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_uk.c
+@@ -784,7 +784,7 @@ static enum i40iw_status_code i40iw_cq_poll_completion(struct i40iw_cq_uk *cq,
+ 	get_64bit_val(cqe, 0, &qword0);
+ 	get_64bit_val(cqe, 16, &qword2);
+ 
+-	info->tcp_seq_num = (u8)RS_64(qword0, I40IWCQ_TCPSEQNUM);
++	info->tcp_seq_num = (u32)RS_64(qword0, I40IWCQ_TCPSEQNUM);
+ 
+ 	info->qp_id = (u32)RS_64(qword2, I40IWCQ_QPID);
+ 
+-- 
+2.1.3
+

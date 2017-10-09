@@ -1,0 +1,31 @@
+From a28f047e5f9b987d614eeee34388087ffdda3e53 Mon Sep 17 00:00:00 2001
+From: Christopher N Bednarz <christopher.n.bednarz@intel.com>
+Date: Tue, 8 Aug 2017 20:38:47 -0500
+Subject: [PATCH 12863/13040] i40iw: Use correct alignment for CQ0 memory
+
+Utilize correct alignment variable when allocating
+DMA memory for CQ0.
+
+Signed-off-by: Christopher N Bednarz <christopher.n.bednarz@intel.com>
+Signed-off-by: Henry Orosco <henry.orosco@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_puda.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_puda.c b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+index 71050c5..7f5583d 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_puda.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_puda.c
+@@ -685,7 +685,7 @@ static enum i40iw_status_code i40iw_puda_cq_create(struct i40iw_puda_rsrc *rsrc)
+ 	cqsize = rsrc->cq_size * (sizeof(struct i40iw_cqe));
+ 	tsize = cqsize + sizeof(struct i40iw_cq_shadow_area);
+ 	ret = i40iw_allocate_dma_mem(dev->hw, &rsrc->cqmem, tsize,
+-				     I40IW_CQ0_ALIGNMENT_MASK);
++				     I40IW_CQ0_ALIGNMENT);
+ 	if (ret)
+ 		return ret;
+ 
+-- 
+2.1.3
+

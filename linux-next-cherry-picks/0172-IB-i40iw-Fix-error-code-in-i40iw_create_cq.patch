@@ -1,0 +1,36 @@
+From 6031e079aa4656743298ea235b894ee883f45c71 Mon Sep 17 00:00:00 2001
+From: Dan Carpenter <dan.carpenter@oracle.com>
+Date: Thu, 13 Jul 2017 10:47:22 +0300
+Subject: [PATCH 12658/13040] IB/i40iw: Fix error code in i40iw_create_cq()
+
+We accidentally forgot to set the error code if ib_copy_from_udata()
+fails.  It means we return ERR_PTR(0) which is NULL and results in a
+NULL dereference in the callers.
+
+Fixes: d37498417947 ("i40iw: add files for iwarp interface")
+Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+Acked-by: Shiraz Saleem <shiraz.saleem@intel.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+---
+ drivers/infiniband/hw/i40iw/i40iw_verbs.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/infiniband/hw/i40iw/i40iw_verbs.c b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+index 4aa0264c..02d871d 100644
+--- a/drivers/infiniband/hw/i40iw/i40iw_verbs.c
++++ b/drivers/infiniband/hw/i40iw/i40iw_verbs.c
+@@ -1168,8 +1168,10 @@ static struct ib_cq *i40iw_create_cq(struct ib_device *ibdev,
+ 		memset(&req, 0, sizeof(req));
+ 		iwcq->user_mode = true;
+ 		ucontext = to_ucontext(context);
+-		if (ib_copy_from_udata(&req, udata, sizeof(struct i40iw_create_cq_req)))
++		if (ib_copy_from_udata(&req, udata, sizeof(struct i40iw_create_cq_req))) {
++			err_code = -EFAULT;
+ 			goto cq_free_resources;
++		}
+ 
+ 		spin_lock_irqsave(&ucontext->cq_reg_mem_list_lock, flags);
+ 		iwpbl = i40iw_get_pbl((unsigned long)req.user_cq_buffer,
+-- 
+2.1.3
+
