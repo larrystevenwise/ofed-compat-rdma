@@ -1,0 +1,82 @@
+From 9799051c7e1ef9c7da8218b1c91b1f7291645002 Mon Sep 17 00:00:00 2001
+From: Michael Chan <michael.chan@broadcom.com>
+Date: Mon, 29 May 2017 19:06:06 -0400
+Subject: [PATCH 7/8] bnxt_en: Add a callback to inform RDMA driver during PCI
+ shutdown.
+
+When bnxt_en gets a PCI shutdown call, we need to have a new callback
+to inform the RDMA driver to do proper shutdown and removal.
+
+Signed-off-by: Michael Chan <michael.chan@broadcom.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c     |  1 +
+ drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.c | 19 +++++++++++++++++++
+ drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.h |  2 ++
+ 3 files changed, 22 insertions(+)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index 0e8da47..562f101 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -6986,6 +6986,7 @@ static void bnxt_remove_one(struct pci_dev *pdev)
+ 	cancel_work_sync(&bp->sp_task);
+ 	bp->sp_event = 0;
+ 
++	bnxt_ulp_shutdown(bp);
+ 	bnxt_clear_int_mode(bp);
+ 	bnxt_hwrm_func_drv_unrgtr(bp);
+ 	bnxt_free_hwrm_resources(bp);
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.c
+index 8b7464b..77da75a 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.c
+@@ -266,6 +266,25 @@ void bnxt_ulp_sriov_cfg(struct bnxt *bp, int num_vfs)
+ 	}
+ }
+ 
++void bnxt_ulp_shutdown(struct bnxt *bp)
++{
++	struct bnxt_en_dev *edev = bp->edev;
++	struct bnxt_ulp_ops *ops;
++	int i;
++
++	if (!edev)
++		return;
++
++	for (i = 0; i < BNXT_MAX_ULP; i++) {
++		struct bnxt_ulp *ulp = &edev->ulp_tbl[i];
++
++		ops = rtnl_dereference(ulp->ulp_ops);
++		if (!ops || !ops->ulp_shutdown)
++			continue;
++		ops->ulp_shutdown(ulp->handle);
++	}
++}
++
+ void bnxt_ulp_async_events(struct bnxt *bp, struct hwrm_async_event_cmpl *cmpl)
+ {
+ 	u16 event_id = le16_to_cpu(cmpl->event_id);
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.h b/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.h
+index 74f816e..d247106 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.h
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ulp.h
+@@ -26,6 +26,7 @@ struct bnxt_ulp_ops {
+ 	void (*ulp_stop)(void *);
+ 	void (*ulp_start)(void *);
+ 	void (*ulp_sriov_config)(void *, int);
++	void (*ulp_shutdown)(void *);
+ };
+ 
+ struct bnxt_msix_entry {
+@@ -87,6 +88,7 @@ void bnxt_subtract_ulp_resources(struct bnxt *bp, int ulp_id);
+ void bnxt_ulp_stop(struct bnxt *bp);
+ void bnxt_ulp_start(struct bnxt *bp);
+ void bnxt_ulp_sriov_cfg(struct bnxt *bp, int num_vfs);
++void bnxt_ulp_shutdown(struct bnxt *bp);
+ void bnxt_ulp_async_events(struct bnxt *bp, struct hwrm_async_event_cmpl *cmpl);
+ struct bnxt_en_dev *bnxt_ulp_probe(struct net_device *dev);
+ 
+-- 
+1.8.3.1
+

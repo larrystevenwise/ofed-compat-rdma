@@ -1,0 +1,32 @@
+From 070ed54900d6c8977fb9cc3bc28907659e03d360 Mon Sep 17 00:00:00 2001
+From: Michael Chan <michael.chan@broadcom.com>
+Date: Fri, 21 Apr 2017 20:11:25 -0400
+Subject: [PATCH 4/8] bnxt_en: Check the FW_LLDP_AGENT flag before allowing
+ DCBX host agent.
+
+Check the additional flag in bnxt_hwrm_func_qcfg() before allowing
+DCBX to be done in host mode.
+
+Signed-off-by: Michael Chan <michael.chan@broadcom.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index 53570eb..0b456ea 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -4248,7 +4248,8 @@ static int bnxt_hwrm_func_qcfg(struct bnxt *bp)
+ 	}
+ #endif
+ 	if (BNXT_PF(bp) && (le16_to_cpu(resp->flags) &
+-			    FUNC_QCFG_RESP_FLAGS_FW_DCBX_AGENT_ENABLED))
++			    (FUNC_QCFG_RESP_FLAGS_FW_DCBX_AGENT_ENABLED |
++			     FUNC_QCFG_RESP_FLAGS_FW_LLDP_AGENT_ENABLED)))
+ 		bp->flags |= BNXT_FLAG_FW_LLDP_AGENT;
+ 
+ 	switch (resp->port_partition_type) {
+-- 
+1.8.3.1
+

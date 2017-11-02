@@ -1,0 +1,35 @@
+From 00a7975db7d4d6df674fc710e1b6d87fdd947acd Mon Sep 17 00:00:00 2001
+From: Michael Chan <michael.chan@broadcom.com>
+Date: Tue, 16 May 2017 16:39:44 -0400
+Subject: [PATCH 6/8] bnxt_en: Check status of firmware DCBX agent before
+ setting DCB_CAP_DCBX_HOST.
+
+Otherwise, all the host based DCBX settings from lldpad will fail if the
+firmware DCBX agent is running.
+
+Signed-off-by: Michael Chan <michael.chan@broadcom.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
+index 46de2f8..5c6dd0c 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_dcb.c
+@@ -553,8 +553,10 @@ static u8 bnxt_dcbnl_setdcbx(struct net_device *dev, u8 mode)
+ 	if ((mode & DCB_CAP_DCBX_VER_CEE) || !(mode & DCB_CAP_DCBX_VER_IEEE))
+ 		return 1;
+ 
+-	if ((mode & DCB_CAP_DCBX_HOST) && BNXT_VF(bp))
+-		return 1;
++	if (mode & DCB_CAP_DCBX_HOST) {
++		if (BNXT_VF(bp) || (bp->flags & BNXT_FLAG_FW_LLDP_AGENT))
++			return 1;
++	}
+ 
+ 	if (mode == bp->dcbx_cap)
+ 		return 0;
+-- 
+1.8.3.1
+
