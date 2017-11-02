@@ -1,0 +1,32 @@
+From 481faf277d8489f2cec5174977ce7d4fd8ee629e Mon Sep 17 00:00:00 2001
+From: Sriharsha Basavapatna <sriharsha.basavapatna@broadcom.com>
+Date: Mon, 30 Oct 2017 20:15:22 +0530
+Subject: [PATCH] bnxt_re: fix a crash in qp error event processing
+
+In bnxt_qplib_process_qp_event(), for qp error events we look up the
+qp-handle and pass it for further processing. But we don't check if the
+handle is NULL. This could lead to a crash in the called functions when
+that qp-handle is dereferenced, if the qp is destroyed in the meantime.
+Fix this by checking for a valid qp-handle in that function.
+
+Signed-off-by: Sriharsha Basavapatna <sriharsha.basavapatna@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/qplib_rcfw.c | 2 ++
+ 1 file changed, 2 insertions(+)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+index 2bdb1562bd21..b9b2f5a3c800 100644
+--- a/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
++++ b/drivers/infiniband/hw/bnxt_re/qplib_rcfw.c
+@@ -306,6 +306,8 @@ static int bnxt_qplib_process_qp_event(struct bnxt_qplib_rcfw *rcfw,
+ 			"QPLIB: qpid 0x%x, req_err=0x%x, resp_err=0x%x\n",
+ 			qp_id, err_event->req_err_state_reason,
+ 			err_event->res_err_state_reason);
++		if (!qp)
++			break;
+ 		bnxt_qplib_acquire_cq_locks(qp, &flags);
+ 		bnxt_qplib_mark_qp_error(qp);
+ 		bnxt_qplib_release_cq_locks(qp, &flags);
+-- 
+2.11.0.258.ge05806da9
+
