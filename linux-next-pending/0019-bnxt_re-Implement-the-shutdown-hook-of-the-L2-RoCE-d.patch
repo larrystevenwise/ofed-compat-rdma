@@ -1,0 +1,55 @@
+From 5455e73a76a397d77541bb5b0eedac137ef525b5 Mon Sep 17 00:00:00 2001
+From: Somnath Kotur <somnath.kotur@broadcom.com>
+Date: Wed, 25 Oct 2017 09:12:30 +0530
+Subject: [PATCH 1/5] bnxt_re: Implement the shutdown hook of the L2-RoCE
+ driver interface
+
+When host is shutting down, it invokes the shutdown hook of the
+L2 driver where it would attempt to free the MSI-X vectors, but would fail
+because some vectors are held by the RoCE driver.
+Implement the new hook in the L2 -> RoCE interface which will be invoked so that
+the RoCE driver can unregister the device and free up the MSI-X vectors it had
+claimed so that L2 can proceed with it's shutdown without failure.
+
+Signed-off-by: Somnath Kotur <somnath.kotur@broadcom.com>
+Signed-off-by: Doug Ledford <dledford@redhat.com>
+
+diff --git a/drivers/infiniband/hw/bnxt_re/main.c b/drivers/infiniband/hw/bnxt_re/main.c
+index 87f8a5d..aafc19a 100644
+--- a/drivers/infiniband/hw/bnxt_re/main.c
++++ b/drivers/infiniband/hw/bnxt_re/main.c
+@@ -78,6 +78,7 @@ static struct list_head bnxt_re_dev_list = LIST_HEAD_INIT(bnxt_re_dev_list);
+ /* Mutex to protect the list of bnxt_re devices added */
+ static DEFINE_MUTEX(bnxt_re_dev_lock);
+ static struct workqueue_struct *bnxt_re_wq;
++static void bnxt_re_ib_unreg(struct bnxt_re_dev *rdev, bool lock_wait);
+ 
+ /* for handling bnxt_en callbacks later */
+ static void bnxt_re_stop(void *p)
+@@ -92,11 +93,22 @@ static void bnxt_re_sriov_config(void *p, int num_vfs)
+ {
+ }
+ 
++static void bnxt_re_shutdown(void *p)
++{
++	struct bnxt_re_dev *rdev = p;
++
++	if (!rdev)
++		return;
++
++	bnxt_re_ib_unreg(rdev, false);
++}
++
+ static struct bnxt_ulp_ops bnxt_re_ulp_ops = {
+ 	.ulp_async_notifier = NULL,
+ 	.ulp_stop = bnxt_re_stop,
+ 	.ulp_start = bnxt_re_start,
+-	.ulp_sriov_config = bnxt_re_sriov_config
++	.ulp_sriov_config = bnxt_re_sriov_config,
++	.ulp_shutdown = bnxt_re_shutdown
+ };
+ 
+ /* RoCE -> Net driver */
+-- 
+2.5.5
+
