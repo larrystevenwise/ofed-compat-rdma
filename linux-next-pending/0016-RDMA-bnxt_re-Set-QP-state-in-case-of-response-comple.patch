@@ -1,0 +1,45 @@
+From 1faffd689e54c314a6b5d5bbe06804c6bf357fc0 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Fri, 3 Nov 2017 19:28:19 -0700
+Subject: [PATCH 2/4] RDMA/bnxt_re: Set QP state in case of response completion
+ errors
+
+Moves the driver QP state to error in case of response completion
+errors. Handles the scenarios which doesn't generate a terminal CQE.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/qplib_fp.c | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/qplib_fp.c b/drivers/infiniband/hw/bnxt_re/qplib_fp.c
+index 31ea9f4..805a612 100644
+--- a/drivers/infiniband/hw/bnxt_re/qplib_fp.c
++++ b/drivers/infiniband/hw/bnxt_re/qplib_fp.c
+@@ -2118,6 +2118,7 @@ static int bnxt_qplib_cq_process_res_rc(struct bnxt_qplib_cq *cq,
+ 	*pcqe = cqe;
+ 
+ 	if (hwcqe->status != CQ_RES_RC_STATUS_OK) {
++		qp->state = CMDQ_MODIFY_QP_NEW_STATE_ERR;
+ 		 /* Add qp to flush list of the CQ */
+ 		bnxt_qplib_lock_buddy_cq(qp, cq);
+ 		__bnxt_qplib_add_flush_qp(qp);
+@@ -2181,6 +2182,7 @@ static int bnxt_qplib_cq_process_res_ud(struct bnxt_qplib_cq *cq,
+ 	*pcqe = cqe;
+ 
+ 	if (hwcqe->status != CQ_RES_RC_STATUS_OK) {
++		qp->state = CMDQ_MODIFY_QP_NEW_STATE_ERR;
+ 		/* Add qp to flush list of the CQ */
+ 		bnxt_qplib_lock_buddy_cq(qp, cq);
+ 		__bnxt_qplib_add_flush_qp(qp);
+@@ -2268,6 +2270,7 @@ static int bnxt_qplib_cq_process_res_raweth_qp1(struct bnxt_qplib_cq *cq,
+ 	*pcqe = cqe;
+ 
+ 	if (hwcqe->status != CQ_RES_RC_STATUS_OK) {
++		qp->state = CMDQ_MODIFY_QP_NEW_STATE_ERR;
+ 		/* Add qp to flush list of the CQ */
+ 		bnxt_qplib_lock_buddy_cq(qp, cq);
+ 		__bnxt_qplib_add_flush_qp(qp);
+-- 
+2.5.5
+

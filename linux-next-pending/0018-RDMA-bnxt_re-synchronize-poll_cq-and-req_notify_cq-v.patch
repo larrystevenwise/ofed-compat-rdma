@@ -1,0 +1,52 @@
+From b53367bb0452d8f92cdb7dadc6ba192cff035c4b Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Sat, 4 Nov 2017 01:27:30 -0700
+Subject: [PATCH 4/4] RDMA/bnxt_re: synchronize poll_cq and req_notify_cq verbs
+
+Synchronize poll_cq and req_notify_cq verbs using cq_lock,
+instead of the lower level qplib->hwq.lock.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/infiniband/hw/bnxt_re/ib_verbs.c | 15 ++++++++++-----
+ 1 file changed, 10 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/infiniband/hw/bnxt_re/ib_verbs.c b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+index 96ec797..d5770aa 100644
+--- a/drivers/infiniband/hw/bnxt_re/ib_verbs.c
++++ b/drivers/infiniband/hw/bnxt_re/ib_verbs.c
+@@ -2999,8 +2999,10 @@ int bnxt_re_req_notify_cq(struct ib_cq *ib_cq,
+ 			  enum ib_cq_notify_flags ib_cqn_flags)
+ {
+ 	struct bnxt_re_cq *cq = container_of(ib_cq, struct bnxt_re_cq, ib_cq);
+-	int type = 0;
++	int type = 0, rc = 0;
++	unsigned long flags;
+ 
++	spin_lock_irqsave(&cq->cq_lock, flags);
+ 	/* Trigger on the very next completion */
+ 	if (ib_cqn_flags & IB_CQ_NEXT_COMP)
+ 		type = DBR_DBR_TYPE_CQ_ARMALL;
+@@ -3010,12 +3012,15 @@ int bnxt_re_req_notify_cq(struct ib_cq *ib_cq,
+ 
+ 	/* Poll to see if there are missed events */
+ 	if ((ib_cqn_flags & IB_CQ_REPORT_MISSED_EVENTS) &&
+-	    !(bnxt_qplib_is_cq_empty(&cq->qplib_cq)))
+-		return 1;
+-
++	    !(bnxt_qplib_is_cq_empty(&cq->qplib_cq))) {
++		rc = 1;
++		goto exit;
++	}
+ 	bnxt_qplib_req_notify_cq(&cq->qplib_cq, type);
+ 
+-	return 0;
++exit:
++	spin_unlock_irqrestore(&cq->cq_lock, flags);
++	return rc;
+ }
+ 
+ /* Memory Regions */
+-- 
+2.5.5
+
