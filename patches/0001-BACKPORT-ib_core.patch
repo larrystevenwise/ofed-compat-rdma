@@ -12,12 +12,13 @@ Signed-off-by: Vladimir Sokolovsky <vlad@mellanox.com>
  drivers/infiniband/core/netlink.c       |  3 +
  drivers/infiniband/core/roce_gid_mgmt.c | 27 +++++++++
  drivers/infiniband/core/sa_query.c      | 35 ++++++++++++
- drivers/infiniband/core/umem.c          | 17 +++++-
+ drivers/infiniband/core/umem.c          | 34 ++++++++++++
+ drivers/infiniband/core/umem_odp.c      | 23 ++++++++
  drivers/infiniband/core/user_mad.c      |  3 +
  drivers/infiniband/core/verbs.c         |  4 ++
  include/rdma/ib_addr.h                  | 23 ++++++++
  include/rdma/ib_verbs.h                 | 28 ++++++++++
- 14 files changed, 320 insertions(+), 14 deletions(-)
+ 15 files changed, 361 insertions(+), 13 deletions(-)
 
 diff --git a/drivers/infiniband/core/addr.c b/drivers/infiniband/core/addr.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -638,7 +639,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  #include <linux/slab.h>
  #include <rdma/ib_umem_odp.h>
  
-@@ -91,12 +94,20 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+@@ -91,12 +94,23 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
  	unsigned long npages;
  	int ret;
  	int i;
@@ -649,6 +650,9 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#endif
  	struct scatterlist *sg, *sg_list_start;
  	int need_release = 0;
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++	unsigned int gup_flags = FOLL_WRITE;
++#endif
  
  	if (dmasync)
 +#ifdef HAVE_STRUCT_DMA_ATTRS
@@ -659,16 +663,38 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	if (!size)
  		return ERR_PTR(-EINVAL);
-@@ -187,7 +198,7 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+@@ -183,14 +197,30 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
+ 	if (ret)
+ 		goto out;
+ 
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++	if (!umem->writable)
++		gup_flags |= FOLL_FORCE;
++#endif
++
+ 	need_release = 1;
  	sg_list_start = umem->sg_head.sgl;
  
  	while (npages) {
--		ret = get_user_pages(cur_base,
++#ifdef HAVE_GET_USER_PAGES_8_PARAMS
 +		ret = get_user_pages(current, current->mm, cur_base,
++				     min_t(unsigned long, npages,
++					   PAGE_SIZE / sizeof (struct page *)),
++				     1, !umem->writable, page_list, vma_list);
++#else
+ 		ret = get_user_pages(cur_base,
  				     min_t(unsigned long, npages,
  					   PAGE_SIZE / sizeof (struct page *)),
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++				     gup_flags, page_list, vma_list);
++#else
  				     1, !umem->writable, page_list, vma_list);
-@@ -214,7 +225,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
++#endif
++#endif
+ 
+ 		if (ret < 0)
+ 			goto out;
+@@ -214,7 +244,11 @@ struct ib_umem *ib_umem_get(struct ib_ucontext *context, unsigned long addr,
  				  umem->sg_head.sgl,
  				  umem->npages,
  				  DMA_BIDIRECTIONAL,
@@ -680,6 +706,58 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	if (umem->nmap <= 0) {
  		ret = -ENOMEM;
+diff --git a/drivers/infiniband/core/umem_odp.c b/drivers/infiniband/core/umem_odp.c
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/infiniband/core/umem_odp.c
++++ b/drivers/infiniband/core/umem_odp.c
+@@ -527,6 +527,9 @@ int ib_umem_odp_map_dma_pages(struct ib_umem *umem, u64 user_virt, u64 bcnt,
+ 	u64 off;
+ 	int j, k, ret = 0, start_idx, npages = 0;
+ 	u64 base_virt_addr;
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++	unsigned int flags = 0;
++#endif
+ 
+ 	if (access_mask == 0)
+ 		return -EINVAL;
+@@ -556,6 +559,11 @@ int ib_umem_odp_map_dma_pages(struct ib_umem *umem, u64 user_virt, u64 bcnt,
+ 		goto out_put_task;
+ 	}
+ 
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++	if (access_mask & ODP_WRITE_ALLOWED_BIT)
++		flags |= FOLL_WRITE;
++#endif
++
+ 	start_idx = (user_virt - ib_umem_start(umem)) >> PAGE_SHIFT;
+ 	k = start_idx;
+ 
+@@ -572,10 +580,25 @@ int ib_umem_odp_map_dma_pages(struct ib_umem *umem, u64 user_virt, u64 bcnt,
+ 		 * complex (and doesn't gain us much performance in most use
+ 		 * cases).
+ 		 */
++#if defined(HAVE_GET_USER_PAGES_REMOTE_8_PARAMS) || defined(HAVE_GET_USER_PAGES_REMOTE_7_PARAMS) || defined(HAVE_GET_USER_PAGES_REMOTE_8_PARAMS_W_LOCKED)
+ 		npages = get_user_pages_remote(owning_process, owning_mm,
+ 				user_virt, gup_num_pages,
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++#ifdef HAVE_GET_USER_PAGES_REMOTE_8_PARAMS_W_LOCKED
++				flags, local_page_list, NULL, NULL);
++#else
++				flags, local_page_list, NULL);
++#endif
++#else
++				access_mask & ODP_WRITE_ALLOWED_BIT,
++				0, local_page_list, NULL);
++#endif
++#else
++		npages = get_user_pages(owning_process, owning_mm,
++				user_virt, gup_num_pages,
+ 				access_mask & ODP_WRITE_ALLOWED_BIT,
+ 				0, local_page_list, NULL);
++#endif
+ 		up_read(&owning_mm->mmap_sem);
+ 
+ 		if (npages < 0)
 diff --git a/drivers/infiniband/core/user_mad.c b/drivers/infiniband/core/user_mad.c
 index xxxxxxx..xxxxxxx xxxxxx
 --- a/drivers/infiniband/core/user_mad.c
