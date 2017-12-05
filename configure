@@ -124,6 +124,12 @@ Usage:  `basename $0` [options]
     --with-qib-mod    make CONFIG_INFINIBAND_QIB=m [no]
     --without-qib-mod    [yes]
 
+    --with-rxe-mod    make CONFIG_RDMA_RXE=m [no]
+    --without-rxe-mod    [yes]
+
+    --with-rdmavt-mod    make CONFIG_INFINIBAND_RDMAVT=m [no]
+    --without-rdmavt-mod    [yes]
+
     --with-iser-mod    make CONFIG_INFINIBAND_ISER=m [no]
     --without-iser-mod    [yes]
 
@@ -570,17 +576,25 @@ main()
                         --without-ipath_inf-mod)
                             CONFIG_INFINIBAND_IPATH=
                         ;;
+                        --with-rxe-mod)
+                            CONFIG_RDMA_RXE="m"
+                        ;;
+                        --without-rxe-mod)
+                            CONFIG_RDMA_RXE=
+                        ;;
+                        --with-rdmavt-mod)
+                            CONFIG_INFINIBAND_RDMAVT="m"
+                        ;;
+                        --without-rdmavt-mod)
+                            CONFIG_INFINIBAND_RDMAVT=
+                        ;;
                         --with-qib-mod)
                             CONFIG_INFINIBAND_QIB="m"
-                            CONFIG_INFINIBAND_RDMAVT="m"
-                            CONFIG_RDMA_RXE="m"
                             add_conf "# Load QIB" "QIB_LOAD=yes"
                             add_conf "# QIB QME BP VER" "QIB_QME_BPVER=1"
                         ;;
                         --without-qib-mod)
                             CONFIG_INFINIBAND_QIB=
-                            CONFIG_INFINIBAND_RDMAVT=
-                            CONFIG_RDMA_RXE=
                         ;;
                         --with-iser-mod)
                             CONFIG_INFINIBAND_ISER="m"
@@ -1311,14 +1325,20 @@ if [ "X${CONFIG_INFINIBAND_IPATH}" == "Xm" ]; then
 else
         DEFINE_INFINIBAND_IPATH="#undef CONFIG_INFINIBAND_IPATH"
 fi
-if [ "X${CONFIG_INFINIBAND_QIB}" == "Xm" ]; then
-        DEFINE_INFINIBAND_QIB="#undef CONFIG_INFINIBAND_QIB\n#define CONFIG_INFINIBAND_QIB 1"
-        DEFINE_INFINIBAND_RDMAVT="#undef CONFIG_INFINIBAND_RDMAVT\n#define CONFIG_INFINIBAND_RDMAVT 1"
+if [ "X${CONFIG_RDMA_RXE}" == "Xm" ]; then
         DEFINE_RDMA_RXE="#undef CONFIG_RDMA_RXE\n#define CONFIG_RDMA_RXE 1"
 else
-        DEFINE_INFINIBAND_QIB="#undef CONFIG_INFINIBAND_QIB"
-        DEFINE_INFINIBAND_RDMAVT="#undef CONFIG_INFINIBAND_RDMAVT"
         DEFINE_RDMA_RXE="#undef CONFIG_RDMA_RXE"
+fi
+if [ "X${CONFIG_INFINIBAND_RDMAVT}" == "Xm" ]; then
+        DEFINE_INFINIBAND_RDMAVT="#undef CONFIG_INFINIBAND_RDMAVT\n#define CONFIG_INFINIBAND_RDMAVT 1"
+else
+        DEFINE_INFINIBAND_RDMAVT="#undef CONFIG_INFINIBAND_RDMAVT"
+fi
+if [ "X${CONFIG_INFINIBAND_QIB}" == "Xm" ]; then
+        DEFINE_INFINIBAND_QIB="#undef CONFIG_INFINIBAND_QIB\n#define CONFIG_INFINIBAND_QIB 1"
+else
+        DEFINE_INFINIBAND_QIB="#undef CONFIG_INFINIBAND_QIB"
 fi
 if [ "X${CONFIG_INFINIBAND_MTHCA_DEBUG}" == "Xy" ]; then
         DEFINE_INFINIBAND_MTHCA_DEBUG="#undef CONFIG_INFINIBAND_MTHCA_DEBUG\n#define CONFIG_INFINIBAND_MTHCA_DEBUG 1"
