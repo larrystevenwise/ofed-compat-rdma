@@ -9,7 +9,8 @@ Signed-off-by: Vladimir Neyelov <vladimirn@mellanox.com>
  drivers/infiniband/ulp/iser/iser_initiator.c |  73 +++++-
  drivers/infiniband/ulp/iser/iser_memory.c    | 364 ++++++++++++++++++++++++++-
  drivers/infiniband/ulp/iser/iser_verbs.c     |   2 +
- 5 files changed, 478 insertions(+), 7 deletions(-)
+ drivers/scsi/scsi_priv.h                     |   2 +
+ 6 files changed, 480 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/infiniband/ulp/iser/iscsi_iser.c b/drivers/infiniband/ulp/iser/iscsi_iser.c
 index xxxxxxx..xxxxxxx xxxxxx
@@ -759,3 +760,18 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  void iser_err_comp(struct ib_wc *wc, const char *type)
  {
+diff --git a/drivers/scsi/scsi_priv.h b/drivers/scsi/scsi_priv.h
+index xxxxxxx..xxxxxxx xxxxxx
+--- a/drivers/scsi/scsi_priv.h
++++ b/drivers/scsi/scsi_priv.h
+@@ -187,8 +187,10 @@ static inline void scsi_dh_remove_device(struct scsi_device *sdev) { }
+  */
+ 
+ #define SCSI_DEVICE_BLOCK_MAX_TIMEOUT	600	/* units in seconds */
++#ifndef HAVE_SCSI_DEVICE_SCSI_INTERNAL_DEVICE_BLOCK
+ extern int scsi_internal_device_block(struct scsi_device *sdev);
+ extern int scsi_internal_device_unblock(struct scsi_device *sdev,
+ 					enum scsi_device_state new_state);
++#endif
+ 
+ #endif /* _SCSI_PRIV_H */
