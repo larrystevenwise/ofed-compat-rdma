@@ -1,6 +1,6 @@
 diff -Naur a/drivers/infiniband/hw/qedr/main.c b/drivers/infiniband/hw/qedr/main.c
---- a/drivers/infiniband/hw/qedr/main.c	2017-07-26 16:54:46.395167714 +0300
-+++ b/drivers/infiniband/hw/qedr/main.c	2017-07-26 16:56:34.943019998 +0300
+--- a/drivers/infiniband/hw/qedr/main.c	2017-12-07 10:45:53.308325483 +0200
++++ b/drivers/infiniband/hw/qedr/main.c	2017-12-07 10:46:01.016325521 +0200
 @@ -170,7 +170,7 @@
  	dev->ibdev.get_port_immutable = qedr_port_immutable;
  	dev->ibdev.get_netdev = qedr_get_netdev;
@@ -11,8 +11,8 @@ diff -Naur a/drivers/infiniband/hw/qedr/main.c b/drivers/infiniband/hw/qedr/main
  	dev->ibdev.get_link_layer = qedr_link_layer;
  	dev->ibdev.get_dev_fw_str = qedr_get_dev_fw_str;
 diff -Naur a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/verbs.c
---- a/drivers/infiniband/hw/qedr/verbs.c	2017-07-26 16:54:46.396167731 +0300
-+++ b/drivers/infiniband/hw/qedr/verbs.c	2017-07-26 16:56:34.943019998 +0300
+--- a/drivers/infiniband/hw/qedr/verbs.c	2017-12-07 10:45:53.308325483 +0200
++++ b/drivers/infiniband/hw/qedr/verbs.c	2017-12-07 10:46:01.016325521 +0200
 @@ -1953,7 +1953,22 @@
  
  	qp_attr->qp_state = qedr_get_ibqp_state(params.state);
@@ -37,8 +37,8 @@ diff -Naur a/drivers/infiniband/hw/qedr/verbs.c b/drivers/infiniband/hw/qedr/ver
  	qp_attr->rq_psn = params.rq_psn;
  	qp_attr->sq_psn = params.sq_psn;
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/qlogic/qed/qed_main.c
---- a/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-26 16:54:46.397167748 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-26 16:56:34.944020016 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-12-07 10:46:01.016325521 +0200
 @@ -379,6 +379,46 @@
  	memset(&cdev->int_params.out, 0, sizeof(struct qed_int_param));
  }
@@ -120,8 +120,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/q
  			rc = cnt;
  	}
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/qlogic/qed/qed_spq.c
---- a/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-26 16:54:46.397167748 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-26 16:56:34.944020016 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-12-07 10:46:01.016325521 +0200
 @@ -78,10 +78,11 @@
  
  	comp_done = (struct qed_spq_comp_done *)cookie;
@@ -147,8 +147,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/ql
  			smp_read_barrier_depends();
  			if (p_fw_ret)
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c b/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c
---- a/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c	2017-07-26 16:54:46.397167748 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c	2017-07-26 16:56:34.944020016 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c	2017-12-07 10:46:01.020325521 +0200
 @@ -104,8 +104,11 @@
  
  	return edev->ops->dcb->getpfcstate(edev->cdev);
@@ -178,8 +178,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_dcbnl.c b/drivers/net/etherne
  	struct qede_dev *edev = netdev_priv(netdev);
  
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
---- a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c	2017-07-26 16:54:46.398167765 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c	2017-07-26 16:56:34.945020033 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c	2017-12-07 10:46:01.020325521 +0200
 @@ -749,10 +749,12 @@
  	memset(&params, 0, sizeof(params));
  	params.override_flags |= QED_LINK_OVERRIDE_PAUSE_CONFIG;
@@ -326,8 +326,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c b/drivers/net/ether
  
  void qede_set_ethtool_ops(struct net_device *dev)
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_filter.c b/drivers/net/ethernet/qlogic/qede/qede_filter.c
---- a/drivers/net/ethernet/qlogic/qede/qede_filter.c	2017-07-26 16:54:46.398167765 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_filter.c	2017-07-26 16:56:34.945020033 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_filter.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_filter.c	2017-12-07 10:46:01.020325521 +0200
 @@ -31,10 +31,13 @@
   */
  #include <linux/netdevice.h>
@@ -436,8 +436,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_filter.c b/drivers/net/ethern
  static int qede_set_mcast_rx_mac(struct qede_dev *edev,
  				 enum qed_filter_xcast_params_type opcode,
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_fp.c b/drivers/net/ethernet/qlogic/qede/qede_fp.c
---- a/drivers/net/ethernet/qlogic/qede/qede_fp.c	2017-07-26 16:54:46.399167782 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_fp.c	2017-07-26 16:56:34.946020050 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_fp.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_fp.c	2017-12-07 10:46:01.020325521 +0200
 @@ -32,7 +32,9 @@
  #include <linux/netdevice.h>
  #include <linux/etherdevice.h>
@@ -679,8 +679,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_fp.c b/drivers/net/ethernet/q
  		netif_tx_stop_queue(netdev_txq);
  		txq->stopped_cnt++;
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede.h b/drivers/net/ethernet/qlogic/qede/qede.h
---- a/drivers/net/ethernet/qlogic/qede/qede.h	2017-07-26 16:54:46.399167782 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede.h	2017-07-26 16:56:34.946020050 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede.h	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede.h	2017-12-07 10:46:01.020325521 +0200
 @@ -39,7 +39,9 @@
  #include <linux/bitmap.h>
  #include <linux/kernel.h>
@@ -705,8 +705,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede.h b/drivers/net/ethernet/qlog
  #ifdef CONFIG_DCB
  void qede_set_dcbnl_ops(struct net_device *ndev);
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet/qlogic/qede/qede_main.c
---- a/drivers/net/ethernet/qlogic/qede/qede_main.c	2017-07-26 16:54:46.400167799 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_main.c	2017-07-26 16:56:34.947020067 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_main.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_main.c	2017-12-07 10:46:47.408325745 +0200
 @@ -47,7 +47,9 @@
  #include <linux/netdev_features.h>
  #include <linux/udp.h>
@@ -736,7 +736,29 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  static void qede_remove(struct pci_dev *pdev);
  static void qede_shutdown(struct pci_dev *pdev);
-@@ -325,6 +330,8 @@
+@@ -149,7 +154,13 @@
+ }
+ 
+ #ifdef CONFIG_QED_SRIOV
++#if defined(HAVE_NDO_SET_VF_VLAN)
++#ifdef HAVE_VF_VLAN_PROTO
++static int qede_set_vf_vlan(struct net_device *ndev, int vf, u16 vlan, u8 qos,
++			    __be16 vlan_proto)
++#else
+ static int qede_set_vf_vlan(struct net_device *ndev, int vf, u16 vlan, u8 qos)
++#endif
+ {
+ 	struct qede_dev *edev = netdev_priv(ndev);
+ 
+@@ -163,6 +174,7 @@
+ 
+ 	return edev->ops->iov->set_vlan(edev->cdev, vlan, vf);
+ }
++#endif
+ 
+ static int qede_set_vf_mac(struct net_device *ndev, int vfidx, u8 *mac)
+ {
+@@ -325,6 +337,8 @@
  	struct qede_stats_common *p_common = &edev->stats.common;
  	struct qed_eth_stats stats;
  
@@ -745,7 +767,45 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  	p_common->no_buff_discards = stats.common.no_buff_discards;
  	p_common->packet_too_big_discard = stats.common.packet_too_big_discard;
  	p_common->ttl0_discard = stats.common.ttl0_discard;
-@@ -496,6 +503,7 @@
+@@ -421,14 +435,25 @@
+ 	}
+ }
+ 
++#ifdef HAVE_NDO_GET_STATS64_RET_VOID
++void qede_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
++#elif defined(HAVE_NDO_GET_STATS64)
+ static
+ struct rtnl_link_stats64 *qede_get_stats64(struct net_device *dev,
+ 					   struct rtnl_link_stats64 *stats)
++#else
++static
++struct rtnl_link_stats64 *qede_get_stats64(struct net_device *dev)
++#endif
+ {
+ 	struct qede_dev *edev = netdev_priv(dev);
++#if defined(HAVE_NDO_GET_STATS64)
+ 	struct qede_stats_common *p_common;
++#endif
+ 
+ 	qede_fill_by_demand_stats(edev);
++
++#if defined(HAVE_NDO_GET_STATS64)
+ 	p_common = &edev->stats.common;
+ 
+ 	stats->rx_packets = p_common->rx_ucast_pkts + p_common->rx_mcast_pkts +
+@@ -450,8 +475,11 @@
+ 		stats->collisions = edev->stats.bb.tx_total_collisions;
+ 	stats->rx_crc_errors = p_common->rx_crc_errors;
+ 	stats->rx_frame_errors = p_common->rx_align_errors;
++#endif
+ 
++#ifndef HAVE_NDO_GET_STATS64_RET_VOID
+ 	return stats;
++#endif
+ }
+ 
+ #ifdef CONFIG_QED_SRIOV
+@@ -496,6 +524,7 @@
  	return edev->ops->iov->set_link_state(edev->cdev, vfidx, link_state);
  }
  
@@ -753,7 +813,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  static int qede_set_vf_trust(struct net_device *dev, int vfidx, bool setting)
  {
  	struct qede_dev *edev = netdev_priv(dev);
-@@ -506,6 +514,7 @@
+@@ -506,6 +535,7 @@
  	return edev->ops->iov->set_trust(edev->cdev, vfidx, setting);
  }
  #endif
@@ -761,10 +821,13 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  static int qede_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
  {
-@@ -538,8 +547,10 @@
+@@ -537,23 +567,37 @@
+ 	.ndo_do_ioctl = qede_ioctl,
  #ifdef CONFIG_QED_SRIOV
  	.ndo_set_vf_mac = qede_set_vf_mac,
++#if defined(HAVE_NDO_SET_VF_VLAN)
  	.ndo_set_vf_vlan = qede_set_vf_vlan,
++#endif
 +#ifdef HAVE_NETDEV_OPS_NDO_SET_VF_TRUST
  	.ndo_set_vf_trust = qede_set_vf_trust,
  #endif
@@ -772,7 +835,15 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  	.ndo_vlan_rx_add_vid = qede_vlan_rx_add_vid,
  	.ndo_vlan_rx_kill_vid = qede_vlan_rx_kill_vid,
  	.ndo_set_features = qede_set_features,
-@@ -550,10 +561,16 @@
+-	.ndo_get_stats64 = qede_get_stats64,
++#if defined(HAVE_NDO_GET_STATS64) || defined(HAVE_NDO_GET_STATS64_RET_VOID)
++        .ndo_get_stats64         = qede_get_stats64,
++#else
++        .ndo_get_stats           = qede_get_stats64,
++#endif
+ #ifdef CONFIG_QED_SRIOV
+ 	.ndo_set_vf_link_state = qede_set_vf_link_state,
+ 	.ndo_set_vf_spoofchk = qede_set_vf_spoofchk,
  	.ndo_get_vf_config = qede_get_vf_config,
  	.ndo_set_vf_rate = qede_set_vf_rate,
  #endif
@@ -789,7 +860,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  #ifdef CONFIG_RFS_ACCEL
  	.ndo_rx_flow_steer = qede_rx_flow_steer,
  #endif
-@@ -630,8 +647,10 @@
+@@ -630,8 +674,10 @@
  
  	/* Encap features*/
  	hw_features |= NETIF_F_GSO_GRE | NETIF_F_GSO_UDP_TUNNEL |
@@ -801,7 +872,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	if (!IS_VF(edev) && edev->dev_info.common.num_hwfns == 1)
  		hw_features |= NETIF_F_NTUPLE;
-@@ -640,8 +659,10 @@
+@@ -640,8 +686,10 @@
  				NETIF_F_SG | NETIF_F_TSO | NETIF_F_TSO_ECN |
  				NETIF_F_TSO6 | NETIF_F_GSO_GRE |
  				NETIF_F_GSO_UDP_TUNNEL | NETIF_F_RXCSUM |
@@ -813,7 +884,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	ndev->vlan_features = hw_features | NETIF_F_RXHASH | NETIF_F_RXCSUM |
  			      NETIF_F_HIGHDMA;
-@@ -694,7 +715,9 @@
+@@ -694,7 +742,9 @@
  
  			kfree(fp->sb_info);
  			kfree(fp->rxq);
@@ -823,7 +894,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  			kfree(fp->txq);
  		}
  		kfree(edev->fp_array);
-@@ -754,7 +777,7 @@
+@@ -754,7 +804,7 @@
  			fp->rxq = kzalloc(sizeof(*fp->rxq), GFP_KERNEL);
  			if (!fp->rxq)
  				goto err;
@@ -832,7 +903,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  			if (edev->xdp_prog) {
  				fp->xdp_tx = kzalloc(sizeof(*fp->xdp_tx),
  						     GFP_KERNEL);
-@@ -762,6 +785,7 @@
+@@ -762,6 +812,7 @@
  					goto err;
  				fp->type |= QEDE_FASTPATH_XDP;
  			}
@@ -840,7 +911,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  		}
  	}
  
-@@ -985,9 +1009,11 @@
+@@ -985,9 +1036,11 @@
  
  	pci_set_drvdata(pdev, NULL);
  
@@ -852,7 +923,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	/* Use global ops since we've freed edev */
  	qed_ops->common->slowpath_stop(cdev);
-@@ -1146,9 +1172,11 @@
+@@ -1146,9 +1199,11 @@
  	dma_addr_t mapping;
  	int i;
  
@@ -864,7 +935,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	if (edev->gro_disable)
  		return 0;
-@@ -1198,7 +1226,11 @@
+@@ -1198,7 +1253,11 @@
  	rxq->num_rx_buffers = edev->q_num_rx_buffers;
  
  	rxq->rx_buf_size = NET_IP_ALIGN + ETH_OVERHEAD + edev->ndev->mtu;
@@ -876,7 +947,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	/* Make sure that the headroom and  payload fit in a single page */
  	if (rxq->rx_buf_size + rxq->rx_headroom > PAGE_SIZE)
-@@ -1207,10 +1239,14 @@
+@@ -1207,10 +1266,14 @@
  	/* Segment size to spilt a page in multiple equal parts,
  	 * unless XDP is used in which case we'd use the entire page.
  	 */
@@ -891,7 +962,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	/* Allocate the parallel driver ring for Rx buffers */
  	size = sizeof(*rxq->sw_rx_ring) * RX_RING_SIZE;
-@@ -1263,9 +1299,11 @@
+@@ -1263,9 +1326,11 @@
  static void qede_free_mem_txq(struct qede_dev *edev, struct qede_tx_queue *txq)
  {
  	/* Free the parallel SW ring */
@@ -903,7 +974,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  		kfree(txq->sw_tx_ring.skbs);
  
  	/* Free the real RQ ring used by FW */
-@@ -1281,17 +1319,21 @@
+@@ -1281,17 +1346,21 @@
  	txq->num_tx_buffers = edev->q_num_tx_buffers;
  
  	/* Allocate the parallel driver ring for Tx buffers */
@@ -925,7 +996,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	rc = edev->ops->common->chain_alloc(edev->cdev,
  					    QED_CHAIN_USE_TO_CONSUME_PRODUCE,
-@@ -1338,11 +1380,13 @@
+@@ -1338,11 +1407,13 @@
  			goto out;
  	}
  
@@ -939,7 +1010,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  	if (fp->type & QEDE_FASTPATH_TX) {
  		rc = qede_alloc_mem_txq(edev, fp->txq);
-@@ -1398,19 +1442,23 @@
+@@ -1398,19 +1469,23 @@
  		fp->edev = edev;
  		fp->id = queue_id;
  
@@ -963,7 +1034,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  				fp->rxq->data_direction = DMA_FROM_DEVICE;
  			fp->rxq->dev = &edev->pdev->dev;
  		}
-@@ -1535,7 +1583,11 @@
+@@ -1535,7 +1610,11 @@
  {
  	struct qede_fastpath *fp = (struct qede_fastpath *)cookie;
  
@@ -975,7 +1046,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  }
  
  static int qede_setup_irqs(struct qede_dev *edev)
-@@ -1640,11 +1692,13 @@
+@@ -1640,11 +1719,13 @@
  				return rc;
  		}
  
@@ -989,7 +1060,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  	}
  
  	/* Stop all Queues in reverse order */
-@@ -1667,6 +1721,7 @@
+@@ -1667,6 +1748,7 @@
  			}
  		}
  
@@ -997,7 +1068,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  		/* Stop the XDP forwarding queue */
  		if (fp->type & QEDE_FASTPATH_XDP) {
  			rc = qede_stop_txq(edev, fp->xdp_tx, i);
-@@ -1675,6 +1730,7 @@
+@@ -1675,6 +1757,7 @@
  
  			bpf_prog_put(fp->rxq->xdp_prog);
  		}
@@ -1005,7 +1076,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  	}
  
  	/* Stop the vport */
-@@ -1701,9 +1757,11 @@
+@@ -1701,9 +1784,11 @@
  	/* Let the XDP queue share the queue-zone with one of the regular txq.
  	 * We don't really care about its coalescing.
  	 */
@@ -1017,7 +1088,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  		params.queue_id = txq->index;
  
  	params.sb = fp->sb_info->igu_sb_id;
-@@ -1812,7 +1870,7 @@
+@@ -1812,7 +1897,7 @@
  
  			qede_update_rx_prod(edev, rxq);
  		}
@@ -1026,7 +1097,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  		if (fp->type & QEDE_FASTPATH_XDP) {
  			rc = qede_start_txq(edev, fp, fp->xdp_tx, i, XDP_PI);
  			if (rc)
-@@ -1825,6 +1883,7 @@
+@@ -1825,6 +1910,7 @@
  				goto out;
  			}
  		}
@@ -1034,7 +1105,7 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  
  		if (fp->type & QEDE_FASTPATH_TX) {
  			rc = qede_start_txq(edev, fp, fp->txq, i, TX_PI(0));
-@@ -2055,7 +2114,9 @@
+@@ -2055,7 +2141,9 @@
  	if (rc)
  		return rc;
  
@@ -1045,8 +1116,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet
  	edev->ops->common->update_drv_state(edev->cdev, true);
  
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_ptp.c b/drivers/net/ethernet/qlogic/qede/qede_ptp.c
---- a/drivers/net/ethernet/qlogic/qede/qede_ptp.c	2017-07-26 16:54:46.400167799 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_ptp.c	2017-07-26 16:58:17.940775151 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_ptp.c	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_ptp.c	2017-12-07 10:46:01.024325521 +0200
 @@ -64,7 +64,7 @@
  	struct qede_dev *edev = ptp->edev;
  	int rc;
@@ -1141,8 +1212,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_ptp.c b/drivers/net/ethernet/
  
  	ptp->clock = ptp_clock_register(&ptp->clock_info, &edev->pdev->dev);
 diff -Naur a/drivers/net/ethernet/qlogic/qede/qede_ptp.h b/drivers/net/ethernet/qlogic/qede/qede_ptp.h
---- a/drivers/net/ethernet/qlogic/qede/qede_ptp.h	2017-07-26 16:54:46.400167799 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/qede_ptp.h	2017-07-26 16:56:34.947020067 +0300
+--- a/drivers/net/ethernet/qlogic/qede/qede_ptp.h	2017-12-07 10:45:53.268325483 +0200
++++ b/drivers/net/ethernet/qlogic/qede/qede_ptp.h	2017-12-07 10:46:01.024325521 +0200
 @@ -34,7 +34,11 @@
  
  #include <linux/ptp_clock_kernel.h>

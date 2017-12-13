@@ -1,6 +1,6 @@
 diff -Naur a/drivers/net/ethernet/qlogic/qed/Makefile b/drivers/net/ethernet/qlogic/qed/Makefile
---- a/drivers/net/ethernet/qlogic/qed/Makefile	2017-07-25 18:07:13.682393749 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/Makefile	2017-07-25 18:07:40.238832021 +0300
+--- a/drivers/net/ethernet/qlogic/qed/Makefile	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/Makefile	2017-12-07 10:31:09.264321211 +0200
 @@ -4,7 +4,9 @@
  	 qed_int.o qed_main.o qed_mcp.o qed_sp_commands.o qed_spq.o qed_l2.o \
  	 qed_selftest.o qed_dcbx.o qed_debug.o qed_ptp.o
@@ -14,8 +14,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/Makefile b/drivers/net/ethernet/qlo
  qed-$(CONFIG_QED_ISCSI) += qed_iscsi.o qed_ooo.o
  qed-$(CONFIG_QED_FCOE) += qed_fcoe.o
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_dev.c b/drivers/net/ethernet/qlogic/qed/qed_dev.c
---- a/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-07-25 18:07:13.683393765 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-07-25 18:07:40.239832038 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_dev.c	2017-12-07 10:31:09.264321211 +0200
 @@ -171,7 +171,7 @@
  		qed_eq_free(p_hwfn, p_hwfn->p_eq);
  		qed_consq_free(p_hwfn, p_hwfn->p_consq);
@@ -62,8 +62,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_dev.c b/drivers/net/ethernet/ql
  		/* Roce CNQ each requires: 1 status block + 1 CNQ. We divide
  		 * the status blocks equally between L2 / RoCE but with
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h b/drivers/net/ethernet/qlogic/qed/qed_fcoe.h
---- a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-07-25 18:07:13.683393765 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-07-25 18:07:40.239832038 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-12-06 17:35:51.016192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_fcoe.h	2017-12-07 10:31:09.264321211 +0200
 @@ -79,7 +79,7 @@
  }
  #endif /* CONFIG_QED_FCOE */
@@ -74,8 +74,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_fcoe.h b/drivers/net/ethernet/q
  extern const struct qed_ll2_ops qed_ll2_ops_pass;
  #endif
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed.h b/drivers/net/ethernet/qlogic/qed/qed.h
---- a/drivers/net/ethernet/qlogic/qed/qed.h	2017-07-25 18:07:13.681393732 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed.h	2017-07-25 18:07:40.239832038 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed.h	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed.h	2017-12-07 10:31:09.264321211 +0200
 @@ -684,7 +684,7 @@
  
  	struct qed_dbg_params		dbg_params;
@@ -86,8 +86,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed.h b/drivers/net/ethernet/qlogic
  	u8				ll2_mac_address[ETH_ALEN];
  #endif
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h b/drivers/net/ethernet/qlogic/qed/qed_iscsi.h
---- a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-07-25 18:07:13.685393798 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-07-25 18:07:40.239832038 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_iscsi.h	2017-12-07 10:31:09.264321211 +0200
 @@ -52,7 +52,7 @@
  	iscsi_event_cb_t event_cb;
  };
@@ -98,8 +98,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_iscsi.h b/drivers/net/ethernet/
  #endif
  
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/qlogic/qed/qed_main.c
---- a/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-25 18:07:13.681393732 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-07-25 18:07:40.240832054 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-12-06 17:36:00.808192102 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_main.c	2017-12-07 10:31:09.268321211 +0200
 @@ -800,7 +800,7 @@
  	cdev->int_params.fp_msix_cnt = cdev->int_params.out.num_vectors -
  				       cdev->num_hwfns;
@@ -119,8 +119,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/q
  		params->rdma_pf_params.min_dpis = QED_ROCE_DPIS;
  		/* divide by 3 the MRs to avoid MF ILT overflow */
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_mcp.c b/drivers/net/ethernet/qlogic/qed/qed_mcp.c
---- a/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-07-25 18:07:13.682393749 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-07-25 18:07:40.240832054 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_mcp.c	2017-12-07 10:31:09.268321211 +0200
 @@ -657,7 +657,7 @@
  	if (IS_ENABLED(CONFIG_QED_SRIOV))
  		config_bitmap |= CONFIG_QED_SRIOV_BITMAP_IDX;
@@ -149,8 +149,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_mcp.c b/drivers/net/ethernet/ql
  		else if (qed_mcp_get_shmem_proto_mfw(p_hwfn, p_ptt, p_proto))
  			qed_mcp_get_shmem_proto_legacy(p_hwfn, p_proto);
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_roce.h b/drivers/net/ethernet/qlogic/qed/qed_roce.h
---- a/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-07-25 18:07:13.679393699 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-07-25 18:07:40.241832071 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-12-06 17:35:51.012192054 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_roce.h	2017-12-07 10:31:09.268321211 +0200
 @@ -164,7 +164,7 @@
  	dma_addr_t shared_queue_phys_addr;
  };
@@ -161,8 +161,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_roce.h b/drivers/net/ethernet/q
  void qed_roce_async_event(struct qed_hwfn *p_hwfn,
  			  u8 fw_event_code, union rdma_eqe_data *rdma_data);
 diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/qlogic/qed/qed_spq.c
---- a/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-25 18:07:13.680393716 +0300
-+++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-07-25 18:07:40.241832071 +0300
+--- a/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-12-06 17:36:00.808192102 +0200
++++ b/drivers/net/ethernet/qlogic/qed/qed_spq.c	2017-12-07 10:31:09.268321211 +0200
 @@ -304,7 +304,8 @@
  			   struct event_ring_entry *p_eqe)
  {
@@ -174,8 +174,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qed/qed_spq.c b/drivers/net/ethernet/ql
  		qed_roce_async_event(p_hwfn, p_eqe->opcode,
  				     &p_eqe->data.rdma_data);
 diff -Naur a/drivers/net/ethernet/qlogic/qede/Makefile b/drivers/net/ethernet/qlogic/qede/Makefile
---- a/drivers/net/ethernet/qlogic/qede/Makefile	2017-07-25 18:07:13.687393831 +0300
-+++ b/drivers/net/ethernet/qlogic/qede/Makefile	2017-07-25 18:07:40.241832071 +0300
+--- a/drivers/net/ethernet/qlogic/qede/Makefile	2017-12-06 17:35:51.016192054 +0200
++++ b/drivers/net/ethernet/qlogic/qede/Makefile	2017-12-07 10:31:09.268321211 +0200
 @@ -2,4 +2,5 @@
  
  qede-y := qede_main.o qede_fp.o qede_filter.o qede_ethtool.o qede_ptp.o
@@ -184,8 +184,8 @@ diff -Naur a/drivers/net/ethernet/qlogic/qede/Makefile b/drivers/net/ethernet/ql
 +#qede-$(CONFIG_QED_RDMA) += qede_roce.o
 +qede-y += qede_roce.o
 diff -Naur a/include/linux/qed/qede_roce.h b/include/linux/qed/qede_roce.h
---- a/include/linux/qed/qede_roce.h	2017-07-25 18:07:12.762378561 +0300
-+++ b/include/linux/qed/qede_roce.h	2017-07-25 18:07:40.241832071 +0300
+--- a/include/linux/qed/qede_roce.h	2017-12-06 17:35:51.068192055 +0200
++++ b/include/linux/qed/qede_roce.h	2017-12-07 10:31:09.268321211 +0200
 @@ -68,7 +68,7 @@
  
  bool qede_roce_supported(struct qede_dev *dev);
@@ -196,8 +196,8 @@ diff -Naur a/include/linux/qed/qede_roce.h b/include/linux/qed/qede_roce.h
  void qede_roce_dev_event_open(struct qede_dev *dev);
  void qede_roce_dev_event_close(struct qede_dev *dev);
 diff -Naur a/include/linux/qed/qed_ll2_if.h b/include/linux/qed/qed_ll2_if.h
---- a/include/linux/qed/qed_ll2_if.h	2017-07-25 18:07:12.763378578 +0300
-+++ b/include/linux/qed/qed_ll2_if.h	2017-07-25 18:07:40.242832087 +0300
+--- a/include/linux/qed/qed_ll2_if.h	2017-12-06 17:35:51.068192055 +0200
++++ b/include/linux/qed/qed_ll2_if.h	2017-12-07 10:31:09.268321211 +0200
 @@ -138,7 +138,7 @@
  	int (*get_stats)(struct qed_dev *cdev, struct qed_ll2_stats *stats);
  };
