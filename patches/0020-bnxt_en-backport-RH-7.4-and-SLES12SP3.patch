@@ -1,0 +1,113 @@
+From d19275ab587694d3cf845d4bf30a4d71a009a4a2 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Thu, 14 Dec 2017 04:59:04 -0500
+Subject: [PATCH] bnxt_en: backport RH 7.4 and SLES12SP3
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c       | 14 ++++++++++++++
+ drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.c |  7 +++++++
+ drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.h | 10 +++++++++-
+ 3 files changed, 30 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index feb2227..9c66e2c 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -5899,8 +5899,12 @@ static int bnxt_ioctl(struct net_device *dev, struct ifreq *ifr, int cmd)
+ 	return -EOPNOTSUPP;
+ }
+ 
++#ifdef HAVE_NDO_GET_STATS64_RET_VOID
++static void bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
++#elif defined(HAVE_NDO_GET_STATS64)
+ static struct rtnl_link_stats64 *
+ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
++#endif
+ {
+ 	u32 i;
+ 	struct bnxt *bp = netdev_priv(dev);
+@@ -5908,7 +5912,11 @@ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
+ 	memset(stats, 0, sizeof(struct rtnl_link_stats64));
+ 
+ 	if (!bp->bnapi)
++#ifndef HAVE_NDO_GET_STATS64_RET_VOID
+ 		return stats;
++#else
++		return;
++#endif
+ 
+ 	/* TODO check if we need to synchronize with bnxt_close path */
+ 	for (i = 0; i < bp->cp_nr_rings; i++) {
+@@ -5956,7 +5964,9 @@ bnxt_get_stats64(struct net_device *dev, struct rtnl_link_stats64 *stats)
+ 		stats->tx_errors = le64_to_cpu(tx->tx_err);
+ 	}
+ 
++#ifndef HAVE_NDO_GET_STATS64_RET_VOID
+ 	return stats;
++#endif
+ }
+ 
+ static bool bnxt_mc_list_updated(struct bnxt *bp, u32 *rx_mask)
+@@ -6975,7 +6985,11 @@ static const struct net_device_ops bnxt_netdev_ops = {
+ #ifdef CONFIG_BNXT_SRIOV
+ 	.ndo_get_vf_config	= bnxt_get_vf_config,
+ 	.ndo_set_vf_mac		= bnxt_set_vf_mac,
++#if defined(HAVE_NDO_SET_VF_VLAN)
+ 	.ndo_set_vf_vlan	= bnxt_set_vf_vlan,
++#elif defined(HAVE_NDO_SET_VF_VLAN_EXTENDED)
++	.extended.ndo_set_vf_vlan	= bnxt_set_vf_vlan,
++#endif
+ 	.ndo_set_vf_rate	= bnxt_set_vf_bw,
+ 	.ndo_set_vf_link_state	= bnxt_set_vf_link_state,
+ 	.ndo_set_vf_spoofchk	= bnxt_set_vf_spoofchk,
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.c
+index 79984c8..0d236a4 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.c
+@@ -177,7 +177,13 @@ int bnxt_set_vf_mac(struct net_device *dev, int vf_id, u8 *mac)
+ 	return hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
+ }
+ 
++#if defined(HAVE_NDO_SET_VF_VLAN) || defined(HAVE_NDO_SET_VF_VLAN_EXTENDED)
++#ifdef HAVE_VF_VLAN_PROTO
++int bnxt_set_vf_vlan(struct net_device *dev, int vf_id, u16 vlan_id, u8 qos,
++		     __be16 vlan_proto)
++#else
+ int bnxt_set_vf_vlan(struct net_device *dev, int vf_id, u16 vlan_id, u8 qos)
++#endif
+ {
+ 	struct hwrm_func_cfg_input req = {0};
+ 	struct bnxt *bp = netdev_priv(dev);
+@@ -213,6 +219,7 @@ int bnxt_set_vf_vlan(struct net_device *dev, int vf_id, u16 vlan_id, u8 qos)
+ 		vf->vlan = vlan_tag;
+ 	return rc;
+ }
++#endif
+ 
+ int bnxt_set_vf_bw(struct net_device *dev, int vf_id, int min_tx_rate,
+ 		   int max_tx_rate)
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.h b/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.h
+index 6042bb3..68cd35b 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.h
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_sriov.h
+@@ -13,7 +13,15 @@
+ 
+ int bnxt_get_vf_config(struct net_device *, int, struct ifla_vf_info *);
+ int bnxt_set_vf_mac(struct net_device *, int, u8 *);
+-int bnxt_set_vf_vlan(struct net_device *, int, u16, u8);
++#if defined(HAVE_NDO_SET_VF_VLAN) || defined(HAVE_NDO_SET_VF_VLAN_EXTENDED)
++#ifdef HAVE_VF_VLAN_PROTO
++int bnxt_set_vf_vlan(struct net_device *dev, int vf_id, u16 vlan_id, u8 qos,
++		     __be16 vlan_proto);
++#else
++int bnxt_set_vf_vlan(struct net_device *dev, int vf_id, u16 vlan_id, u8 qos);
++#endif
++#endif
++
+ int bnxt_set_vf_bw(struct net_device *, int, int, int);
+ int bnxt_set_vf_link_state(struct net_device *, int, int);
+ int bnxt_set_vf_spoofchk(struct net_device *, int, bool);
+-- 
+1.8.3.1
+
