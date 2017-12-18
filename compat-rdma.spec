@@ -120,6 +120,18 @@ Group: System Environment/Libraries
 %description -n compat-rdma-devel
 Core, HW and ULPs kernel modules sources
 
+%if %{build_compat_rdma_firmware}
+%package -n compat-rdma-firmware
+Requires: kernel
+Requires: compat-rdma
+Version: %{_version}
+Release: %{_release}
+Summary: Firmware package
+Group: System Environment/Libraries
+%description -n compat-rdma-firmware
+This package contains firmware for RDMA devices
+%endif
+
 %prep
 %setup -n %{_name}-%{_version}
 
@@ -451,7 +463,10 @@ fi
 /sbin/connectx_port_config
 %config(noreplace) %{RDMA_CONF_DIR}/connectx.conf
 %endif
+
 %if %{build_compat_rdma_firmware}
+%files -n compat-rdma-firmware
+%defattr(-,root,root,-)
 %if %{build_qedr}
 /lib/firmware/qed/*
 %endif
