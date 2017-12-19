@@ -1,0 +1,54 @@
+From 894e6d29bd4fd71cd9bfd4cc5b93f3a5099bbf58 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Tue, 19 Dec 2017 00:47:15 -0500
+Subject: [PATCH] bnxt_en: RHEL 7.0/7.1 backport for OFED - 4.8-2
+
+Fixed errors and warnings in RH 7.0 and 7.1 compilation
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c         | 5 -----
+ drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c | 7 ++++++-
+ 2 files changed, 6 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index 9c66e2c..f7d2d90 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -6644,14 +6644,9 @@ int bnxt_setup_mq_tc(struct net_device *dev, u8 tc)
+ 	return 0;
+ }
+ 
+-#ifdef HAVE_NDO_SETUP_TC
+ #ifdef HAVE_NDO_SETUP_TC_4_PARAMS
+ static int bnxt_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
+ 			 struct tc_to_netdev *ntc)
+-#else
+-static int bnxt_setup_tc(struct net_device *dev, u32 handle, __be16 proto,
+-                         struct tc_to_netdev *ntc)
+-#endif
+ {
+ 	if (ntc->type != TC_SETUP_MQPRIO)
+ 		return -EINVAL;
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+index df15a20..bbe6c50 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt_ethtool.c
+@@ -783,8 +783,13 @@ static u32 bnxt_get_rxfh_key_size(struct net_device *dev)
+ 	return HW_HASH_KEY_SIZE;
+ }
+ 
+-static int bnxt_get_rxfh(struct net_device *dev, u32 *indir, u8 *key,
++static int bnxt_get_rxfh(struct net_device *dev, u32 *indir,
++#ifdef HAVE_ETH_SS_RSS_HASH_FUNCS
++			 u8 *key,
+ 			 u8 *hfunc)
++#else
++			 u8 *key)
++#endif
+ {
+ 	struct bnxt *bp = netdev_priv(dev);
+ 	struct bnxt_vnic_info *vnic = &bp->vnic_info[0];
+-- 
+1.8.3.1
+
