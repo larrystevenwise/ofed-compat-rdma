@@ -1,0 +1,40 @@
+From 512c7840cd692fdac0333684249753ebf3c819f9 Mon Sep 17 00:00:00 2001
+From: "Mintz, Yuval" <Yuval.Mintz@cavium.com>
+Date: Mon, 29 May 2017 11:24:49 +0300
+Subject: [PATCH] qed: Don't log missing periodic stats by default
+
+Current implementation lacks the logic for providing management
+firmware with RDMA-related statistics; [much] worse than that -
+it logs such events by default to system logs.
+
+Since the statistics' gathering is done periodically, using sufficiently
+new management firmware the system logs would get filled with these
+unnecessary prints.
+
+For now, reduce the verbosity of the log so that it would not be
+logged by default.
+
+Fixes: 6c75424612a7 ("qed: Add support for NCSI statistics")
+Signed-off-by: Yuval Mintz <Yuval.Mintz@cavium.com>
+Signed-off-by: David S. Miller <davem@davemloft.net>
+---
+ drivers/net/ethernet/qlogic/qed/qed_main.c | 3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qed/qed_main.c b/drivers/net/ethernet/qlogic/qed/qed_main.c
+index 537d123..715b3aa 100644
+--- a/drivers/net/ethernet/qlogic/qed/qed_main.c
++++ b/drivers/net/ethernet/qlogic/qed/qed_main.c
+@@ -1759,7 +1759,8 @@ void qed_get_protocol_stats(struct qed_dev *cdev,
+ 		qed_get_protocol_stats_iscsi(cdev, &stats->iscsi_stats);
+ 		break;
+ 	default:
+-		DP_ERR(cdev, "Invalid protocol type = %d\n", type);
++		DP_VERBOSE(cdev, QED_MSG_SP,
++			   "Invalid protocol type = %d\n", type);
+ 		return;
+ 	}
+ }
+-- 
+1.8.3.1
+
