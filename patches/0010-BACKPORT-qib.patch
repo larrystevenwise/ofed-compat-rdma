@@ -176,16 +176,44 @@ diff -durp a/drivers/infiniband/hw/qib/qib_init.c b/drivers/infiniband/hw/qib/qi
 diff -durp a/drivers/infiniband/hw/qib/qib_user_pages.c b/drivers/infiniband/hw/qib/qib_user_pages.c
 --- a/drivers/infiniband/hw/qib/qib_user_pages.c
 +++ b/drivers/infiniband/hw/qib/qib_user_pages.c
-@@ -66,7 +66,8 @@ static int __qib_get_user_pages(unsigned
+@@ -58,6 +58,12 @@ static int __qib_get_user_pages(unsigned
+ 	size_t got;
+ 	int ret;
+ 
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++        int gup_flags;
++
++        gup_flags = FOLL_WRITE | FOLL_FORCE;
++#endif
++
+ 	lock_limit = rlimit(RLIMIT_MEMLOCK) >> PAGE_SHIFT;
+ 
+ 	if (num_pages > lock_limit && !capable(CAP_IPC_LOCK)) {
+@@ -66,9 +72,20 @@ static int __qib_get_user_pages(unsigned
  	}
  
  	for (got = 0; got < num_pages; got += ret) {
 -		ret = get_user_pages(start_page + got * PAGE_SIZE,
-+		ret = get_user_pages(current, current->mm,
-+				     start_page + got * PAGE_SIZE,
- 				     num_pages - got, 1, 1,
- 				     p + got, NULL);
+-				     num_pages - got, 1, 1,
+-				     p + got, NULL);
++#ifdef HAVE_GET_USER_PAGES_8_PARAMS
++                ret = get_user_pages(current, current->mm,
++                                     start_page + got * PAGE_SIZE,
++                                     num_pages - got, 1, 1,
++                                     p + got, NULL);
++#else
++        	ret = get_user_pages(start_page + got * PAGE_SIZE,
++                                     num_pages - got,
++#ifdef HAVE_GET_USER_PAGES_GUP_FLAGS
++                                     gup_flags, p + got, NULL);
++#else
++                                     1, 1, p + got, NULL);
++#endif
++#endif
  		if (ret < 0)
+ 			goto bail_release;
+ 	}
+
 diff -durp a/drivers/infiniband/hw/qib/qib_pcie.c b/drivers/infiniband/hw/qib/qib_pcie.c
 --- a/drivers/infiniband/hw/qib/qib_pcie.c
 +++ b/drivers/infiniband/hw/qib/qib_pcie.c
