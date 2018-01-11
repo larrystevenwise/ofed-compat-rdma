@@ -1664,7 +1664,7 @@ index xxxxxxx..xxxxxxx xxxxxx
  
  	queue_work(priv->mdev->workqueue, &priv->vxlan_del_task);
  }
-+#elif HAVE_VXLAN_DYNAMIC_PORT
++#elif defined(HAVE_VXLAN_DYNAMIC_PORT)
 +static void mlx4_en_add_vxlan_port(struct  net_device *dev,
 +				   sa_family_t sa_family, __be16 port)
 +{
@@ -1774,7 +1774,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE_NDO_UDP_TUNNEL_ADD
  	.ndo_udp_tunnel_add	= mlx4_en_add_vxlan_port,
  	.ndo_udp_tunnel_del	= mlx4_en_del_vxlan_port,
-+#elif HAVE_VXLAN_DYNAMIC_PORT
++#elif defined(HAVE_VXLAN_DYNAMIC_PORT)
 +	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
 +	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
 +#endif
@@ -1833,7 +1833,7 @@ index xxxxxxx..xxxxxxx xxxxxx
 +#ifdef HAVE_NDO_UDP_TUNNEL_ADD
  	.ndo_udp_tunnel_add	= mlx4_en_add_vxlan_port,
  	.ndo_udp_tunnel_del	= mlx4_en_del_vxlan_port,
-+#elif HAVE_VXLAN_DYNAMIC_PORT
++#elif defined(HAVE_VXLAN_DYNAMIC_PORT)
 +	.ndo_add_vxlan_port	= mlx4_en_add_vxlan_port,
 +	.ndo_del_vxlan_port	= mlx4_en_del_vxlan_port,
 +#endif
