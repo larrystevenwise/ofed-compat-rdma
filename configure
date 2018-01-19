@@ -1011,12 +1011,6 @@ if [ "X${CONFIG_INFINIBAND_ADDR_TRANS}" == "Xy" ]; then
     fi
 fi
 
-	if [[ ! -e .vmw_pvrdma_applied && "X$CONFIG_INFINIBAND_VMWARE_PVRDMA" == "Xm" ]]; then
-		echo ".vmw_pvrdma_applied does not exist. running ofed-patch.sh for vmw_pvrdma"
-		ex ${CWD}/ofed_scripts/ofed_patch.sh --without-git --without-quilt --with-patchdir=tech-preview/vmw_pvrdma
-		touch .vmw_pvrdma_applied
-	fi
-
         # Create configure.mk
         /bin/rm -f ${CWD}/${CONFIG}
         cat >> ${CWD}/${CONFIG} << EOFCONFIG
