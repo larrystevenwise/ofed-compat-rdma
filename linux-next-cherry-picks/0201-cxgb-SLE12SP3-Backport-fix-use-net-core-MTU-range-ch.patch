@@ -1,0 +1,67 @@
+From 9ed296f13d7e354cbb9c321012cac2915e7e2c6a Mon Sep 17 00:00:00 2001
+From: Steve Wise <swise@opengridcomputing.com>
+Date: Fri, 19 Jan 2018 12:14:22 -0800
+Subject: [PATCH] cxgb: SLE12SP3 Backport fix: use net core MTU range checking
+
+Signed-off-by: Steve Wise <swise@opengridcomputing.com>
+---
+ drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c | 6 ++++++
+ drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c | 7 +++++++
+ 2 files changed, 13 insertions(+)
+
+diff --git a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+index 5f9170a..fae073d 100644
+--- a/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb3/cxgb3_main.c
+@@ -2534,8 +2534,10 @@ static int cxgb_change_mtu(struct net_device *dev, int new_mtu)
+ 	struct adapter *adapter = pi->adapter;
+ 	int ret;
+ 
++#ifndef HAVE_NET_DEVICE_MAX_MTU
+ 	if (new_mtu < 81)	/* accommodate SACK */
+ 		return -EINVAL;
++#endif
+ 	if ((ret = t3_mac_set_mtu(&pi->mac, new_mtu)))
+ 		return ret;
+ 	dev->mtu = new_mtu;
+@@ -3317,6 +3319,10 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 
+ 		netdev->netdev_ops = &cxgb_netdev_ops;
+ 		netdev->ethtool_ops = &cxgb_ethtool_ops;
++#ifdef HAVE_NET_DEVICE_MAX_MTU
++		netdev->min_mtu = 81;
++		netdev->max_mtu = ETH_MAX_MTU;
++#endif
+ 	}
+ 
+ 	pci_set_drvdata(pdev, adapter);
+diff --git a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+index 2591c79..56db5dd 100644
+--- a/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
++++ b/drivers/net/ethernet/chelsio/cxgb4/cxgb4_main.c
+@@ -3087,8 +3087,10 @@ static int cxgb_change_mtu(struct net_device *dev, int new_mtu)
+ 	int ret;
+ 	struct port_info *pi = netdev_priv(dev);
+ 
++#ifndef HAVE_NET_DEVICE_MAX_MTU
+ 	if (new_mtu < 81 || new_mtu > MAX_MTU)         /* accommodate SACK */
+ 		return -EINVAL;
++#endif
+ 	ret = t4_set_rxmode(pi->adapter, pi->adapter->pf, pi->viid, new_mtu, -1,
+ 			    -1, -1, -1, true);
+ 	if (!ret)
+@@ -5165,6 +5167,11 @@ static int init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		netdev->vlan_features = netdev->features & VLAN_FEAT;
+ 
+ 		netdev->priv_flags |= IFF_UNICAST_FLT;
++#ifdef HAVE_NET_DEVICE_MAX_MTU
++		/* MTU range: 81 - 9600 */
++		netdev->min_mtu = 81;
++		netdev->max_mtu = MAX_MTU;
++#endif
+ 
+ 		netdev->netdev_ops = &cxgb4_netdev_ops;
+ #ifdef CONFIG_CHELSIO_T4_DCB
+-- 
+2.9.5
+
