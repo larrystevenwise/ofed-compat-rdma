@@ -1,0 +1,81 @@
+From 7db439adf57eb6b87535dc4d6ccbe03a7462d00f Mon Sep 17 00:00:00 2001
+From: Michal Kalderon <michal.kalderon@cavium.com>
+Date: Sun, 4 Feb 2018 17:07:29 +0200
+Subject: [PATCH] qede: SLE12SP3 Backport fix: use core min/max MTU checking  
+ based on commit - caff2a87f60ab15ce872e65d577d7577c9121026   ethernet/qlogic:
+ use core min/max MTU checking
+
+     qede: min_mtu 46, max_mtu 9600
+     - Put define for max in qede.h
+
+Signed-off-by: Michal Kalderon <michal.kalderon@cavium.com>
+---
+ drivers/net/ethernet/qlogic/qede/qede.h         | 5 +++--
+ drivers/net/ethernet/qlogic/qede/qede_ethtool.c | 8 ++++++--
+ drivers/net/ethernet/qlogic/qede/qede_main.c    | 5 +++++
+ 3 files changed, 14 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/net/ethernet/qlogic/qede/qede.h b/drivers/net/ethernet/qlogic/qede/qede.h
+index 9407786..7e18ae6 100644
+--- a/drivers/net/ethernet/qlogic/qede/qede.h
++++ b/drivers/net/ethernet/qlogic/qede/qede.h
+@@ -529,8 +529,9 @@ void qede_update_rx_prod(struct qede_dev *edev, struct qede_rx_queue *rxq);
+ #define NUM_TX_BDS_MIN		128
+ #define NUM_TX_BDS_DEF		NUM_TX_BDS_MAX
+ 
+-#define QEDE_MIN_PKT_LEN	64
+-#define QEDE_RX_HDR_SIZE	256
++#define QEDE_MIN_PKT_LEN		64
++#define QEDE_RX_HDR_SIZE		256
++#define QEDE_MAX_JUMBO_PACKET_SIZE	9600
+ #define	for_each_queue(i) for (i = 0; i < edev->num_queues; i++)
+ 
+ #endif /* _QEDE_H_ */
+diff --git a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+index 3abbf91..d77f0cf 100644
+--- a/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
++++ b/drivers/net/ethernet/qlogic/qede/qede_ethtool.c
+@@ -795,18 +795,22 @@ static void qede_update_mtu(struct qede_dev *edev,
+ }
+ 
+ /* Netdevice NDOs */
+-#define ETH_MAX_JUMBO_PACKET_SIZE	9600
+-#define ETH_MIN_PACKET_SIZE		60
++#ifndef HAVE_NET_DEVICE_MAX_MTU
++#define ETH_MAX_JUMBO_PACKET_SIZE      9600
++#define ETH_MIN_PACKET_SIZE            60
++#endif
+ int qede_change_mtu(struct net_device *ndev, int new_mtu)
+ {
+ 	struct qede_dev *edev = netdev_priv(ndev);
+ 	struct qede_reload_args args;
+ 
++#ifndef HAVE_NET_DEVICE_MAX_MTU
+ 	if ((new_mtu > ETH_MAX_JUMBO_PACKET_SIZE) ||
+ 	    ((new_mtu + ETH_HLEN) < ETH_MIN_PACKET_SIZE)) {
+ 		DP_ERR(edev, "Can't support requested MTU size\n");
+ 		return -EINVAL;
+ 	}
++#endif
+ 
+ 	DP_VERBOSE(edev, (NETIF_MSG_IFUP | NETIF_MSG_IFDOWN),
+ 		   "Configuring MTU size of %d\n", new_mtu);
+diff --git a/drivers/net/ethernet/qlogic/qede/qede_main.c b/drivers/net/ethernet/qlogic/qede/qede_main.c
+index 56dfb51..e86c21d 100644
+--- a/drivers/net/ethernet/qlogic/qede/qede_main.c
++++ b/drivers/net/ethernet/qlogic/qede/qede_main.c
+@@ -651,6 +651,11 @@ static void qede_init_ndev(struct qede_dev *edev)
+ 
+ 	ndev->hw_features = hw_features;
+ 
++#ifdef HAVE_NET_DEVICE_MAX_MTU
++	/* MTU range: 46 - 9600 */
++	ndev->min_mtu = ETH_ZLEN - ETH_HLEN;
++	ndev->max_mtu = QEDE_MAX_JUMBO_PACKET_SIZE;
++#endif
+ 	/* Set network device HW mac */
+ 	ether_addr_copy(edev->ndev->dev_addr, edev->dev_info.common.hw_mac);
+ 
+-- 
+1.8.3.1
+
