@@ -1,0 +1,33 @@
+From a7fe27d1607a0ac062c1f76a8d9a29e7c2231c77 Mon Sep 17 00:00:00 2001
+From: Selvin Xavier <selvin.xavier@broadcom.com>
+Date: Wed, 7 Feb 2018 00:01:29 -0800
+Subject: [PATCH] bnxt_en: Setting the MTU ranges
+
+MTU range was not getting set. It is required for some of the
+latest distros.
+
+Signed-off-by: Selvin Xavier <selvin.xavier@broadcom.com>
+---
+ drivers/net/ethernet/broadcom/bnxt/bnxt.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
+
+diff --git a/drivers/net/ethernet/broadcom/bnxt/bnxt.c b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+index f7d2d90..7a2aa02 100644
+--- a/drivers/net/ethernet/broadcom/bnxt/bnxt.c
++++ b/drivers/net/ethernet/broadcom/bnxt/bnxt.c
+@@ -7320,8 +7320,10 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 	dev->priv_flags |= IFF_UNICAST_FLT;
+ 
+ 	/* MTU range: 60 - 9500 */
+-	//dev->min_mtu = ETH_ZLEN;
+-	//dev->max_mtu = 9500;
++#ifdef HAVE_NET_DEVICE_MAX_MTU
++	dev->min_mtu = ETH_ZLEN;
++	dev->max_mtu = 9500;
++#endif
+ 
+ #ifdef CONFIG_BNXT_SRIOV
+ 	init_waitqueue_head(&bp->sriov_cfg_wait);
+-- 
+2.5.5
+
